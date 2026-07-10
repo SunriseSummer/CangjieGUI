@@ -11,14 +11,24 @@ layers behind a single umbrella package:
   the trailing-lambda builder, the widget catalog, and `DesktopApp`.
 - **`cui`** — an umbrella that re-exports both, so applications just `import cui.*`.
 
-<img width="1197" height="954" alt="日历" src="https://github.com/user-attachments/assets/0fb6c314-467f-4b8d-b7aa-63f510c3131b" />
-
-<img width="1292" height="934" alt="画板" src="https://github.com/user-attachments/assets/64292a58-7fcc-4e60-b827-1daa3269db26" />
-
-<img width="1350" height="965" alt="任务管理器" src="https://github.com/user-attachments/assets/f4dcdab4-2a34-4882-96d3-e20728d99409" />
-
-<img width="1231" height="905" alt="记事本" src="https://github.com/user-attachments/assets/8afb89c4-2618-4b6c-88a8-dfaa13356f2b" />
-
+<table>
+<tr>
+<td>
+<img src="https://github.com/user-attachments/assets/0fb6c314-467f-4b8d-b7aa-63f510c3131b" />
+</td>
+<td>
+<img src="https://github.com/user-attachments/assets/64292a58-7fcc-4e60-b827-1daa3269db26" />
+</td>
+</tr>
+<tr>
+<td>
+<img src="https://github.com/user-attachments/assets/f4dcdab4-2a34-4882-96d3-e20728d99409" />
+</td>
+<td>
+<img src="https://github.com/user-attachments/assets/8afb89c4-2618-4b6c-88a8-dfaa13356f2b" />
+</td>
+</tr>
+</table>
 
 ## Declarative UI
 
