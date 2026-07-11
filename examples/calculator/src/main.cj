@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2026. CangjieGUI contributors. All rights reserved.
+ */
+/*
  * CUI example: a desktop calculator.
  *
  * What it demonstrates:
@@ -17,6 +20,7 @@ import cui.ButtonRole
 import cui.Color
 import cui.DesktopApp
 import cui.Flexible
+import cui.FontSizes
 import cui.HStack
 import cui.Icon
 import cui.IconName
@@ -43,7 +47,7 @@ class CalcModel {
 
 main(): Int64 {
     let model = CalcModel()
-    let app = DesktopApp(WindowSpec("CUI Calculator", 420, 560, resizable: false, scale: 1.5), theme: calculatorTheme())
+    let app = DesktopApp(WindowSpec("CUI 计算器", 480, 600, resizable: false, scale: 1.5), theme: calculatorTheme())
     app.run {
         calculatorView(model)
     }
@@ -56,9 +60,9 @@ func calculatorView(model: CalcModel): Unit {
     VStack(spacing: 10.0, padding: Insets(16.0)) {
         HStack(flexible: false) {
             Icon(IconName.Calculator, color: Some(Color.rgb(106, 168, 255)))
-            Label("Calculator")
+            Label("计算器", fontSize: FontSizes.TITLE)
             Spacer()
-            SegmentedControl(["Std", "Sci"], model.mode)
+            SegmentedControl(["标准", "科学"], model.mode)
         }
         displayPanel(model)
         if (model.mode.value == 1) {
@@ -79,8 +83,9 @@ func calculatorView(model: CalcModel): Unit {
 func displayPanel(model: CalcModel): Unit {
     Panel(padding: Insets(16.0, 18.0, 16.0, 18.0), style: Some(displaySurface()), flexible: false) {
         VStack(spacing: 6.0, flexible: false) {
-            Label(pendingText(model), muted: true, align: TextAlign.Trailing)
-            Label(model.display, align: TextAlign.Trailing, color: Some(Color.rgb(248, 250, 252)))
+            Label(pendingText(model), muted: true, align: TextAlign.Trailing, fontSize: FontSizes.CAPTION)
+            Label(model.display, align: TextAlign.Trailing, color: Some(Color.rgb(248, 250, 252)),
+                fontSize: FontSizes.DISPLAY)
         }
     }
 }
@@ -107,7 +112,7 @@ func keypadRow(model: CalcModel, keys: Array<String>): Unit {
 // passes weight 2.0 and spans exactly two columns of the rows above it.
 func calcKey(model: CalcModel, label: String, weight!: Float32 = 1.0): Unit {
     Flexible(weight: weight) {
-        Button(label, {=> press(model, label)}, role: keyRole(label), style: keyStyle(label))
+        Button(label, {=> press(model, label)}, role: keyRole(label), style: keyStyle(label), fontSize: FontSizes.TITLE)
     }
 }
 

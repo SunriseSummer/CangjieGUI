@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2026. CangjieGUI contributors. All rights reserved.
+ */
+/*
  * CUI example: a plain-text editor.
  *
  * What it demonstrates:
@@ -21,6 +24,7 @@ import cui.DesktopApp
 import cui.Divider
 import cui.EventHandler
 import cui.FileDialogRequest
+import cui.FontSizes
 import cui.FrameHandler
 import cui.HStack
 import cui.IconButton
@@ -42,11 +46,11 @@ import cui.VStack
 import cui.WindowSpec
 
 class NotepadModel {
-    let body = State<String>("Welcome to CUI Notepad.\nType here, then save or Save As.")
+    let body = State<String>("欢迎使用 CUI 记事本。\n中文与 English 均使用系统 UI 字体清晰显示。")
     let bodyCursor = State<Int64>(body.value.size)
     let bodyScroll = State<Float32>(0.0)
     let currentPath = State<String>("")
-    let status = State<String>("Ready")
+    let status = State<String>("就绪")
     let readOnly = State<Bool>(false)
     let openDialog = State<?FileDialogRequest>(None<FileDialogRequest>)
     let saveDialog = State<?FileDialogRequest>(None<FileDialogRequest>)
@@ -54,7 +58,7 @@ class NotepadModel {
 
 main(): Int64 {
     let model = NotepadModel()
-    let app = DesktopApp(WindowSpec("CUI Notepad", 820, 560, scale: 1.5), metadata: Some(notepadMetadata()),
+    let app = DesktopApp(WindowSpec("CUI 记事本", 900, 580, scale: 1.5), metadata: Some(notepadMetadata()),
         hints: notepadHints(), theme: notepadTheme())
     let documentPath = ApplicationPaths.preferencePath("CUI", "Notepad") + "notepad.txt"
     app.run {
@@ -124,28 +128,28 @@ func notepadView(model: NotepadModel, app: DesktopApp, documentPath: String): Un
 func toolbar(model: NotepadModel, app: DesktopApp, documentPath: String): Unit {
     Panel(padding: Insets(10.0), style: Some(toolbarSurface()), flexible: false) {
         HStack {
-            IconButton(IconName.NewDocument, label: Some("New")) {
+            IconButton(IconName.NewDocument, label: Some("新建")) {
                 => newFile(model)
             }
-            IconButton(IconName.OpenFolder, label: Some("Open")) {
+            IconButton(IconName.OpenFolder, label: Some("打开")) {
                 => openFile(model, app)
             }
             Divider(axis: Axis.Vertical)
-            IconButton(IconName.Save, label: Some("Save"), role: ButtonRole.Primary) {
+            IconButton(IconName.Save, label: Some("保存"), role: ButtonRole.Primary) {
                 => saveCurrentFile(model, documentPath)
             }
-            IconButton(IconName.SaveAs, label: Some("Save As")) {
+            IconButton(IconName.SaveAs, label: Some("另存为")) {
                 => saveFileAs(model, app, documentPath)
             }
             Divider(axis: Axis.Vertical)
-            IconButton(IconName.Copy, label: Some("Copy")) {
+            IconButton(IconName.Copy, label: Some("复制")) {
                 => copyAll(model.body, model.status)
             }
-            IconButton(IconName.Paste, label: Some("Paste")) {
+            IconButton(IconName.Paste, label: Some("粘贴")) {
                 => pasteClipboard(model.body, model.bodyCursor, model.status)
             }
             Spacer()
-            Checkbox("Read only", model.readOnly)
+            Checkbox("只读", model.readOnly)
         }
     }
 }
@@ -154,10 +158,10 @@ func toolbar(model: NotepadModel, app: DesktopApp, documentPath: String): Unit {
 // stored, so it can never drift out of sync with the document.
 func statusBar(model: NotepadModel): Unit {
     HStack(flexible: false) {
-        Label(model.status.value, muted: true)
+        Label(model.status.value, muted: true, fontSize: FontSizes.CAPTION)
         Spacer()
-        Label(documentName(model), muted: true)
-        Label(documentStats(model.body.value), muted: true)
+        Label(documentName(model), muted: true, fontSize: FontSizes.CAPTION)
+        Label(documentStats(model.body.value), muted: true, fontSize: FontSizes.CAPTION)
     }
 }
 
@@ -165,12 +169,12 @@ func documentName(model: NotepadModel): String {
     if (model.currentPath.value.size > 0) {
         model.currentPath.value
     } else {
-        "unsaved buffer"
+        "未保存文档"
     }
 }
 
 func documentStats(text: String): String {
-    "| ${text.split("\n").size} lines | ${text.size} bytes | UTF-8"
+    "| ${text.split("\n").size} 行 | ${text.size} 字节 | UTF-8"
 }
 
 func toolbarSurface(): SurfaceStyle {

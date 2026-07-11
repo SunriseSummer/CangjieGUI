@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2026. CangjieGUI contributors. All rights reserved.
+ */
+/*
  * CUI example: a small Windows process monitor.
  *
  * What it demonstrates:
@@ -19,6 +22,7 @@ import cui.Color
 import cui.DesktopApp
 import cui.DisplayInfo
 import cui.DisplayMode
+import cui.FontSizes
 import cui.FrameHandler
 import cui.FrameInfo
 import cui.HStack
@@ -49,9 +53,9 @@ struct Refresh {
 }
 
 class ProcessModel {
-    let output = State<String>("Loading process snapshot...")
+    let output = State<String>("正在载入进程快照……")
     let outputScroll = State<Float32>(0.0)
-    let status = State<String>("Starting")
+    let status = State<String>("正在启动")
     let lastRefresh = State<UInt64>(0)
     let tab = State<Int64>(0)
 }
@@ -110,7 +114,7 @@ main(): Int64 {
     let model = ProcessModel()
     let worker = RefreshWorker()
     worker.request()
-    let app = DesktopApp(WindowSpec("CUI Process Manager", 900, 600, scale: 1.5), metadata: Some(processMetadata()),
+    let app = DesktopApp(WindowSpec("CUI 进程管理器", 940, 620, scale: 1.5), metadata: Some(processMetadata()),
         hints: processHints(), theme: processTheme())
     let system = systemLine()
     let display = displayLine(allDisplayInfos())
@@ -129,7 +133,7 @@ func tick(frame: FrameInfo, model: ProcessModel, worker: RefreshWorker): Unit {
     match (worker.collect()) {
         case Some(snapshot) =>
             model.output.value = snapshot
-            model.status.value = "Updated at ${frame.elapsedMs / 1000} s"
+            model.status.value = "已于 ${frame.elapsedMs / 1000} 秒更新"
         case None => ()
     }
     let last = model.lastRefresh.value
@@ -144,15 +148,15 @@ func processView(model: ProcessModel, worker: RefreshWorker, facts: Array<String
     VStack(padding: Insets(14.0)) {
         Panel(padding: Insets(10.0), flexible: false) {
             HStack {
-                IconButton(IconName.Refresh, label: Some("Refresh"), role: ButtonRole.Primary) {
+                IconButton(IconName.Refresh, label: Some("刷新"), role: ButtonRole.Primary) {
                     => worker.request()
                 }
                 Label(statusText(model, worker), muted: true)
                 Spacer()
-                Label("auto-refresh every ${Refresh.INTERVAL_MS / 1000} s", muted: true)
+                Label("每 ${Refresh.INTERVAL_MS / 1000} 秒自动刷新", muted: true, fontSize: FontSizes.CAPTION)
             }
         }
-        TabView(["Processes", "Summary"], model.tab) {
+        TabView(["进程", "概览"], model.tab) {
             TextArea("process.output", model.output, scroll: Some(model.outputScroll), editable: false)
             summaryPage(model, facts)
         }
@@ -161,14 +165,14 @@ func processView(model: ProcessModel, worker: RefreshWorker, facts: Array<String
 
 func statusText(model: ProcessModel, worker: RefreshWorker): String {
     if (worker.isBusy()) {
-        "Refreshing..."
+        "正在刷新……"
     } else {
         model.status.value
     }
 }
 
 func summaryPage(model: ProcessModel, facts: Array<String>): Unit {
-    let titles = ["System", "Display", "Power"]
+    let titles = ["系统", "显示器", "电源"]
     VStack(spacing: 10.0, padding: Insets(6.0)) {
         for (i in 0..facts.size) {
             factCard(titles[i], facts[i])
@@ -181,8 +185,8 @@ func summaryPage(model: ProcessModel, facts: Array<String>): Unit {
 func factCard(title: String, value: String): Unit {
     Panel(padding: Insets(12.0), flexible: false) {
         VStack(spacing: 6.0, flexible: false) {
-            Label(title, muted: true)
-            Label(value)
+            Label(title, muted: true, fontSize: FontSizes.CAPTION)
+            Label(value, fontSize: FontSizes.TITLE)
         }
     }
 }
@@ -190,27 +194,27 @@ func factCard(title: String, value: String): Unit {
 func snapshotCard(model: ProcessModel): Unit {
     Panel(padding: Insets(12.0), flexible: false) {
         VStack(spacing: 8.0, flexible: false) {
-            Label("Snapshot size", muted: true)
+            Label("进程快照大小", muted: true, fontSize: FontSizes.CAPTION)
             ProgressBar(State<Float32>(snapshotAmount(model.output.value)))
-            Label("${model.output.value.size} bytes from tasklist", muted: true)
+            Label("tasklist 返回 ${model.output.value.size} 字节", muted: true, fontSize: FontSizes.CAPTION)
         }
     }
 }
 
 func systemLine(): String {
     let cpu = cpuInfo()
-    "${platformName()} | ${cpu.logicalCores} logical cores | ${cpu.systemRamMb} MiB RAM"
+    "${platformName()} | ${cpu.logicalCores} 个逻辑核心 | ${cpu.systemRamMb} MiB 内存"
 }
 
 func displayLine(displays: Array<DisplayInfo>): String {
     let display = displays[0]
-    "${displays.size} display(s) | ${display.name} ${modeLabel(display.modes.current)} | scale ${display.geometry.contentScale}"
+    "${displays.size} 台显示器 | ${display.name} ${modeLabel(display.modes.current)} | 缩放 ${display.geometry.contentScale}"
 }
 
 func modeLabel(mode: ?DisplayMode): String {
     match (mode) {
         case Some(value) => "${value.width}x${value.height} @ ${Int64(value.refreshRate)} Hz"
-        case None => "mode unknown"
+        case None => "显示模式未知"
     }
 }
 
@@ -220,19 +224,19 @@ func powerSummary(info: PowerInfo): String {
 
 func powerStateLabel(state: PowerState): String {
     match (state) {
-        case PowerState.Error => "unavailable"
-        case PowerState.Unknown => "unknown"
-        case PowerState.OnBattery => "on battery"
-        case PowerState.NoBattery => "plugged in"
-        case PowerState.Charging => "charging"
-        case PowerState.Charged => "charged"
+        case PowerState.Error => "不可用"
+        case PowerState.Unknown => "未知"
+        case PowerState.OnBattery => "使用电池"
+        case PowerState.NoBattery => "已接通电源"
+        case PowerState.Charging => "充电中"
+        case PowerState.Charged => "已充满"
     }
 }
 
 func percentLabel(percent: ?Int32): String {
     match (percent) {
         case Some(value) => "${value}%"
-        case None => "percent unknown"
+        case None => "电量未知"
     }
 }
 
@@ -253,7 +257,7 @@ func clampUnit(value: Float32): Float32 {
 func loadProcesses(): String {
     match (executeWithOutput("cmd", ["/D", "/C", "chcp 65001 >NUL & tasklist"])) {
         case (0, stdoutBytes, _) => bytesToText(stdoutBytes)
-        case (_, _, stderrBytes) => "tasklist failed:\n${bytesToText(stderrBytes)}"
+        case (_, _, stderrBytes) => "tasklist 执行失败：\n${bytesToText(stderrBytes)}"
     }
 }
 

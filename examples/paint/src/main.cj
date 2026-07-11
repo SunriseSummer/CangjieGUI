@@ -1,3 +1,6 @@
+/*
+ * Copyright (c) 2026. CangjieGUI contributors. All rights reserved.
+ */
 package cui_paint
 
 import std.collection.ArrayList
@@ -6,6 +9,7 @@ import cui.CanvasWidget
 import cui.Color
 import cui.Cursor
 import cui.DesktopApp
+import cui.FontSizes
 import cui.HStack
 import cui.Icon
 import cui.IconButton
@@ -117,7 +121,7 @@ class ColorSwatch <: Widget {
 
 main(): Int64 {
     let model = PaintModel()
-    let app = DesktopApp(WindowSpec("CUI Paint", 860, 580, scale: 1.5), theme: paintTheme())
+    let app = DesktopApp(WindowSpec("CUI 画板", 900, 600, scale: 1.5), theme: paintTheme())
     let crosshair = Cursor.system(SystemCursor.Crosshair)
     app.manage(crosshair)
     crosshair.setActive()
@@ -151,26 +155,30 @@ func paintView(model: PaintModel): Unit {
     VStack(padding: Insets(14.0)) {
         Panel(padding: Insets(10.0), flexible: false) {
             HStack {
-                IconButton(IconName.Trash, label: Some("Clear"), role: ButtonRole.Danger) {
+                IconButton(IconName.Trash, label: Some("清空"), role: ButtonRole.Danger) {
                     => model.strokes.clear()
                 }
                 Icon(IconName.Brush, color: Some(model.color.value))
                 Slider("paint.brush", model.brushSize, lower: 1.0, upper: 18.0)
-                Label("${Int64(model.brushSize.value)} px", muted: true)
-                Label("${model.strokes.size} strokes", muted: true)
+                Label("画笔 ${Int64(model.brushSize.value)} px", muted: true, fontSize: FontSizes.CAPTION)
+                Label("${model.strokes.size} 条笔迹", muted: true, fontSize: FontSizes.CAPTION)
                 Spacer()
                 for (swatch in PALETTE) {
                     ColorSwatch(swatch, model.color)
                 }
             }
         }
-        CanvasWidget({r, frame => drawCanvas(r, frame, model)}, onEvent: {event, frame => paintEvent(event, frame, model)})
+        CanvasWidget(
+            {r, frame => drawCanvas(r, frame, model)},
+            onEvent: {event, frame => paintEvent(event, frame, model)}
+        )
     }
 }
 
 func drawCanvas(r: Renderer, frame: Rect, model: PaintModel): Unit {
     if (model.strokes.isEmpty()) {
-        r.text("Drag inside this area to draw", frame.x + 12.0, frame.y + 12.0, Color.rgb(150, 165, 152))
+        r.text("在画布内拖动鼠标开始绘画", frame.x + 12.0, frame.y + 12.0, Color.rgb(120, 142, 124),
+            pointSize: FontSizes.BODY)
     }
     for (stroke in model.strokes) {
         r.strokeLine(stroke.x1, stroke.y1, stroke.x2, stroke.y2, Pen(width: stroke.size, color: stroke.color))

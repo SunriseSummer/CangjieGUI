@@ -1,4 +1,7 @@
 /*
+ * Copyright (c) 2026. CangjieGUI contributors. All rights reserved.
+ */
+/*
  * CUI example: a month calendar.
  *
  * What it demonstrates:
@@ -18,6 +21,7 @@ import cui.Color
 import cui.DateTimeParts
 import cui.DesktopApp
 import cui.Flexible
+import cui.FontSizes
 import cui.HStack
 import cui.IconButton
 import cui.IconName
@@ -41,8 +45,7 @@ import cui.emit
 
 let CALENDAR_BADGE = "cui-calendar-badge.bmp"
 let CALENDAR_ACCENT = Color.rgb(126, 87, 194)
-let MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
-    "November", "December"]
+let MONTH_NAMES = ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"]
 
 class CalendarModel {
     let today: DateTimeParts
@@ -63,7 +66,7 @@ main(): Int64 {
     writeCalendarBadge()
     let model = CalendarModel(Time.currentDateTime())
     let badge = ImageView(CALENDAR_BADGE, preferredWidth: Some(40.0), preferredHeight: 30.0)
-    let app = DesktopApp(WindowSpec("CUI Calendar", 760, 520, scale: 1.5), theme: calendarTheme())
+    let app = DesktopApp(WindowSpec("CUI 日历", 780, 560, scale: 1.5), theme: calendarTheme())
     app.manage(badge)
     app.run {
         calendarView(model, badge)
@@ -77,7 +80,7 @@ func calendarView(model: CalendarModel, badge: Widget): Unit {
     VStack(spacing: 12.0, padding: Insets(16.0)) {
         HStack(spacing: 10.0, flexible: false) {
             emit(badge)
-            Label(monthTitle(model))
+            Label(monthTitle(model), fontSize: FontSizes.TITLE)
             Spacer()
             IconButton(IconName.ChevronLeft) {
                 => shiftMonth(model, -1)
@@ -87,7 +90,7 @@ func calendarView(model: CalendarModel, badge: Widget): Unit {
             }
         }
         Panel(padding: Insets(14.0)) {
-            TabView(["Month", "Agenda"], model.tab) {
+            TabView(["月历", "日程"], model.tab) {
                 monthPage(model)
                 agendaPage(model)
             }
@@ -105,11 +108,11 @@ func monthPage(model: CalendarModel): Unit {
 }
 
 func weekdayHeader(): Unit {
-    let names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    let names = ["日", "一", "二", "三", "四", "五", "六"]
     HStack(spacing: 8.0, flexible: false) {
         for (name in names) {
             Flexible {
-                Label(name, muted: true, align: TextAlign.Center)
+                Label(name, muted: true, align: TextAlign.Center, fontSize: FontSizes.CAPTION)
             }
         }
     }
@@ -138,9 +141,9 @@ func dayCell(model: CalendarModel, day: Int64): Unit {
 func agendaPage(model: CalendarModel): Unit {
     VStack(spacing: 10.0, padding: Insets(6.0)) {
         Label(selectedDateLine(model), muted: true)
-        agendaItem("09:30", "Planning review")
-        agendaItem("14:00", "Design walkthrough")
-        agendaItem("17:30", "Personal notes")
+        agendaItem("09:30", "项目规划评审")
+        agendaItem("14:00", "设计方案走查")
+        agendaItem("17:30", "整理个人笔记")
         Spacer()
     }
 }
@@ -148,7 +151,7 @@ func agendaPage(model: CalendarModel): Unit {
 func agendaItem(time: String, title: String): Unit {
     Panel(padding: Insets(12.0), style: Some(agendaCardSurface()), flexible: false) {
         HStack(spacing: 14.0) {
-            Label(time, color: Some(CALENDAR_ACCENT))
+            Label(time, color: Some(CALENDAR_ACCENT), fontSize: FontSizes.CAPTION)
             Label(title)
             Spacer()
         }
@@ -211,18 +214,18 @@ func agendaCardSurface(): SurfaceStyle {
 // ----------------- month arithmetic ----------------------------
 
 func isToday(model: CalendarModel, day: Int64): Bool {
-    model.year.value == Int64(model.today.year) &&
-        model.month.value == Int64(model.today.month) &&
-        day == Int64(model.today.day)
+    model.year.value == Int64(model.today.year) && model.month.value == Int64(model.today.month) && day == Int64(model
+        .today
+        .day)
 }
 
 func monthTitle(model: CalendarModel): String {
-    "${MONTH_NAMES[model.month.value - 1]} ${model.year.value}"
+    "${model.year.value} 年 ${MONTH_NAMES[model.month.value - 1]}"
 }
 
 func selectedDateLine(model: CalendarModel): String {
     let weekday = Time.dayOfWeek(Int32(model.year.value), Int32(model.month.value), Int32(model.selected.value))
-    "${weekdayName(weekday)}, ${MONTH_NAMES[model.month.value - 1]} ${model.selected.value}, ${model.year.value}"
+    "${model.year.value} 年 ${model.month.value} 月 ${model.selected.value} 日，${weekdayName(weekday)}"
 }
 
 func shiftMonth(model: CalendarModel, delta: Int64): Unit {
@@ -276,13 +279,13 @@ func weekdayIndex(day: Weekday): Int64 {
 
 func weekdayName(day: Weekday): String {
     match (day) {
-        case Weekday.Sunday => "Sunday"
-        case Weekday.Monday => "Monday"
-        case Weekday.Tuesday => "Tuesday"
-        case Weekday.Wednesday => "Wednesday"
-        case Weekday.Thursday => "Thursday"
-        case Weekday.Friday => "Friday"
-        case Weekday.Saturday => "Saturday"
+        case Weekday.Sunday => "星期日"
+        case Weekday.Monday => "星期一"
+        case Weekday.Tuesday => "星期二"
+        case Weekday.Wednesday => "星期三"
+        case Weekday.Thursday => "星期四"
+        case Weekday.Friday => "星期五"
+        case Weekday.Saturday => "星期六"
     }
 }
 

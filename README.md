@@ -1,15 +1,16 @@
 # CUI: Cangjie Declarative UI Framework
 
-CUI is a Cangjie desktop GUI framework built on SDL3. The module is split into two
-layers behind a single umbrella package:
+CUI is a Cangjie desktop GUI framework built on SDL3 and SDL3_ttf. The repository contains
+two sibling modules with a one-way dependency:
 
-- **`cui.sdl`** — the SDL3 wrapper. Raw C FFI (`sdl_*_raw`), geometry/color primitives,
-  the renderer, surfaces, textures, windows, input, and desktop/platform integration
-  (clipboard, cursor, display, filesystem, hints, dialogs, message boxes, time, power,
-  CPU/memory/platform info). Raw pointers never escape this layer.
-- **`cui.gui`** — the declarative GUI framework. The `Widget` tree, flex layout, theming,
-  the trailing-lambda builder, the widget catalog, and `DesktopApp`.
-- **`cui`** — an umbrella that re-exports both, so applications just `import cui.*`.
+- **`sdl`** — a reusable SDL3/SDL3_ttf module for graphics, windows, input, dialogs,
+  displays, filesystem, time, and platform integration. It can be consumed without CUI,
+  which is useful for games and custom renderers.
+- **`cui`** — the declarative GUI module. Its focused child packages are `cui.core`,
+  `cui.controls`, `cui.text`, `cui.media`, and `cui.desktop`; the root `cui` package
+  re-exports the application-facing API.
+
+The dependency direction is strictly `cui -> sdl`; the SDL module never imports GUI code.
 
 <table>
     <tr>
@@ -129,7 +130,7 @@ app.run {
 }
 ```
 
-Examples live in `cui/examples`. Each depends on the local `cui` package and doubles as a
+Examples live in `examples`. Each depends on the local `cui` package and doubles as a
 smoke test and a best-practice teaching case: `calculator`, `notepad`, `paint`, `calendar`,
 and `process_manager`.
 
@@ -152,8 +153,43 @@ so falloff is a smooth ramp with no banding. `Renderer.captureBmp` and the
 `--snapshot <path.bmp>` runtime flag render a settled frame to a BMP for headless visual
 tests and documentation thumbnails.
 
-Text still uses SDL's built-in debug bitmap font; a richer text backend can drop in later
-without touching the anti-aliasing pipeline.
+Text is rendered by SDL3_ttf from the current platform's UI font. Windows prefers
+`Microsoft YaHei UI` (`msyh.ttc`) and falls back to Segoe UI; macOS and Linux use their
+corresponding system UI or Noto/DejaVu candidates. Fonts are cached by point size, measured
+with real glyph metrics, and drawn as UTF-8 text, so Chinese and Latin text share the same
+high-resolution rendering path.
+
+## Project layout and build
+
+```text
+CangjieGUI/
+├── cjpm.toml             # cui module; depends on ./sdl
+├── src/                  # cui, cui.core, controls, text, media, desktop
+├── sdl/
+│   ├── cjpm.toml         # standalone sdl module
+│   └── src/              # sdl plus dialogs/displays/input/system/ffi
+├── examples/
+└── .sdl3/                # SDL3 + SDL3_ttf import libraries and runtime DLLs
+```
+
+On Windows, `.sdl3` contains both cjpm link names (`libSDL3.dll`,
+`libSDL3_ttf.dll`) and runtime names (`SDL3.dll`, `SDL3_ttf.dll`), together with their
+MinGW import libraries. Build and test each module independently:
+
+```powershell
+cd sdl
+cjpm build
+cjpm test
+
+cd ..
+cjpm build
+cjpm test
+```
+
+To use only the low-level module, declare `sdl = { path = ".../sdl" }` in the consumer's
+`[dependencies]`. See [`sdl/README.md`](sdl/README.md) for package-level imports. Native
+executables distributed outside `cjpm run` must ship `SDL3.dll` and `SDL3_ttf.dll` beside
+the executable (or on the process library search path).
 
 ## Widgets and infrastructure
 

@@ -1,0 +1,10 @@
+[package]
+cjc-version = "1.0.5"
+name = "sdl"
+version = "0.1.0"
+output-type = "static"
+description = "Safe SDL3 and SDL3_ttf bindings for Cangjie."
+
+[ffi.c]
+SDL3 = { path = "./.sdl3" }
+SDL3_ttf = { path = "./.sdl3" }
