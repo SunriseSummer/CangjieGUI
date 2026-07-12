@@ -29,6 +29,12 @@ public class Renderer {
     private var ssWidth: Int32 = 0
     private var ssHeight: Int32 = 0
     private var ssEnabled: Bool
+    // The live drawing scale (render coordinates -> target pixels), mirrored from every
+    // SDL_SetRenderScale call. Geometry draws through the GPU scale; TEXT rasterizes at
+    // this scale and draws 1:1 on the pixel grid instead (see `text`), because stretching
+    // small glyph bitmaps through the render scale is what blurs it.
+    private var scaleX: Float32 = 1.0
+    private var scaleY: Float32 = 1.0
     private let geometry = GeometryBatch()
     private let textBackend: ?NativeTextRenderer
     private let clipStack = ArrayList<Rect>()
@@ -84,6 +90,8 @@ public class Renderer {
         let sx = Float32(targetWidth) / max(1.0, logicalWidth)
         let sy = Float32(targetHeight) / max(1.0, logicalHeight)
         ensureSdl(unsafe { SDL_SetRenderScale(ptr, sx, sy) }, "SDL_SetRenderScale")
+        scaleX = sx
+        scaleY = sy
         clear(clearColor)
     }
 
@@ -97,6 +105,8 @@ public class Renderer {
         }
         ensureSdl(unsafe { SDL_SetRenderTarget(ptr, CPointer<Unit>()) }, "SDL_SetRenderTarget")
         let _ = unsafe { SDL_SetRenderScale(ptr, 1.0, 1.0) }
+        scaleX = 1.0
+        scaleY = 1.0
         var outW: Int32 = 0
         var outH: Int32 = 0
         let _ = unsafe { SDL_GetRenderOutputSize(ptr, inout outW, inout outH) }
@@ -110,6 +120,8 @@ public class Renderer {
 
     private func drawDirect(clearColor: Color): Unit {
         let _ = unsafe { SDL_SetRenderScale(ptr, contentScale, contentScale) }
+        scaleX = contentScale
+        scaleY = contentScale
         clear(clearColor)
     }
 
@@ -191,6 +203,8 @@ public class Renderer {
             throw CuiException("Renderer scale must be greater than 0.")
         }
         ensureSdl(unsafe { SDL_SetRenderScale(ptr, scale, scale) }, "SDL_SetRenderScale")
+        scaleX = scale
+        scaleY = scale
     }
 
     public func setVSync(vsync: Int32): Unit {
@@ -372,6 +386,15 @@ public class Renderer {
 
     /**
      * Draws UTF-8 text with the platform UI font through SDL3_ttf.
+     *
+     * Text takes a dedicated path through the render scale: glyphs are rasterized by
+     * FreeType at the EFFECTIVE pixel size (`pointSize` x the live scale) and drawn with
+     * the GPU scale reset to 1:1 at snapped target-pixel positions. Rasterizing at the
+     * logical size and letting the render scale stretch the small bitmaps — as geometry
+     * does — resamples every glyph twice and is what made text visibly softer and fainter
+     * than the vector primitives around it. Under supersampling, positions snap to
+     * multiples of `SUPERSAMPLE` so the resolve lands glyph origins on whole physical
+     * pixels.
      */
     public func text(
         text: String,
@@ -381,7 +404,24 @@ public class Renderer {
         pointSize!: Float32 = FontSizes.BODY
     ): Unit {
         match (textBackend) {
-            case Some(value) => value.draw(text, x, y, pointSize, NativeTextColor(color.r, color.g, color.b, color.a))
+            case Some(value) =>
+                let native = NativeTextColor(color.r, color.g, color.b, color.a)
+                if (scaleX == 1.0 && scaleY == 1.0) {
+                    value.draw(text, snapPixel(x, 1.0), snapPixel(y, 1.0), pointSize, native)
+                    return
+                }
+                let step: Float32 = if (ssEnabled) {
+                    Float32(SUPERSAMPLE)
+                } else {
+                    1.0
+                }
+                let px = snapPixel(x * scaleX, step)
+                let py = snapPixel(y * scaleY, step)
+                let _ = unsafe { SDL_SetRenderScale(ptr, 1.0, 1.0) }
+                applyClipForTextPass()
+                value.draw(text, px, py, pointSize * scaleY, native)
+                let _ = unsafe { SDL_SetRenderScale(ptr, scaleX, scaleY) }
+                applyClip()
             case None => ()
         }
     }
@@ -417,8 +457,25 @@ public class Renderer {
 
     private func textMetrics(text: String, pointSize: Float32): NativeTextMetrics {
         match (textBackend) {
-            case Some(value) => value.measure(text, pointSize)
+            case Some(value) =>
+                if (scaleX == 1.0 && scaleY == 1.0) {
+                    return value.measure(text, pointSize)
+                }
+                // Measure the same scaled rasterization the text pass draws, mapped back to
+                // logical units — carets, selection bands and ellipsis decisions computed
+                // from these metrics then line up with the pixels actually painted.
+                let scaled = value.measure(text, pointSize * scaleY)
+                NativeTextMetrics(scaled.width / scaleX, scaled.height / scaleY)
             case None => NativeTextMetrics(Float32(text.size) * pointSize * 0.55, pointSize * 1.3)
+        }
+    }
+
+    // While the text pass draws with the GPU scale reset to 1:1, the active clip must be
+    // re-expressed in target pixels: SDL clip rectangles live in the current scaled space.
+    private func applyClipForTextPass(): Unit {
+        match (currentClip()) {
+            case Some(rect) => setClip(Rect(rect.x * scaleX, rect.y * scaleY, rect.w * scaleX, rect.h * scaleY))
+            case None => ()
         }
     }
 
@@ -446,6 +503,22 @@ public class Renderer {
 
 private func rectFromSdl(raw: SdlRect): Rect {
     Rect(Float32(raw.x), Float32(raw.y), Float32(raw.w), Float32(raw.h))
+}
+
+/*
+ * Rounds a target-pixel coordinate to the nearest multiple of `step` (1 = whole pixels;
+ * the supersample factor = positions that resolve onto whole physical pixels). Glyphs
+ * drawn between pixels get smeared across two columns by the linear filter, which reads
+ * as blur — snapping is what keeps stems solid.
+ */
+private func snapPixel(value: Float32, step: Float32): Float32 {
+    let units = value / step
+    let snapped = if (units >= 0.0) {
+        Float32(Int64(units + 0.5))
+    } else {
+        -Float32(Int64(-units + 0.5))
+    }
+    snapped * step
 }
 
 private func clamp01(value: Float32): Float32 {
