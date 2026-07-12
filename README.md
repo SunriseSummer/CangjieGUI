@@ -22,10 +22,19 @@ CUI 是一个使用仓颉语言编写的桌面图形界面框架，基于 SDL3 �
             <img src="https://github.com/user-attachments/assets/52ce3489-c32d-4df7-80bc-75b2cb34d42f" />
         </td>
         <td>
-            <img src="https://github.com/user-attachments/assets/fa4ff7e8-bd1b-4aa5-ac02-fbe7f8637ba0" />
+            <img src="https://github.com/user-attachments/assets/0e26d146-675e-498b-beee-68ebcb2418b3" />
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <img src="https://github.com/user-attachments/assets/e9f40aa5-8478-416f-baaa-9f1ce5d7356f" />
+        </td>
+        <td>
+            <img src="https://github.com/user-attachments/assets/f1624385-ae74-4c29-8a89-70bb56a1f63f" />
         </td>
     </tr>
 </table>
+
 
 ## 核心能力
 
