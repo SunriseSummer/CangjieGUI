@@ -7,6 +7,16 @@ public struct WindowSpec {
     public let resizable: Bool
     public let highDpi: Bool
     public let scale: Float32
+    // Whether the renderer waits for the vertical blank on present. On (the default) prevents
+    // tearing and is the right choice for real applications. Off lets the frame loop run
+    // uncapped, which is how a benchmark measures true per-frame work: with vsync on, every
+    // frame period snaps to a refresh multiple (16.7/33.3/50 ms at 60 Hz), so any improvement
+    // smaller than a whole refresh interval is invisible.
+    public let vsync: Bool
+    // Supersample factor per axis (1 = off, 2 = default 4x-samples anti-aliasing). Higher is
+    // smoother but pays for that many times the pixels every frame; lower trades edge smoothness
+    // for fill cost. 2 suits a hardware renderer; a software renderer may want 1.
+    public let supersample: Int32
 
     public init(
         title: String,
@@ -14,7 +24,9 @@ public struct WindowSpec {
         height: Int32,
         resizable!: Bool = true,
         highDpi!: Bool = true,
-        scale!: Float32 = 1.0
+        scale!: Float32 = 1.0,
+        vsync!: Bool = true,
+        supersample!: Int32 = 2
     ) {
         this.title = title
         this.width = width
@@ -22,6 +34,8 @@ public struct WindowSpec {
         this.resizable = resizable
         this.highDpi = highDpi
         this.scale = normalizedScale(scale)
+        this.vsync = vsync
+        this.supersample = supersample
     }
 }
 
@@ -69,7 +83,7 @@ public class SdlWindow <: Resource {
                 destroyCreatedResources(window, createdRenderer)
                 throw CuiException("SDL_CreateWindowAndRenderer failed: ${lastSdlError()}")
             }
-            configureRenderer(window, createdRenderer, spec.scale)
+            configureRenderer(window, createdRenderer, spec.scale, spec.vsync)
             if (!unsafe { SDL_StartTextInput(window) }) {
                 destroyCreatedResources(window, createdRenderer)
                 throw CuiException("SDL_StartTextInput failed: ${lastSdlError()}")
@@ -78,7 +92,7 @@ public class SdlWindow <: Resource {
 
         this.windowPtr = window
         this.rendererPtr = createdRenderer
-        this.renderer = Renderer(createdRenderer, contentScale: spec.scale)
+        this.renderer = Renderer(createdRenderer, contentScale: spec.scale, supersample: spec.supersample)
     }
 
     public func setTitle(title: String): Unit {

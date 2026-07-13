@@ -93,6 +93,7 @@ public import cui.core.ZStack
 public import cui.core.ScrollBar
 public import cui.core.Spring
 public import cui.core.ScrollView
+public import cui.core.LazyColumn
 public import cui.core.derive
 public import cui.core.emit
 public import cui.core.rememberState

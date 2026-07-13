@@ -1,6 +1,7 @@
 package sdl
 
 import std.collection.ArrayList
+import std.collection.HashMap
 import std.math.cos
 import std.math.sin
 import std.math.sqrt
@@ -26,6 +27,16 @@ private let AA_FEATHER: Float32 = 0.7
 // radii keep curve error well under a device pixel once the render scale is applied.
 private let ARC_CHORD: Float64 = 1.1
 
+// Distinct mesh kinds so a filled and a stroked shape of the same size cache separately.
+private let MESH_KIND_FILL: Int64 = 0
+private let MESH_KIND_STROKE: Int64 = 1
+
+// How many distinct shape meshes to retain before the older generation is dropped. A UI reuses a
+// small set of shapes (a few panel/card/chip sizes, each with a fill, a border and two shadow
+// layers), so this is ample; a churning shape (an animated size) simply misses and re-tessellates
+// as before, bounded by the two-generation eviction.
+private let MESH_CACHE_CAP: Int64 = 256
+
 internal class GeometryBatch {
     private var target = CPointer<Unit>()
     private var verts = CPointer<SdlVertex>()
@@ -42,6 +53,11 @@ internal class GeometryBatch {
     private let pathY = ArrayList<Float32>()
     private let normX = ArrayList<Float32>()
     private let normY = ArrayList<Float32>()
+    // Tessellated shape meshes in local coordinates (origin at 0,0), keyed by shape and size. A
+    // scrolling panel keeps the same shape and only changes position, so its mesh is built once and
+    // thereafter merely translated and coloured — turning per-frame arc/normal tessellation (the CPU
+    // cost that dominates a content page) into a cheap vertex copy.
+    private let meshCache = MeshCache(MESH_CACHE_CAP) {mesh => mesh.free()}
 
     func fillRoundedRect(renderer: CPointer<Unit>, rect: Rect, radius: Float32, color: Color): Unit {
         fillRoundedRectSoft(renderer, rect, radius, color, AA_FEATHER)
@@ -62,16 +78,45 @@ internal class GeometryBatch {
         if (renderer.isNull() || rect.w <= 0.0 || rect.h <= 0.0) {
             return
         }
-        buildRoundedRectPath(rect, radius)
-        fillPath(renderer, color, clampFeather(feather, min(rect.w, rect.h)))
+        let f = clampFeather(feather, min(rect.w, rect.h))
+        // A cached mesh is built in local coordinates and reused across frames and across same-size
+        // shapes; only extreme sizes (outside the key budget) fall back to per-call tessellation.
+        if (withinKeyBudget(rect.w, rect.h, radius, f)) {
+            let key = meshKey(MESH_KIND_FILL, rect.w, rect.h, radius, f)
+            let mesh = match (meshCache.get(key)) {
+                case Some(existing) => existing
+                case None =>
+                    buildRoundedRectPath(Rect(0.0, 0.0, rect.w, rect.h), radius)
+                    let built = buildFillMesh(f)
+                    meshCache.put(key, built)
+                    built
+            }
+            emitMesh(renderer, mesh, rect.x, rect.y, color)
+        } else {
+            buildRoundedRectPath(rect, radius)
+            fillPath(renderer, color, f)
+        }
     }
 
     func strokeRoundedRect(renderer: CPointer<Unit>, rect: Rect, radius: Float32, pen: Pen): Unit {
         if (renderer.isNull() || rect.w <= 0.0 || rect.h <= 0.0 || pen.width <= 0.0) {
             return
         }
-        buildRoundedRectPath(rect, radius)
-        strokePath(renderer, pen)
+        if (withinKeyBudget(rect.w, rect.h, radius, pen.width)) {
+            let key = meshKey(MESH_KIND_STROKE, rect.w, rect.h, radius, pen.width)
+            let mesh = match (meshCache.get(key)) {
+                case Some(existing) => existing
+                case None =>
+                    buildRoundedRectPath(Rect(0.0, 0.0, rect.w, rect.h), radius)
+                    let built = buildStrokeMesh(pen)
+                    meshCache.put(key, built)
+                    built
+            }
+            emitMesh(renderer, mesh, rect.x, rect.y, pen.color)
+        } else {
+            buildRoundedRectPath(rect, radius)
+            strokePath(renderer, pen)
+        }
     }
 
     func fillCircle(renderer: CPointer<Unit>, center: Point, radius: Float32, color: Color): Unit {
@@ -153,6 +198,7 @@ internal class GeometryBatch {
      * reallocates on next use, so this is called when the owning renderer shuts down.
      */
     func dispose(): Unit {
+        meshCache.freeAll()
         if (verts.isNotNull()) {
             unsafe { LibC.free(verts) }
             verts = CPointer<SdlVertex>()
@@ -244,6 +290,187 @@ internal class GeometryBatch {
             pushVertex(pathX[i] + normX[i] * offset, pathY[i] + normY[i] * offset, alpha)
             i += 1
         }
+    }
+
+    // --- cached-mesh emission ---
+    //
+    // The build* methods below produce a CachedMesh from the CURRENT path (in local coordinates,
+    // built at the origin) with the identical topology as fillPath/strokePath, but storing relative
+    // positions and per-vertex alpha instead of writing straight to the GPU buffer. emitMesh then
+    // translates and colours the stored mesh into the buffer. Splitting build from emit is what lets
+    // the expensive tessellation be memoized while position and colour still vary per call.
+
+    // Builds the feathered fill mesh (inner ring at full alpha, outer fringe at alpha zero) for the
+    // current path. Mirrors fillPath's topology exactly.
+    private func buildFillMesh(feather: Float32): CachedMesh {
+        computeNormals()
+        let n = pathX.size
+        let half = feather / 2.0
+        let mpx = ArrayList<Float32>()
+        let mpy = ArrayList<Float32>()
+        let malpha = ArrayList<Float32>()
+        var i: Int64 = 0
+        while (i < n) {
+            mpx.add(pathX[i] - normX[i] * half)
+            mpy.add(pathY[i] - normY[i] * half)
+            malpha.add(1.0)
+            i += 1
+        }
+        i = 0
+        while (i < n) {
+            mpx.add(pathX[i] + normX[i] * half)
+            mpy.add(pathY[i] + normY[i] * half)
+            malpha.add(0.0)
+            i += 1
+        }
+        let mi = ArrayList<Int32>()
+        var k: Int64 = 1
+        while (k < n - 1) {
+            addTri(mi, 0, k, k + 1)
+            k += 1
+        }
+        i = 0
+        while (i < n) {
+            let j = (i + 1) % n
+            addTri(mi, i, j, n + j)
+            addTri(mi, i, n + j, n + i)
+            i += 1
+        }
+        materializeMesh(mpx, mpy, malpha, mi)
+    }
+
+    // Builds the four-ring stroke mesh (feather-out, solid, solid, feather-in) for the current path.
+    // Mirrors strokePath's topology exactly.
+    private func buildStrokeMesh(pen: Pen): CachedMesh {
+        computeNormals()
+        let n = pathX.size
+        let feather = AA_FEATHER
+        let solid = max(0.0, (pen.width - feather) / 2.0)
+        let peak = min(1.0, pen.width / feather)
+        let mpx = ArrayList<Float32>()
+        let mpy = ArrayList<Float32>()
+        let malpha = ArrayList<Float32>()
+        appendRing(mpx, mpy, malpha, solid + feather, 0.0)
+        appendRing(mpx, mpy, malpha, solid, peak)
+        appendRing(mpx, mpy, malpha, -solid, peak)
+        appendRing(mpx, mpy, malpha, -(solid + feather), 0.0)
+        let mi = ArrayList<Int32>()
+        var ring: Int64 = 0
+        while (ring < 3) {
+            var i: Int64 = 0
+            while (i < n) {
+                let j = (i + 1) % n
+                let a = ring * n + i
+                let b = ring * n + j
+                let c = (ring + 1) * n + j
+                let d = (ring + 1) * n + i
+                addTri(mi, a, b, c)
+                addTri(mi, a, c, d)
+                i += 1
+            }
+            ring += 1
+        }
+        materializeMesh(mpx, mpy, malpha, mi)
+    }
+
+    // Copies a freshly tessellated mesh (built in the local ArrayLists) into native vertex and index
+    // buffers owned by the CachedMesh. Relative position goes in px/py and coverage in colA; the RGB
+    // is filled per draw in emitMesh. Runs only on a cache miss, so the copy cost is paid once.
+    private func materializeMesh(
+        mpx: ArrayList<Float32>,
+        mpy: ArrayList<Float32>,
+        malpha: ArrayList<Float32>,
+        mi: ArrayList<Int32>
+    ): CachedMesh {
+        let vc = mpx.size
+        let ic = mi.size
+        let nativeVerts = unsafe { LibC.malloc<SdlVertex>(count: max(1, vc)) }
+        let nativeIdx = unsafe { LibC.malloc<Int32>(count: max(1, ic)) }
+        if (nativeVerts.isNull() || nativeIdx.isNull()) {
+            if (nativeVerts.isNotNull()) {
+                unsafe { LibC.free(nativeVerts) }
+            }
+            if (nativeIdx.isNotNull()) {
+                unsafe { LibC.free(nativeIdx) }
+            }
+            return CachedMesh(CPointer<SdlVertex>(), CPointer<Int32>(), 0, 0)
+        }
+        var i: Int64 = 0
+        while (i < vc) {
+            var vertex = SdlVertex()
+            vertex.px = mpx[i]
+            vertex.py = mpy[i]
+            vertex.colA = malpha[i]
+            unsafe { nativeVerts.write(i, vertex) }
+            i += 1
+        }
+        i = 0
+        while (i < ic) {
+            unsafe { nativeIdx.write(i, mi[i]) }
+            i += 1
+        }
+        CachedMesh(nativeVerts, nativeIdx, vc, ic)
+    }
+
+    // Appends one offset ring of the current path (positions + a flat alpha) to a mesh under build.
+    private func appendRing(
+        mpx: ArrayList<Float32>,
+        mpy: ArrayList<Float32>,
+        malpha: ArrayList<Float32>,
+        offset: Float32,
+        alpha: Float32
+    ): Unit {
+        var i: Int64 = 0
+        let n = pathX.size
+        while (i < n) {
+            mpx.add(pathX[i] + normX[i] * offset)
+            mpy.add(pathY[i] + normY[i] * offset)
+            malpha.add(alpha)
+            i += 1
+        }
+    }
+
+    // Emits a cached mesh translated by (dx, dy) and tinted `color`: the cheap per-frame path that
+    // replaces re-tessellation. Colour is applied here (via begin), so one mesh serves every colour.
+    private func emitMesh(renderer: CPointer<Unit>, mesh: CachedMesh, dx: Float32, dy: Float32, color: Color): Unit {
+        let vc = mesh.vertCount
+        let ic = mesh.idxCount
+        if (vc == 0 || ic == 0 || renderer.isNull() || mesh.relVerts.isNull() || mesh.indices.isNull()) {
+            return
+        }
+        // Grow the shared output buffer, then translate + colour the cached relative vertices into it
+        // with a tight native loop (no bounds checks, no per-vertex allocation). The index buffer is
+        // invariant, so it is handed to SDL straight from the cached mesh — no per-frame index copy.
+        ensureCapacity(vc, 0)
+        if (verts.isNull()) {
+            return
+        }
+        let cr = Float32(Int64(color.r)) / 255.0
+        let cg = Float32(Int64(color.g)) / 255.0
+        let cb = Float32(Int64(color.b)) / 255.0
+        let ca = Float32(Int64(color.a)) / 255.0
+        var i: Int64 = 0
+        while (i < vc) {
+            var vertex = unsafe { mesh.relVerts.read(i) }
+            vertex.px = vertex.px + dx
+            vertex.py = vertex.py + dy
+            // The mesh stores per-vertex coverage (0..1 feather alpha) in colA; fold in the draw colour.
+            vertex.colA = ca * vertex.colA
+            vertex.colR = cr
+            vertex.colG = cg
+            vertex.colB = cb
+            unsafe { verts.write(i, vertex) }
+            i += 1
+        }
+        let _ = unsafe {
+            SDL_RenderGeometry(renderer, CPointer<Unit>(), verts, Int32(vc), mesh.indices, Int32(ic))
+        }
+    }
+
+    private func addTri(indices: ArrayList<Int32>, a: Int64, b: Int64, c: Int64): Unit {
+        indices.add(Int32(a))
+        indices.add(Int32(b))
+        indices.add(Int32(c))
     }
 
     // --- path construction (clockwise in screen coordinates) ---
@@ -491,4 +718,122 @@ internal class GeometryBatch {
 
 private func clampFeather(feather: Float32, minDimension: Float32): Float32 {
     max(0.1, min(feather, minDimension * 0.9))
+}
+
+// Quantizes a length to quarter-pixel units for mesh keying: sub-quarter-pixel size differences
+// share a mesh (an imperceptible size rounding, while the draw position stays exact).
+private func quantizeLength(value: Float32): Int64 {
+    Int64(value * 4.0 + 0.5)
+}
+
+// True when a shape's dimensions fit the packed key's bit budget. An out-of-range shape bypasses the
+// cache and tessellates directly, so an extreme size can never alias onto another shape's mesh.
+private func withinKeyBudget(w: Float32, h: Float32, radius: Float32, extra: Float32): Bool {
+    w >= 0.0 && w < 8192.0 && h >= 0.0 && h < 8192.0 && radius >= 0.0 && radius < 512.0 && extra >= 0.0 && extra < 64.0
+}
+
+// Packs (kind, width, height, radius, extra) into one Int64 cache key. Field widths: kind 1 bit,
+// width/height 15 bits each (quarter-pixel, < 8192px), radius 11 bits (< 512px), extra 8 bits
+// (< 64px) — 50 bits total. withinKeyBudget guarantees each field fits, so distinct shapes never
+// collide onto one key.
+private func meshKey(kind: Int64, w: Float32, h: Float32, radius: Float32, extra: Float32): Int64 {
+    let qw = quantizeLength(w)
+    let qh = quantizeLength(h)
+    let qr = quantizeLength(radius)
+    let qe = quantizeLength(extra)
+    kind | (qw << 1) | (qh << 16) | (qr << 31) | (qe << 42)
+}
+
+// A tessellated shape in local coordinates, held in native buffers so per-frame emit is a tight
+// unsafe loop: relative positions live in each vertex's px/py and the feather coverage in its colA
+// (the draw colour is folded in at emit); the index buffer is invariant and handed straight to SDL.
+internal class CachedMesh {
+    let relVerts: CPointer<SdlVertex>
+    let indices: CPointer<Int32>
+    let vertCount: Int64
+    let idxCount: Int64
+
+    init(relVerts: CPointer<SdlVertex>, indices: CPointer<Int32>, vertCount: Int64, idxCount: Int64) {
+        this.relVerts = relVerts
+        this.indices = indices
+        this.vertCount = vertCount
+        this.idxCount = idxCount
+    }
+
+    // Frees the native buffers. Called when the mesh is evicted from the cache or the batch disposes.
+    func free(): Unit {
+        if (relVerts.isNotNull()) {
+            unsafe { LibC.free(relVerts) }
+        }
+        if (indices.isNotNull()) {
+            unsafe { LibC.free(indices) }
+        }
+    }
+}
+
+// A bounded, two-generation cache of shape meshes. When the active generation fills, the older
+// (retired) generation is dropped whole — running `destroy` on each mesh — and the current one
+// becomes retired; a hit in the retired generation is promoted back so a hot shape survives a
+// rotation. Because the meshes own native buffers, the promote path removes the mesh from the retired
+// generation BEFORE re-inserting it, so the rotation that insert may trigger cannot destroy the mesh
+// being returned — the same native-lifetime safeguard as the shaped-text cache. `destroy` is injected
+// (production frees the native buffers) so the eviction bookkeeping is unit-testable without a GPU.
+internal class MeshCache {
+    private let capacity: Int64
+    private let destroy: (CachedMesh) -> Unit
+    private var active = HashMap<Int64, CachedMesh>()
+    private var retired = HashMap<Int64, CachedMesh>()
+
+    init(capacity: Int64, destroy: (CachedMesh) -> Unit) {
+        this.capacity = max(1, capacity)
+        this.destroy = destroy
+    }
+
+    func get(key: Int64): ?CachedMesh {
+        match (active.get(key)) {
+            case Some(mesh) => return Some(mesh)
+            case None => ()
+        }
+        match (retired.get(key)) {
+            case Some(mesh) =>
+                let _ = retired.remove(key)
+                insert(key, mesh)
+                Some(mesh)
+            case None => None
+        }
+    }
+
+    func put(key: Int64, mesh: CachedMesh): Unit {
+        insert(key, mesh)
+    }
+
+    // Destroys every cached mesh across both generations. Called when the owning batch is disposed.
+    func freeAll(): Unit {
+        destroyGeneration(active)
+        active.clear()
+        destroyGeneration(retired)
+        retired.clear()
+    }
+
+    // Live entries across both generations — for tests and diagnostics.
+    func size(): Int64 {
+        active.size + retired.size
+    }
+
+    private func insert(key: Int64, mesh: CachedMesh): Unit {
+        if (active.size >= capacity) {
+            destroyGeneration(retired)
+            retired.clear()
+            let recycled = retired
+            retired = active
+            active = recycled
+        }
+        active[key] = mesh
+    }
+
+    private func destroyGeneration(generation: HashMap<Int64, CachedMesh>): Unit {
+        for ((_, mesh) in generation) {
+            destroy(mesh)
+        }
+    }
 }

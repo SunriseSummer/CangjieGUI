@@ -59,6 +59,11 @@ public class BenchAccumulator {
         }
         let now = PerformanceClock.ticksNanoseconds()
         frame += 1
+        // Zero the text-cost counters as measurement begins, so the totals printed at the end cover
+        // exactly the measured window: draws scale with frames, shapes (cache misses) should not.
+        if (frame == warmup + 1) {
+            ctx.renderer.resetTextMeasureCount()
+        }
         if (frame == 1) {
             lastTicks = now
             return
@@ -98,6 +103,9 @@ public class BenchAccumulator {
             UInt64(0)
         }
         println("[bench] ${group} / ${name}: avg ${formatDuration(avg)}/frame (~${fps} fps), min ${formatDuration(minNs)}, max ${formatDuration(maxNs)} over ${measured} frames")
+        // The shaped-text cache working: draws grow with the frame count, shapes (TTF_CreateText
+        // misses) stay near the working-set size no matter how long the run.
+        println("[bench]   文本：${ctx.renderer.textDrawCount()} 次绘制 / ${ctx.renderer.textShapeCount()} 次成形（成形越少＝复用越充分）")
         report("display", group, BenchResult(name, measured, sumNs, 0))
         ctx.requestClose()
     }

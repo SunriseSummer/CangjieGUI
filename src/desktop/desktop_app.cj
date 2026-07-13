@@ -24,6 +24,8 @@ public class DesktopApp {
     private let resources = ArrayList<Resource>()
     private let stateStore = StateStore()
     private let snapshotPath: ?String
+    // Per-phase frame timing, enabled with `--profile`; None (and zero cost) in a normal run.
+    private let profiler: ?FrameProfiler
     private var frames: UInt64 = 0
     private var baseCursor: ?Cursor = None
     private var pointerCursor: ?Cursor = None
@@ -46,6 +48,11 @@ public class DesktopApp {
         this.ctx.fontScale = max(0.1, fontScale)
         this.frameDelay = frameDelay
         this.snapshotPath = snapshotArgument()
+        this.profiler = if (profileEnabled()) {
+            Some(FrameProfiler(60))
+        } else {
+            None
+        }
     }
 
     public func manage(resource: Resource): Unit {
@@ -98,6 +105,11 @@ public class DesktopApp {
         // The finally block keeps shutdown deterministic even when a widget throws out of
         // the frame loop: managed resources close in reverse order, then the window.
         try {
+            match (profiler) {
+                case Some(_) =>
+                    println("[profile] 渲染后端 ${ctx.renderer.driverName()}｜超采样 ${ctx.renderer.supersampleFactor()}x｜视口 ${window.width}x${window.height} @ ${window.scale}x")
+                case None => ()
+            }
             var previousTick = window.ticks()
             while (!ctx.shouldClose) {
                 let frame = nextFrame(previousTick)
@@ -105,14 +117,23 @@ public class DesktopApp {
                 ctx.frame = frame
                 ctx.viewportWidth = Float32(window.width)
                 ctx.viewportHeight = Float32(window.height)
+                let tBuild = FrameProfiler.now()
                 let widget = buildRoot(body, stateStore)
+                let tLayout = FrameProfiler.now()
                 ctx.adoptFocusRing(stateStore.focusRing())
                 widget.layout(ctx, Rect(0.0, 0.0, Float32(window.width), Float32(window.height)))
+                let tEvents = FrameProfiler.now()
                 drainEvents(widget)
                 dispatchEvent(widget, UiEvent.Frame(frame))
+                let tDraw = FrameProfiler.now()
                 frames += 1
-                draw(widget)
+                let (beginNs, treeNs, resolveNs, presentNs) = draw(widget)
                 window.delay(frameDelay)
+                match (profiler) {
+                    case Some(p) => p.record(tLayout - tBuild, tEvents - tLayout, tDraw - tEvents, beginNs, treeNs,
+                        resolveNs, presentNs)
+                    case None => ()
+                }
             }
         } finally {
             closeManagedResources()
@@ -187,8 +208,14 @@ public class DesktopApp {
         }
     }
 
-    private func draw(widget: Widget): Unit {
+    // Draws one frame, returning the nanosecond durations of its sub-phases (scene begin, tree draw,
+    // supersample resolve, present) for the profiler. The timestamps are a handful of clock reads —
+    // negligible against a frame — so they run unconditionally and only the profiler, when enabled,
+    // records them.
+    private func draw(widget: Widget): (UInt64, UInt64, UInt64, UInt64) {
+        let t0 = FrameProfiler.now()
         ctx.renderer.beginScene(Float32(window.width), Float32(window.height), ctx.theme.bg)
+        let t1 = FrameProfiler.now()
         // Cleared before the tree so only a control hovered this frame shows a tooltip; the
         // tree registers into the slot during draw, and the overlay is painted last, on top.
         ctx.clearTooltip()
@@ -207,9 +234,13 @@ public class DesktopApp {
         }
         ctx.drawActiveOverlay()
         applyTextInputAnchor()
+        let t2 = FrameProfiler.now()
         ctx.renderer.endScene()
+        let t3 = FrameProfiler.now()
         maybeSnapshot()
         ctx.renderer.present()
+        let t4 = FrameProfiler.now()
+        (t1 - t0, t2 - t1, t3 - t2, t4 - t3)
     }
 
     /*
@@ -381,6 +412,16 @@ private func snapshotArgument(): ?String {
         i += 1
     }
     None
+}
+
+// True when `--profile` is on the command line, turning on per-phase frame timing.
+private func profileEnabled(): Bool {
+    for (arg in getCommandLine()) {
+        if (arg == "--profile") {
+            return true
+        }
+    }
+    false
 }
 
 private func configuredWindow(spec: WindowSpec, metadata: ?AppMetadata, hints: Array<SdlHintSetting>): SdlWindow {

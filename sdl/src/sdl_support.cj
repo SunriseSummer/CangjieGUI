@@ -35,7 +35,7 @@ internal func lastSdlError(): String {
 /**
  * Throws `CuiException` when renderer defaults cannot be applied after window creation.
  */
-internal func configureRenderer(window: CPointer<Unit>, renderer: CPointer<Unit>, scale: Float32): Unit {
+internal func configureRenderer(window: CPointer<Unit>, renderer: CPointer<Unit>, scale: Float32, vsync: Bool): Unit {
     if (!unsafe { SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND) }) {
         destroyCreatedResources(window, renderer)
         throw CuiException("SDL_SetRenderDrawBlendMode failed: ${lastSdlError()}")
@@ -44,7 +44,13 @@ internal func configureRenderer(window: CPointer<Unit>, renderer: CPointer<Unit>
         destroyCreatedResources(window, renderer)
         throw CuiException("SDL_SetRenderScale failed: ${lastSdlError()}")
     }
-    let _ = unsafe { SDL_SetRenderVSync(renderer, 1) }
+    // 1 = sync to every vertical blank; 0 = SDL_RENDERER_VSYNC_DISABLED (uncapped present).
+    let vsyncMode = if (vsync) {
+        Int32(1)
+    } else {
+        Int32(0)
+    }
+    let _ = unsafe { SDL_SetRenderVSync(renderer, vsyncMode) }
 }
 
 /**

@@ -101,16 +101,27 @@ protected class NativeTextRenderer {
         if (text.isEmpty()) {
             return
         }
-        let font = fontFor(pointSize)
-        let cText = unsafe { LibC.mallocCString(text) }
-        try (textResource = cText.asResource()) {
-            ensureNative(unsafe {
-                TTF_SetTextString(font.textPointer(), textResource.value, UIntNative(text.size))
-            }, "TTF_SetTextString")
-            ensureNative(unsafe {
-                TTF_SetTextColor(font.textPointer(), color.red, color.green, color.blue, color.alpha)
-            }, "TTF_SetTextColor")
-            ensureNative(unsafe { TTF_DrawRendererText(font.textPointer(), x, y) }, "TTF_DrawRendererText")
+        // The font reuses a cached, already-shaped text object for `text`, so an unchanged string
+        // (every visible label during a scroll) is not re-shaped by SDL_ttf — only redrawn.
+        fontFor(pointSize).drawText(text, x, y, color)
+    }
+
+    /*
+     * Total shaping operations across all sizes since the last reset — each is one TTF_CreateText, a
+     * shaped-text cache miss. A per-frame text-cost probe: on a warm cache this stays flat while draw
+     * calls scale with frames, which is the caching doing its job. Summed on demand over the fonts.
+     */
+    public func shapeCount(): UInt64 {
+        var total: UInt64 = 0
+        for (font in fonts) {
+            total += font.shapeCount
+        }
+        total
+    }
+
+    public func resetShapeCount(): Unit {
+        for (font in fonts) {
+            font.shapeCount = 0
         }
     }
 
@@ -162,36 +173,97 @@ protected class NativeTextRenderer {
     }
 }
 
+// One shaped, ready-to-draw text object plus the colour last applied to it, so redrawing the same
+// string in the same colour next frame skips even the colour update.
+internal class ShapedText {
+    let pointer: CPointer<Unit>
+    var colorKey: Int64 = -1
+
+    init(pointer: CPointer<Unit>) {
+        this.pointer = pointer
+    }
+}
+
+// Packs an RGBA colour into one Int64 so a text object's current colour compares in a single check.
+private func colorKey(color: NativeTextColor): Int64 {
+    (Int64(color.red) << 24) | (Int64(color.green) << 16) | (Int64(color.blue) << 8) | Int64(color.alpha)
+}
+
 private class NativeFont {
     let pointSize: Float32
     private let font: CPointer<Unit>
-    private var text = CPointer<Unit>()
+    private var engine = CPointer<Unit>()
+    // Already-shaped text objects for this size, reused across frames; a miss is the only path that
+    // shapes a string. Bounded and self-freeing: an evicted object's TTF_Text is destroyed.
+    private let cache: GenerationCache<ShapedText>
+    // Shaped-text cache misses (real TTF_CreateText calls) since the last reset. No access modifier
+    // so the renderer can total it as a per-frame text-cost probe.
+    var shapeCount: UInt64 = 0
     private var closed: Bool = false
 
     init(font: CPointer<Unit>, pointSize: Float32) {
         this.font = font
         this.pointSize = pointSize
+        this.cache = GenerationCache<ShapedText>(SHAPED_TEXT_CACHE_CAP) {
+            shaped => if (shaped.pointer.isNotNull()) {
+                unsafe { TTF_DestroyText(shaped.pointer) }
+            }
+        }
     }
 
     /**
-     * Throws `NativeTextException` when SDL_ttf cannot create the cached text object.
+     * Binds this font to the shared text engine and fails fast — as the previous eager text object
+     * did — if the engine cannot shape for it. Throws `NativeTextException` on failure.
      */
     func attach(engine: CPointer<Unit>): Unit {
-        let createdText = unsafe {
-            TTF_CreateText(engine, font, CString(CPointer<UInt8>()), UIntNative(0))
-        }
-        if (createdText.isNull()) {
+        this.engine = engine
+        let probe = unsafe { TTF_CreateText(engine, font, CString(CPointer<UInt8>()), UIntNative(0)) }
+        if (probe.isNull()) {
             throw NativeTextException("TTF_CreateText failed: ${lastNativeError()}")
         }
-        text = createdText
+        unsafe { TTF_DestroyText(probe) }
+    }
+
+    /**
+     * Draws `text` at (x, y) in `color`, reusing a cached shaped-text object so an unchanged string
+     * is not re-shaped by SDL_ttf — only a cache miss shapes. Throws `NativeTextException` on failure.
+     */
+    func drawText(text: String, x: Float32, y: Float32, color: NativeTextColor): Unit {
+        let shaped = obtainShaped(text)
+        let wanted = colorKey(color)
+        // The text object remembers its colour, so only a genuine change touches SDL_ttf again.
+        if (shaped.colorKey != wanted) {
+            ensureNative(unsafe {
+                TTF_SetTextColor(shaped.pointer, color.red, color.green, color.blue, color.alpha)
+            }, "TTF_SetTextColor")
+            shaped.colorKey = wanted
+        }
+        ensureNative(unsafe { TTF_DrawRendererText(shaped.pointer, x, y) }, "TTF_DrawRendererText")
+    }
+
+    // The shaped text object for `text`, created and cached on first use. Only this miss path calls
+    // TTF_CreateText (the shaping cost); repeats hit the cache.
+    private func obtainShaped(text: String): ShapedText {
+        match (cache.get(text)) {
+            case Some(shaped) => return shaped
+            case None => ()
+        }
+        let cText = unsafe { LibC.mallocCString(text) }
+        var pointer = CPointer<Unit>()
+        try (textResource = cText.asResource()) {
+            pointer = unsafe { TTF_CreateText(engine, font, textResource.value, UIntNative(text.size)) }
+        }
+        if (pointer.isNull()) {
+            throw NativeTextException("TTF_CreateText failed: ${lastNativeError()}")
+        }
+        shapeCount += 1
+        let shaped = ShapedText(pointer)
+        cache.put(text, shaped)
+        shaped
     }
 
     func pointer(): CPointer<Unit> {
         font
-    }
-
-    func textPointer(): CPointer<Unit> {
-        text
     }
 
     func close(): Unit {
@@ -199,13 +271,8 @@ private class NativeFont {
             return
         }
         closed = true
-        unsafe {
-            if (text.isNotNull()) {
-                TTF_DestroyText(text)
-            }
-            TTF_CloseFont(font)
-        }
-        text = CPointer<Unit>()
+        cache.clear()
+        unsafe { TTF_CloseFont(font) }
     }
 }
 

@@ -67,6 +67,8 @@ foreign {
 
     func SDL_GetRenderOutputSize(renderer: CPointer<Unit>, w: CPointer<Int32>, h: CPointer<Int32>): Bool
 
+    func SDL_GetRendererName(renderer: CPointer<Unit>): CString
+
     func SDL_CreateTexture(
         renderer: CPointer<Unit>,
         format: UInt32,

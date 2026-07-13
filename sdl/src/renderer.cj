@@ -1,6 +1,6 @@
 package sdl
 
-import std.collection.ArrayList
+import std.collection.{ArrayList, HashMap}
 import sdl.text.{NativeTextColor, NativeTextException, NativeTextMetrics, NativeTextRenderer}
 
 /**
@@ -15,12 +15,91 @@ public struct FontSizes {
 }
 
 /*
- * Supersampling factor. The whole frame is drawn into an offscreen target this many times
- * larger than the window in each axis, then linearly downscaled on present. That single
- * step anti-aliases every primitive — rounded corners, diagonal strokes, circles — on the
- * GPU, with no per-widget cost. 2x (4 samples per pixel) is the sweet spot for desktop UI.
+ * Default supersampling factor. The whole frame is drawn into an offscreen target this many times
+ * larger than the window in each axis, then linearly downscaled on present. That single step
+ * anti-aliases every primitive — rounded corners, diagonal strokes, circles — on the GPU, with no
+ * per-widget cost. 2x (4 samples per pixel) is the sweet spot for desktop UI, but it also makes every
+ * frame pay for 4x the pixels; an application (or a benchmark isolating that cost) can lower it.
  */
-private let SUPERSAMPLE: Int32 = 2
+private let DEFAULT_SUPERSAMPLE: Int32 = 2
+
+// Per-point-size capacity for the text-metrics cache before a generation is retired. A handful of
+// sizes each hold up to this many distinct strings — ample for a dense UI while staying bounded
+// against pathological churn (for example a log of unique lines every frame).
+private let TEXT_METRICS_CAP_PER_SIZE: Int64 = 1024
+
+/*
+ * A per-point-size text-measurement cache. The UI tree is rebuilt every frame, so the same string
+ * is measured over and over; caching (point size, text) -> metrics across frames turns those
+ * repeats into a hash lookup instead of an SDL_ttf shaping call. Keyed size-first so the string is
+ * used directly as the inner key with no per-lookup allocation — an earlier `"${size}#${text}"` key
+ * was measured too costly (its float-to-string build dominated) and reverted. Bounded by a
+ * two-generation eviction per size: when the active generation fills it is retired and a cleared one
+ * takes over; a hit in the retired generation is promoted back, so hot strings survive a rotation.
+ */
+private class MetricsGeneration {
+    private let capacity: Int64
+    private var active = HashMap<String, NativeTextMetrics>()
+    private var retired = HashMap<String, NativeTextMetrics>()
+
+    init(capacity: Int64) {
+        this.capacity = if (capacity < 1) {
+            1
+        } else {
+            capacity
+        }
+    }
+
+    func get(text: String): ?NativeTextMetrics {
+        match (active.get(text)) {
+            case Some(value) => return Some(value)
+            case None => ()
+        }
+        match (retired.get(text)) {
+            case Some(value) =>
+                put(text, value)
+                Some(value)
+            case None => None
+        }
+    }
+
+    func put(text: String, value: NativeTextMetrics): Unit {
+        if (active.size >= capacity) {
+            let recycled = retired
+            recycled.clear()
+            retired = active
+            active = recycled
+        }
+        active[text] = value
+    }
+}
+
+private class TextMetricsCache {
+    private let capacityPerSize: Int64
+    private var bySize = HashMap<Int64, MetricsGeneration>()
+
+    init(capacityPerSize: Int64) {
+        this.capacityPerSize = capacityPerSize
+    }
+
+    func get(sizeKey: Int64, text: String): ?NativeTextMetrics {
+        match (bySize.get(sizeKey)) {
+            case Some(generation) => generation.get(text)
+            case None => None
+        }
+    }
+
+    func put(sizeKey: Int64, text: String, value: NativeTextMetrics): Unit {
+        let generation = match (bySize.get(sizeKey)) {
+            case Some(existing) => existing
+            case None =>
+                let created = MetricsGeneration(capacityPerSize)
+                bySize[sizeKey] = created
+                created
+        }
+        generation.put(text, value)
+    }
+}
 
 public class Renderer {
     internal let ptr: CPointer<Unit>
@@ -28,6 +107,8 @@ public class Renderer {
     private var ssTarget: CPointer<Unit> = CPointer<Unit>()
     private var ssWidth: Int32 = 0
     private var ssHeight: Int32 = 0
+    // Supersample factor per axis (1 = off). Fixed for the renderer's life.
+    private let ssFactor: Int32
     private var ssEnabled: Bool
     // The live drawing scale (render coordinates -> target pixels), mirrored from every
     // SDL_SetRenderScale call. Geometry draws through the GPU scale; TEXT rasterizes at
@@ -41,12 +122,23 @@ public class Renderer {
     // Counts text measurements since the last reset — a per-frame cost probe. Text measurement is a
     // per-frame choke point (each measure shapes the string and, with a real backend, calls
     // SDL_ttf), so benchmarks reset this at a frame boundary to see how many a tree performs.
+    // `measureCount` is total requests; `computeCount` is cache misses (the actual SDL_ttf calls).
     private var measureCount: UInt64 = 0
+    private var computeCount: UInt64 = 0
+    // Counts text draws (each re-shapes the string via TTF_SetTextString and rasterizes it) since the
+    // last reset — the other per-frame text choke point, separate from measurement.
+    private var drawTextCount: UInt64 = 0
+    private let metricsCache = TextMetricsCache(TEXT_METRICS_CAP_PER_SIZE)
 
-    internal init(ptr: CPointer<Unit>, contentScale!: Float32 = 1.0) {
+    internal init(ptr: CPointer<Unit>, contentScale!: Float32 = 1.0, supersample!: Int32 = DEFAULT_SUPERSAMPLE) {
         this.ptr = ptr
         this.contentScale = contentScale
-        this.ssEnabled = ptr.isNotNull() && SUPERSAMPLE > 1
+        this.ssFactor = if (supersample < Int32(1)) {
+            Int32(1)
+        } else {
+            supersample
+        }
+        this.ssEnabled = ptr.isNotNull() && this.ssFactor > Int32(1)
         this.textBackend = createTextBackend(ptr)
     }
 
@@ -56,6 +148,28 @@ public class Renderer {
      */
     public static func headless(): Renderer {
         Renderer(CPointer<Unit>())
+    }
+
+    /**
+     * The SDL render backend actually chosen (for example "direct3d11", "direct3d12", "opengl",
+     * "vulkan", or "software"). A hardware/software tell: "software" means every pixel is drawn on
+     * the CPU, which dominates a supersampled frame. "headless" when there is no device.
+     */
+    public func driverName(): String {
+        if (ptr.isNull()) {
+            return "headless"
+        }
+        let name = unsafe { SDL_GetRendererName(ptr) }
+        if (name.isNull()) {
+            "unknown"
+        } else {
+            name.toString()
+        }
+    }
+
+    /** The active supersample factor per axis (1 = off). */
+    public func supersampleFactor(): Int32 {
+        ssFactor
     }
 
     /**
@@ -81,8 +195,8 @@ public class Renderer {
             drawDirect(clearColor)
             return
         }
-        let targetWidth = outW * SUPERSAMPLE
-        let targetHeight = outH * SUPERSAMPLE
+        let targetWidth = outW * ssFactor
+        let targetHeight = outH * ssFactor
         if (ssTarget.isNull() || targetWidth != ssWidth || targetHeight != ssHeight) {
             allocateTarget(targetWidth, targetHeight)
         }
@@ -466,6 +580,7 @@ public class Renderer {
         color: Color,
         pointSize!: Float32 = FontSizes.BODY
     ): Unit {
+        drawTextCount += 1
         match (textBackend) {
             case Some(value) =>
                 let native = NativeTextColor(color.r, color.g, color.b, color.a)
@@ -474,7 +589,7 @@ public class Renderer {
                     return
                 }
                 let step: Float32 = if (ssEnabled) {
-                    Float32(SUPERSAMPLE)
+                    Float32(ssFactor)
                 } else {
                     1.0
                 }
@@ -518,28 +633,77 @@ public class Renderer {
         this.text(text, tx, ty, color, pointSize: pointSize)
     }
 
-    /** Text measurements performed since the last reset — a per-frame text-cost probe. */
+    /** Text measurements requested since the last reset — a per-frame text-cost probe. */
     public func textMeasureCount(): UInt64 {
         measureCount
     }
 
-    /** Resets the text-measurement counter; call at a frame boundary to sample a single frame. */
+    /** Actual measurement computations (cache misses) since the last reset — SDL_ttf calls on a real backend. */
+    public func textComputeCount(): UInt64 {
+        computeCount
+    }
+
+    /** Text draws issued since the last reset — each rasterizes a (cached, already-shaped) string on a real backend. */
+    public func textDrawCount(): UInt64 {
+        drawTextCount
+    }
+
+    /**
+     * Shaping operations (shaped-text cache misses) since the last reset — the real TTF_CreateText
+     * calls on a display backend, 0 when headless. On a warm cache during a scroll this stays flat
+     * while `textDrawCount` scales with frames, which is the shaped-text cache working.
+     */
+    public func textShapeCount(): UInt64 {
+        match (textBackend) {
+            case Some(value) => value.shapeCount()
+            case None => 0
+        }
+    }
+
+    /** Resets the text measurement, compute, draw, and shape counters; call at a frame boundary to sample one frame. */
     public func resetTextMeasureCount(): Unit {
         measureCount = 0
+        computeCount = 0
+        drawTextCount = 0
+        match (textBackend) {
+            case Some(value) => value.resetShapeCount()
+            case None => ()
+        }
     }
 
     private func textMetrics(text: String, pointSize: Float32): NativeTextMetrics {
         measureCount += 1
+        // Cache the unscaled path only — all layout-time measurement and unscaled draw. The scaled
+        // text-pass path (scaleX/scaleY != 1) is rare and recomputed. The cache sits above the
+        // backend/estimate split, so it serves both the real font backend (skipping SDL_ttf) and the
+        // headless estimate, and `computeCount` tracks the misses in either mode.
+        if (scaleX == 1.0 && scaleY == 1.0) {
+            let sizeKey = Int64(pointSize * Float32(256.0))
+            match (metricsCache.get(sizeKey, text)) {
+                case Some(cached) => return cached
+                case None => ()
+            }
+            computeCount += 1
+            let computed = computeMetrics(text, pointSize)
+            metricsCache.put(sizeKey, text, computed)
+            return computed
+        }
+        computeCount += 1
         match (textBackend) {
             case Some(value) =>
-                if (scaleX == 1.0 && scaleY == 1.0) {
-                    return value.measure(text, pointSize)
-                }
                 // Measure the same scaled rasterization the text pass draws, mapped back to
                 // logical units — carets, selection bands and ellipsis decisions computed
                 // from these metrics then line up with the pixels actually painted.
                 let scaled = value.measure(text, pointSize * scaleY)
                 NativeTextMetrics(scaled.width / scaleX, scaled.height / scaleY)
+            case None => NativeTextMetrics(Float32(text.size) * pointSize * 0.55, pointSize * 1.3)
+        }
+    }
+
+    // The uncached measurement: the real font backend, or a proportional estimate when headless.
+    private func computeMetrics(text: String, pointSize: Float32): NativeTextMetrics {
+        match (textBackend) {
+            case Some(value) => value.measure(text, pointSize)
             case None => NativeTextMetrics(Float32(text.size) * pointSize * 0.55, pointSize * 1.3)
         }
     }

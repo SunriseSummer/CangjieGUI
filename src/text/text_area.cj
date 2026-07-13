@@ -14,6 +14,27 @@ private let AREA_LETTER_X: UInt8 = 88
 private let AREA_LETTER_Y: UInt8 = 89
 private let AREA_LETTER_Z: UInt8 = 90
 
+/*
+ * Caches a document's line split so scrolling does not re-split the whole text every frame. Keyed
+ * by the text's revision: an edit bumps the revision (see Observable.revision), which refreshes the
+ * split on next access, so the cache never serves stale lines. Splitting is already the fast
+ * primitive here (stdlib split beats a hand-rolled byte scan), so the win is not re-doing it.
+ */
+class TextLineCache {
+    private var cachedRevision: UInt64 = 0
+    private var cachedLines: Array<String> = []
+    private var hasValue = false
+
+    func lines(text: String, revision: UInt64): Array<String> {
+        if (!hasValue || revision != cachedRevision) {
+            cachedLines = text.split("\n")
+            cachedRevision = revision
+            hasValue = true
+        }
+        cachedLines
+    }
+}
+
 public class TextArea <: Widget {
     private let id: String
     private let text: Bindable<String>
@@ -23,6 +44,7 @@ public class TextArea <: Widget {
     private var isEditable: Bool
     private let scrollBar: ScrollBar
     private let history: UndoHistory
+    private let lineCache: TextLineCache
     private var frame = Rect.zero()
 
     public init(
@@ -55,6 +77,7 @@ public class TextArea <: Widget {
         this.isEditable = editable
         this.scrollBar = ScrollBar("TextArea:${id}:thumb")
         this.history = localState<UndoHistory>("TextArea:${id}:history") {UndoHistory()}.value
+        this.lineCache = localState<TextLineCache>("TextArea:${id}:lines") {TextLineCache()}.value
         // A read-only text area is not an editing stop, so it stays out of Tab traversal.
         if (editable) {
             registerFocusable(id)
@@ -86,19 +109,25 @@ public class TextArea <: Widget {
         frame = rect
     }
 
+    // The document split into lines, cached by text revision so scrolling never re-splits per frame.
+    private func lines(): Array<String> {
+        lineCache.lines(text.value, text.revision)
+    }
+
     public func draw(ctx: UiContext): Unit {
         let edit = editState()
         edit.normalizeCursor()
+        let docLines = lines()
         // Clamp writes only on change: draw runs every frame, and the offset may be an
         // externally owned state whose observers should not fire for no-op writes.
-        let clampedScroll = clampScrollOffset(scrollStateValue.value, textContentHeight(text.value),
+        let clampedScroll = clampScrollOffset(scrollStateValue.value, textContentHeight(docLines),
             textViewport(frame).h)
         if (clampedScroll != scrollStateValue.value) {
             scrollStateValue.value = clampedScroll
         }
         let content = TextAreaContent(text.value, cursorStateValue.value, scrollStateValue.value)
-        drawTextAreaBox(ctx, frame, id, content, edit.selectionStart(), edit.selectionEnd(), ctx.hasFocus(id),
-            scrollBar.dragging(ctx))
+        drawTextAreaBox(ctx, frame, id, content, docLines, edit.selectionStart(), edit.selectionEnd(),
+            ctx.hasFocus(id), scrollBar.dragging(ctx))
     }
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
@@ -109,13 +138,13 @@ public class TextArea <: Widget {
         let edit = editState()
         match (event) {
             case UiEvent.MouseDown(MouseButton.Left, x, y) =>
-                if (scrollBar.press(ctx, frame, scrollStateValue, textContentHeight(text.value),
+                if (scrollBar.press(ctx, frame, scrollStateValue, textContentHeight(lines()),
                     textViewport(frame).h, x, y)) {
                     return true
                 }
                 return pressAt(ctx, edit, x, y)
             case UiEvent.MouseMove(x, y) =>
-                if (scrollBar.drag(ctx, frame, scrollStateValue, textContentHeight(text.value),
+                if (scrollBar.drag(ctx, frame, scrollStateValue, textContentHeight(lines()),
                     textViewport(frame).h, y)) {
                     return true
                 }
@@ -126,7 +155,7 @@ public class TextArea <: Widget {
             case UiEvent.MouseWheel(_, wy, wx, pointerY) =>
                 if (frame.contains(wx, pointerY)) {
                     scrollStateValue.value = scrollOffsetAfterWheel(scrollStateValue.value, wy,
-                        textContentHeight(text.value), textViewport(frame).h)
+                        textContentHeight(lines()), textViewport(frame).h)
                     return true
                 }
             case UiEvent.TextInput(value) => return recordedEdit(ctx, {=> edit.insert(value)})
@@ -208,7 +237,7 @@ public class TextArea <: Widget {
         } else if (rowTop + CUI_SMALL_H > scroll + viewportH) {
             scroll = rowTop + CUI_SMALL_H - viewportH
         }
-        let clamped = clampScrollOffset(scroll, textContentHeight(text.value), viewportH)
+        let clamped = clampScrollOffset(scroll, textContentHeight(lines()), viewportH)
         if (clamped != scrollStateValue.value) {
             scrollStateValue.value = clamped
         }
@@ -326,6 +355,7 @@ private func drawTextAreaBox(
     frame: Rect,
     id: String,
     content: TextAreaContent,
+    lines: Array<String>,
     selStart: Int64,
     selEnd: Int64,
     focused: Bool,
@@ -337,18 +367,17 @@ private func drawTextAreaBox(
     if (focused) {
         drawTextAreaSelection(ctx, viewport, content, selStart, selEnd)
     }
-    drawLines(ctx, viewport, content.text, content.scroll)
+    drawLines(ctx, viewport, lines, content.scroll)
     drawTextAreaCursor(ctx, viewport, id, content)
     ctx.renderer.popClip()
-    drawVerticalScrollBar(ctx, frame, content.scroll, textContentHeight(content.text), viewport.h, active: barActive)
+    drawVerticalScrollBar(ctx, frame, content.scroll, textContentHeight(lines), viewport.h, active: barActive)
 }
 
 internal func drawTextBoxChrome(ctx: UiContext, frame: Rect, id: String): Unit {
     drawSurface(ctx, frame, ctx.theme.fieldSurface(ctx.showFocusRing(id)))
 }
 
-private func drawLines(ctx: UiContext, rect: Rect, text: String, scroll: Float32): Unit {
-    let lines = text.split("\n")
+private func drawLines(ctx: UiContext, rect: Rect, lines: Array<String>, scroll: Float32): Unit {
     var i = scrollLineIndex(scroll)
     var y = rect.y - scrollLineRemainder(scroll)
     while (i < lines.size && y < rect.bottom()) {
@@ -358,8 +387,8 @@ private func drawLines(ctx: UiContext, rect: Rect, text: String, scroll: Float32
     }
 }
 
-private func textContentHeight(text: String): Float32 {
-    Float32(text.split("\n").size) * CUI_SMALL_H
+private func textContentHeight(lines: Array<String>): Float32 {
+    Float32(lines.size) * CUI_SMALL_H
 }
 
 private func textViewport(frame: Rect): Rect {
