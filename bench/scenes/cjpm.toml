@@ -1,0 +1,10 @@
+[package]
+cjc-version = "1.0.5"
+name = "bench_scenes"
+version = "0.1.0"
+output-type = "static"
+description = "Reusable scene and data builders shared by the CUI benchmarks (headless and display)."
+
+[dependencies]
+cui = { path = "../.." }
+bench_harness = { path = "../harness" }

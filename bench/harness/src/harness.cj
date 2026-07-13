@@ -135,3 +135,64 @@ private func padRight(text: String, width: Int64): String {
     }
     result
 }
+
+// --- machine-readable output + reusable drivers ---
+
+/*
+ * Emits a result in both forms: the human-readable console row, plus a machine-readable line the
+ * report generator (bench/run.ps1) parses into the HTML summary. The machine line is
+ *   @@RESULT|<kind>|<group>|<name>|<nsPerIteration>|<iterations>
+ * `kind` is "frame" (a per-frame cost, judged against the frame budget) or "micro" (an isolated
+ * operation, judged on raw throughput). `group` and `name` must not contain '|'.
+ */
+public func report(kind: String, group: String, result: BenchResult): Unit {
+    printResult(result)
+    println("@@RESULT|${kind}|${group}|${result.name}|${result.perIterationNs()}|${result.iterations}")
+}
+
+/*
+ * Emits a per-frame count metric (for example, text measurements performed in one frame) rather
+ * than a timing. The report shows these as a diagnostic: the count of measurements a tree performs
+ * per frame is identical headless and on a display, so it localises a text-bound cost without a
+ * window. The machine line is @@COUNT|<group>|<name>|<count>.
+ */
+public func reportCount(group: String, name: String, count: UInt64): Unit {
+    println("  ${padRight(name, 36)}${count} 次/帧")
+    println("@@COUNT|${group}|${name}|${count}")
+}
+
+/*
+ * A ping-pong scroll-offset source for frame-cost benchmarks: each `next()` advances the offset by
+ * `step`, reversing at 0 and `maxOffset`, so successive frames sweep the content up and down as a
+ * user dragging the bar would. A class rather than a captured local because a benchmark body is a
+ * single-expression lambda and cannot mutate captured variables.
+ */
+public class ScrollSweep {
+    private let maxOffset: Float32
+    private let step: Float32
+    private var current: Float32 = 0.0
+    private var rising: Bool = true
+
+    public init(maxOffset: Float32, step: Float32) {
+        this.maxOffset = max(0.0, maxOffset)
+        this.step = max(0.0, step)
+    }
+
+    /** The next offset along the sweep. */
+    public func next(): Float32 {
+        if (rising) {
+            current += step
+            if (current >= maxOffset) {
+                current = maxOffset
+                rising = false
+            }
+        } else {
+            current -= step
+            if (current <= 0.0) {
+                current = 0.0
+                rising = true
+            }
+        }
+        current
+    }
+}

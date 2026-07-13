@@ -38,6 +38,10 @@ public class Renderer {
     private let geometry = GeometryBatch()
     private let textBackend: ?NativeTextRenderer
     private let clipStack = ArrayList<Rect>()
+    // Counts text measurements since the last reset — a per-frame cost probe. Text measurement is a
+    // per-frame choke point (each measure shapes the string and, with a real backend, calls
+    // SDL_ttf), so benchmarks reset this at a frame boundary to see how many a tree performs.
+    private var measureCount: UInt64 = 0
 
     internal init(ptr: CPointer<Unit>, contentScale!: Float32 = 1.0) {
         this.ptr = ptr
@@ -514,7 +518,18 @@ public class Renderer {
         this.text(text, tx, ty, color, pointSize: pointSize)
     }
 
+    /** Text measurements performed since the last reset — a per-frame text-cost probe. */
+    public func textMeasureCount(): UInt64 {
+        measureCount
+    }
+
+    /** Resets the text-measurement counter; call at a frame boundary to sample a single frame. */
+    public func resetTextMeasureCount(): Unit {
+        measureCount = 0
+    }
+
     private func textMetrics(text: String, pointSize: Float32): NativeTextMetrics {
+        measureCount += 1
         match (textBackend) {
             case Some(value) =>
                 if (scaleX == 1.0 && scaleY == 1.0) {

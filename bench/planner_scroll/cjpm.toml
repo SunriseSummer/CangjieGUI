@@ -1,9 +1,9 @@
 [package]
 cjc-version = "1.0.5"
-name = "bench_micro"
+name = "bench_planner_scroll"
 version = "0.1.0"
 output-type = "executable"
-description = "Headless single-scenario micro-benchmarks for CUI."
+description = "End-to-end (display) frame-rate benchmark: auto-scrolling a composed content page."
 
 [dependencies]
 cui = { path = "../.." }

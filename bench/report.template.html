@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CUI 性能基准报告</title>
+<style>
+:root{
+  --bg:#faf9f5; --surface:#ffffff; --ink:#282520; --muted:#6b665c; --line:#e9e4d8; --track:#efeadf;
+  --accent:#c15f3c; --ok:#4b7b5b; --good:#3f6e8c; --warn:#b9822f; --bad:#b2472f;
+  --shadow:0 1px 2px rgba(40,30,20,.05), 0 1px 3px rgba(40,30,20,.04);
+  --serif:ui-serif,Georgia,"Songti SC","Times New Roman",serif;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+}
+@media(prefers-color-scheme:dark){:root{
+  --bg:#211f1a; --surface:#2a2822; --ink:#ece7db; --muted:#9d978a; --line:#39352c; --track:#332f27;
+  --accent:#d8946f; --ok:#6fa585; --good:#6f9ab8; --warn:#cfa254; --bad:#d0745a;
+  --shadow:0 1px 2px rgba(0,0,0,.24), 0 1px 3px rgba(0,0,0,.20);
+}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;
+  font-size:14px;letter-spacing:.005em}
+.wrap{max-width:980px;margin:0 auto;padding:56px 24px 80px}
+header{margin-bottom:8px}
+h1{font-family:var(--serif);font-weight:600;font-size:31px;letter-spacing:-.01em;margin:0 0 10px;line-height:1.2}
+.rule{width:44px;height:3px;border-radius:3px;background:var(--accent);margin:0 0 14px}
+.sub{color:var(--muted);font-size:13px;margin:0 0 6px}
+h2{font-family:var(--serif);font-weight:600;font-size:20px;letter-spacing:-.005em;margin:44px 0 16px;
+  display:flex;align-items:center;gap:10px}
+h2::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--accent);display:inline-block}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;background:var(--surface);
+  border:1px solid var(--line);border-radius:14px;padding:14px 20px;font-size:12.5px;color:var(--muted);
+  box-shadow:var(--shadow);margin-top:22px}
+.legend b{color:var(--ink);font-weight:600}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.dot.ok{background:var(--ok)}.dot.good{background:var(--good)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin:22px 0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow)}
+.card .k{color:var(--muted);font-size:12px;margin-bottom:8px;letter-spacing:.01em}
+.card .v{font-family:var(--serif);font-size:27px;font-weight:600;line-height:1.1}
+.card .v.small{font-size:14px;font-weight:600;line-height:1.45;letter-spacing:0}
+.tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  box-shadow:var(--shadow)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:640px}
+th,td{padding:12px 18px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+thead th{font-size:11.5px;color:var(--muted);font-weight:600;letter-spacing:.02em;background:transparent}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:color-mix(in srgb,var(--accent) 5%,transparent)}
+td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+td.grp{color:var(--muted)}
+.barcell{width:230px}
+.bar{background:var(--track);border-radius:7px;height:8px;overflow:hidden;min-width:120px}
+.fill{height:100%;border-radius:7px}
+.fill.ok{background:var(--ok)}.fill.good{background:var(--good)}.fill.warn{background:var(--warn)}
+.fill.bad{background:var(--bad)}.fill.micro{background:var(--accent)}
+.badge{display:inline-block;padding:3px 11px;border-radius:999px;font-size:11.5px;font-weight:600;color:#fff;
+  letter-spacing:.01em}
+.badge.ok{background:var(--ok)}.badge.good{background:var(--good)}.badge.warn{background:var(--warn)}.badge.bad{background:var(--bad)}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:720px){.split{grid-template-columns:1fr}}
+.note{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 22px;box-shadow:var(--shadow)}
+.note h3{font-family:var(--serif);margin:0 0 10px;font-size:15px;font-weight:600}
+.note ul{margin:0;padding-left:20px}
+.note li{margin:6px 0;font-size:13px}
+.note li b{font-weight:600}
+.muted{color:var(--muted)}
+p{margin:10px 0}
+code{background:var(--track);padding:1px 6px;border-radius:5px;font-size:12.5px;
+  font-family:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace}
+footer{margin-top:48px;color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:18px;line-height:1.8}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>CUI 性能基准报告</h1>
+    <div class="rule"></div>
+    <p class="sub">{{META}}</p>
+  </header>
+
+  <div class="legend">
+    <span><b>帧预算（业界交互基线）</b></span>
+    <span><span class="dot ok"></span>120fps ≤ 8.33ms</span>
+    <span><span class="dot good"></span>60fps ≤ 16.67ms</span>
+    <span><span class="dot warn"></span>30fps ≤ 33.33ms</span>
+    <span><span class="dot bad"></span>低于 30fps</span>
+    <span class="muted">口径：无头 CPU 侧 build / layout / draw，文本按估算宽度计，不含 GPU 光栅。</span>
+  </div>
+
+  <div class="cards">
+    <div class="card"><div class="k">帧用例</div><div class="v">{{FRAME_COUNT}}</div></div>
+    <div class="card"><div class="k">超 60fps 预算（短板）</div><div class="v">{{OVER_COUNT}}</div></div>
+    <div class="card"><div class="k">达 120fps（长板）</div><div class="v">{{COMFORT_COUNT}}</div></div>
+    <div class="card"><div class="k">最重帧用例</div><div class="v small">{{WORST}}</div></div>
+  </div>
+
+  <h2>每帧成本 · 无头（对照帧预算）</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>场景</th><th>用例</th><th>每帧耗时</th><th>估算帧率</th><th>评级</th><th>预算占用（相对 16.67ms）</th></tr></thead>
+      <tbody>
+{{FRAME_ROWS}}      </tbody>
+    </table>
+  </div>
+
+  <h2>每帧成本 · 上机实测（含文本光栅）</h2>
+  {{DISPLAY_SECTION}}
+
+  <h2>短板与长板</h2>
+  <div class="split">
+    <div class="note">
+      <h3>短板（超出 60fps 预算，优先优化）</h3>
+      <ul>
+{{WEAK_ITEMS}}      </ul>
+    </div>
+    <div class="note">
+      <h3>长板（稳居 120fps 区间）</h3>
+      <ul>
+{{STRONG_ITEMS}}      </ul>
+    </div>
+  </div>
+
+  <h2>文本度量诊断 · 每帧调用次数</h2>
+  {{COUNT_SECTION}}
+
+  <h2>局部操作吞吐 · 微基准</h2>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>分组</th><th>用例</th><th>单次耗时</th><th>吞吐（次/秒）</th><th>组内相对强度</th></tr></thead>
+      <tbody>
+{{MICRO_ROWS}}      </tbody>
+    </table>
+  </div>
+
+  <footer>
+    数据来源：<code>bench/micro</code> 的 <code>@@RESULT</code> 输出（原始日志见 <code>results/micro.out.txt</code>）；
+    上机数据来自自终止的 <code>bench/planner_scroll</code>、<code>bench/large_table</code>。<br>
+    重新生成：<code>python bench/run.py</code>（<code>--display</code> 采集上机帧率，<code>--open</code> 直接打开，<code>--check</code> 守护回归）。方法学见 <code>bench/README.md</code>。
+  </footer>
+</div>
+</body>
+</html>

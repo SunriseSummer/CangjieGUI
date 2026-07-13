@@ -1,28 +1,14 @@
 /*
- * Scenario: string-operation costs in this runtime. Records a repeatedly-observed characteristic
- * — per-byte String indexing (bounds-checked) is costly, so a hand-rolled byte scan can lose to
- * the heavily optimised stdlib `split`, and string-interpolation key building is not free. These
- * numbers are why the TextArea line-window and text-metrics-cache changes were measured and
- * reverted (see done.md).
+ * Scenario: string-operation costs in this runtime. Records a repeatedly-observed characteristic —
+ * per-byte String indexing (bounds-checked) is costly, so a hand-rolled byte scan can lose to the
+ * heavily optimised stdlib `split`, and string-interpolation key building is not free. These
+ * numbers are why the TextArea line-window and text-metrics-cache changes were measured rather than
+ * assumed (see .todo/done.md).
  */
 package bench_micro
 
-import bench_harness.{printResult, printSection, timeit}
-
-private func buildDocument(lines: Int64): String {
-    let builder = StringBuilder()
-    var i = 0
-    while (i < lines) {
-        builder.append("row ")
-        builder.append(i)
-        builder.append(": the quick brown fox jumps over the lazy dog")
-        if (i < lines - 1) {
-            builder.append("\n")
-        }
-        i += 1
-    }
-    builder.toString()
-}
+import bench_scenes.makeDocument
+import bench_harness.{printSection, report, timeit}
 
 // Counts newlines by direct byte scan — the hand-rolled alternative to splitting.
 private func scanLineCount(text: String): Int64 {
@@ -38,14 +24,14 @@ private func scanLineCount(text: String): Int64 {
 }
 
 public func runStringScanBench(): Unit {
-    printSection("String operations")
-    let document = buildDocument(3000)
+    printSection("字符串操作")
+    let document = makeDocument(3000)
     let reps = 500
     // Counting lines: stdlib split versus a hand-rolled byte scan over the same document.
-    printResult(timeit("stdlib split.size (3000 lines)", reps, {=> document.split("\n").size}))
-    printResult(timeit("hand byte-scan line count", reps, {=> scanLineCount(document)}))
+    report("micro", "字符串", timeit("split.size（3000 行）", reps, {=> document.split("\n").size}))
+    report("micro", "字符串", timeit("手写字节扫描计行", reps, {=> scanLineCount(document)}))
     // Interpolated key build, as a per-call metrics-cache key would do.
     let size: Float32 = 15.0
     let label = "Menu Item Label"
-    printResult(timeit("interp key build", 100000, {=> "${size}#${label}".size}))
+    report("micro", "字符串", timeit("插值构键", 100000, {=> "${size}#${label}".size}))
 }
