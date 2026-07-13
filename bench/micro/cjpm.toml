@@ -1,0 +1,10 @@
+[package]
+cjc-version = "1.0.5"
+name = "bench_micro"
+version = "0.1.0"
+output-type = "executable"
+description = "Headless single-scenario micro-benchmarks for CUI."
+
+[dependencies]
+cui = { path = "../.." }
+bench_harness = { path = "../harness" }

@@ -33,8 +33,11 @@ public class TextEditState {
     }
 
     public func normalizeCursor(): Unit {
-        cursor.value = normalizedTextCursor(text.value, cursor.value)
-        anchor.value = normalizedTextCursor(text.value, anchor.value)
+        // Runs every frame (draw calls it): skip the write when already normalized so callers
+        // that own and observe the cursor/anchor are not notified — and revisions not bumped —
+        // for a no-op. Behaviour is unchanged; only redundant notifications are avoided.
+        let _ = cursor.setIfChanged(normalizedTextCursor(text.value, cursor.value))
+        let _ = anchor.setIfChanged(normalizedTextCursor(text.value, anchor.value))
     }
 
     /** Whether a non-empty range is selected. */

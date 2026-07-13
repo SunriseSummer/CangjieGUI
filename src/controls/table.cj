@@ -375,17 +375,19 @@ public class Table <: Widget {
         if (col < 0 || col >= columns.size || n <= 1) {
             return identity
         }
-        let numeric = columns[col].numeric
         let ascending = sortAsc.value
-        stableSort(identity, {a, b => lessByColumn(a, b, col, numeric, ascending)})
+        // Extract the sort keys once (O(n)) so each of the O(n log n) comparisons reads a flat
+        // array, instead of re-fetching the cell and (for numeric columns) re-parsing the number
+        // on every comparison. The order is identical; only redundant per-comparison work is cut.
+        if (columns[col].numeric) {
+            let keys = Array<Float64>(n, {i => numericKey(cellAt(i, col))})
+            return stableSort(identity, {a, b => lessByOrder(compareFloat(keys[a], keys[b]), ascending)})
+        }
+        let keys = Array<String>(n, {i => cellAt(i, col)})
+        stableSort(identity, {a, b => lessByOrder(compareBytes(keys[a], keys[b]), ascending)})
     }
 
-    private func lessByColumn(a: Int64, b: Int64, col: Int64, numeric: Bool, ascending: Bool): Bool {
-        let comparison = if (numeric) {
-            compareFloat(numericKey(cellAt(a, col)), numericKey(cellAt(b, col)))
-        } else {
-            compareBytes(cellAt(a, col), cellAt(b, col))
-        }
+    private func lessByOrder(comparison: Int64, ascending: Bool): Bool {
         if (ascending) {
             comparison < 0
         } else {

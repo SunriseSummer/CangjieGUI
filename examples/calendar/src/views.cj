@@ -9,7 +9,7 @@
 package cui_calendar
 
 import cui.{Button, ButtonRole, FontSizes, ForEachIndexed, HStack, IconButton, IconName, ImageView, Label,
-    LengthUnits, Panel, Spacer, TabView, TextAlign, VStack, emit}
+    LengthUnits, Panel, Spacer, TabView, TextAlign, VStack}
 
 func calendarView(model: CalendarModel): Unit {
     VStack {

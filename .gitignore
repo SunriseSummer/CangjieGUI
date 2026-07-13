@@ -3,6 +3,7 @@ target/
 *.gcda
 *.gcno
 *.cov
+.todo/
 .agents/
 .claude/
 .idea/

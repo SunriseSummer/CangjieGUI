@@ -1,0 +1,9 @@
+[package]
+cjc-version = "1.0.5"
+name = "bench_harness"
+version = "0.1.0"
+output-type = "static"
+description = "Reusable timing and reporting utilities shared by CUI benchmarks."
+
+[dependencies]
+sdl = { path = "../../sdl" }
