@@ -67,6 +67,16 @@ public class VStack <: Widget {
         stack.setFlexible(value)
         this
     }
+
+    /**
+     * Sizes this stack to its content along the parent's main axis rather than filling the offered
+     * space — the intent-revealing name for the common `.flexible(false)` (a card or toolbar that
+     * should be exactly as tall as what it holds).
+     */
+    public func hug(): VStack {
+        stack.setFlexible(false)
+        this
+    }
 }
 
 public class HStack <: Widget {
@@ -132,6 +142,16 @@ public class HStack <: Widget {
     /** Controls whether this stack itself participates in its parent's flex pass. */
     public func flexible(value: Bool): HStack {
         stack.setFlexible(value)
+        this
+    }
+
+    /**
+     * Sizes this stack to its content along the parent's main axis rather than filling the offered
+     * space — the intent-revealing name for the common `.flexible(false)` (a card or toolbar that
+     * should be exactly as wide as what it holds).
+     */
+    public func hug(): HStack {
+        stack.setFlexible(false)
         this
     }
 }

@@ -25,11 +25,19 @@ public class TextField <: Widget {
     private let xOffset: State<Float32>
     private var autofocusRequested = false
     private let autofocusDone: State<Bool>
+    private let isEditable: Bool
     private var frame = Rect.zero()
 
-    public init(id: String, text: Bindable<String>, cursor!: ?State<Int64> = None, anchor!: ?State<Int64> = None) {
+    public init(
+        id: String,
+        text: Bindable<String>,
+        cursor!: ?State<Int64> = None,
+        anchor!: ?State<Int64> = None,
+        editable!: Bool = true
+    ) {
         this.id = id
         this.text = text
+        this.isEditable = editable
         this.cursorStateValue = match (cursor) {
             case Some(value) => value
             case None => localState<Int64>("TextField:${id}:cursor") {text.value.size}
@@ -45,7 +53,10 @@ public class TextField <: Widget {
         this.history = localState<UndoHistory>("TextField:${id}:history") {UndoHistory()}.value
         this.xOffset = localState<Float32>("TextField:${id}:xoff") {0.0}
         this.autofocusDone = localState<Bool>("TextField:${id}:autofocused") {false}
-        registerFocusable(id)
+        // A read-only field is not an editing stop, so it stays out of Tab traversal (mirrors TextArea).
+        if (editable) {
+            registerFocusable(id)
+        }
         emit(this)
     }
 
@@ -119,7 +130,10 @@ public class TextField <: Widget {
     }
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
-        claimHoverIfInside(ctx, event, frame, id, CursorShape.Text)
+        // A read-only field is not an editing target, so it does not request the text cursor.
+        if (isEditable) {
+            claimHoverIfInside(ctx, event, frame, id, CursorShape.Text)
+        }
         let edit = editState()
         match (event) {
             case UiEvent.MouseDown(MouseButton.Left, x, y) => return pressAt(ctx, edit, x, y)
@@ -177,7 +191,7 @@ public class TextField <: Widget {
     // Runs a mutating action while focused and records it for undo. The before/after text
     // comparison means a no-op edit (e.g. Backspace at position 0) adds no undo step.
     private func recordedEdit(ctx: UiContext, action: () -> Unit): Bool {
-        if (!ctx.hasFocus(id)) {
+        if (!ctx.hasFocus(id) || !isEditable) {
             return false
         }
         let before = snapshot()

@@ -1,7 +1,7 @@
 package cui.controls
 
 import sdl.{Color, FontSizes, Key, MouseButton, Pen, Rect, Size, SurfaceStyle, UiEvent}
-import cui.core.{Bindable, CUI_CONTROL_H, CUI_SMALL_H, CursorShape, Overlay, ScrollBar, State, UiContext, Widget,
+import cui.core.{Bindable, CUI_CONTROL_H, CUI_SMALL_H, CursorShape, Overlay, ScrollBar, State, UiContext, Widget, requireControlId,
     claimHoverIfInside, clampScrollOffset, drawSurface, drawVerticalScrollBar, emit, localState, registerFocusable,
     scrollBarGutter, scrollOffsetAfterWheel}
 
@@ -35,9 +35,7 @@ public class Dropdown <: Widget {
     private var frame = Rect.zero()
 
     public init(id: String, items: Array<String>, selected: Bindable<Int64>) {
-        if (id.isEmpty()) {
-            throw IllegalArgumentException("Dropdown id must not be empty")
-        }
+        requireControlId(id, "Dropdown")
         this.id = id
         this.items = items
         this.selected = selected

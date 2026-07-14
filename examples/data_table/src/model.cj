@@ -7,12 +7,12 @@ package cui_data_table
 import cui.{DerivedState, State}
 
 class FleetModel {
-    let rows = seedServers()
+    let servers = seedServers()
     let selected = State<Int64>(0)
     let summary: DerivedState<String>
 
     init() {
-        let data = this.rows
+        let data = this.servers
         this.summary = this.selected.map<String>({index => serverSummary(data, index)})
     }
 }

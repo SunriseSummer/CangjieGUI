@@ -11,6 +11,28 @@ struct TestProfile {
 }
 
 @Test
+func deriveOverArrayOfSourcesTracksEvery(): Unit {
+    let a = State<Int64>(1)
+    let b = State<Int64>(2)
+    let c = State<Int64>(3)
+    let sources: Array<Observable<Int64>> = [a, b, c]
+    let total = derive<Int64, Int64>(sources, {values =>
+        var sum = 0
+        for (v in values) {
+            sum += v
+        }
+        sum
+    })
+    @Expect(total.value, Int64(6))
+    // Recomputes when ANY source changes — including the 3rd, past the fixed-arity overloads' reach
+    // when combined with more.
+    b.value = 20
+    @Expect(total.value, Int64(24))
+    c.value = 30
+    @Expect(total.value, Int64(51))
+}
+
+@Test
 func derivedStateCachesUntilSourceChanges(): Unit {
     let count = State<Int64>(2)
     let calls = State<Int64>(0)

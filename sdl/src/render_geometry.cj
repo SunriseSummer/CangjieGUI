@@ -27,9 +27,12 @@ private let AA_FEATHER: Float32 = 0.7
 // radii keep curve error well under a device pixel once the render scale is applied.
 private let ARC_CHORD: Float64 = 1.1
 
-// Distinct mesh kinds so a filled and a stroked shape of the same size cache separately.
-private let MESH_KIND_FILL: Int64 = 0
+// Distinct mesh kinds so shapes of the same size but different construction cache separately. Packed
+// into the low 2 bits of the mesh key, so up to four kinds.
+internal let MESH_KIND_FILL: Int64 = 0
 private let MESH_KIND_STROKE: Int64 = 1
+private let MESH_KIND_CIRCLE_FILL: Int64 = 2
+private let MESH_KIND_CIRCLE_STROKE: Int64 = 3
 
 // How many distinct shape meshes to retain before the older generation is dropped. A UI reuses a
 // small set of shapes (a few panel/card/chip sizes, each with a fill, a border and two shadow
@@ -123,16 +126,46 @@ internal class GeometryBatch {
         if (renderer.isNull() || radius <= 0.0) {
             return
         }
-        buildCirclePath(center, radius, 0)
-        fillPath(renderer, color, clampFeather(AA_FEATHER, radius * 2.0))
+        let feather = clampFeather(AA_FEATHER, radius * 2.0)
+        // Cache the circle mesh in local coordinates (centre at origin) and translate to `center` on
+        // emit — knobs, dots and thumbs are the same handful of radii, so this is nearly all hits.
+        if (withinKeyBudget(radius, 0.0, 0.0, feather)) {
+            let key = meshKey(MESH_KIND_CIRCLE_FILL, radius, 0.0, 0.0, feather)
+            let mesh = match (meshCache.get(key)) {
+                case Some(existing) => existing
+                case None =>
+                    buildCirclePath(Point(0.0, 0.0), radius, 0)
+                    let built = buildFillMesh(feather)
+                    meshCache.put(key, built)
+                    built
+            }
+            emitMesh(renderer, mesh, center.x, center.y, color)
+        } else {
+            buildCirclePath(center, radius, 0)
+            fillPath(renderer, color, feather)
+        }
     }
 
     func strokeCircle(renderer: CPointer<Unit>, center: Point, radius: Float32, pen: Pen, minSegments: Int64): Unit {
         if (renderer.isNull() || radius <= 0.0 || pen.width <= 0.0) {
             return
         }
-        buildCirclePath(center, radius, minSegments)
-        strokePath(renderer, pen)
+        // The segment count changes the mesh, so it is part of the key (packed as the height field).
+        if (withinKeyBudget(radius, Float32(minSegments), 0.0, pen.width)) {
+            let key = meshKey(MESH_KIND_CIRCLE_STROKE, radius, Float32(minSegments), 0.0, pen.width)
+            let mesh = match (meshCache.get(key)) {
+                case Some(existing) => existing
+                case None =>
+                    buildCirclePath(Point(0.0, 0.0), radius, minSegments)
+                    let built = buildStrokeMesh(pen)
+                    meshCache.put(key, built)
+                    built
+            }
+            emitMesh(renderer, mesh, center.x, center.y, pen.color)
+        } else {
+            buildCirclePath(center, radius, minSegments)
+            strokePath(renderer, pen)
+        }
     }
 
     /**
@@ -720,10 +753,14 @@ private func clampFeather(feather: Float32, minDimension: Float32): Float32 {
     max(0.1, min(feather, minDimension * 0.9))
 }
 
-// Quantizes a length to quarter-pixel units for mesh keying: sub-quarter-pixel size differences
-// share a mesh (an imperceptible size rounding, while the draw position stays exact).
-private func quantizeLength(value: Float32): Int64 {
-    Int64(value * 4.0 + 0.5)
+// Quantizes a length to quarter-pixel units for mesh keying, TRUNCATING rather than rounding. The
+// truncation is deliberate: withinKeyBudget bounds each field with an exclusive upper limit at a
+// power of two, and floor keeps the largest in-budget value at exactly 2^bits - 1, so a boundary
+// value can never carry a bit into the adjacent packed field (rounding with +0.5 would turn, say,
+// radius 511.9 into 2048 and overflow the 11-bit radius field into `extra`). Sub-quarter-pixel size
+// differences share a mesh — an imperceptible size rounding, while the draw position stays exact.
+internal func quantizeLength(value: Float32): Int64 {
+    Int64(value * 4.0)
 }
 
 // True when a shape's dimensions fit the packed key's bit budget. An out-of-range shape bypasses the
@@ -732,16 +769,16 @@ private func withinKeyBudget(w: Float32, h: Float32, radius: Float32, extra: Flo
     w >= 0.0 && w < 8192.0 && h >= 0.0 && h < 8192.0 && radius >= 0.0 && radius < 512.0 && extra >= 0.0 && extra < 64.0
 }
 
-// Packs (kind, width, height, radius, extra) into one Int64 cache key. Field widths: kind 1 bit,
+// Packs (kind, width, height, radius, extra) into one Int64 cache key. Field widths: kind 2 bits,
 // width/height 15 bits each (quarter-pixel, < 8192px), radius 11 bits (< 512px), extra 8 bits
-// (< 64px) — 50 bits total. withinKeyBudget guarantees each field fits, so distinct shapes never
-// collide onto one key.
-private func meshKey(kind: Int64, w: Float32, h: Float32, radius: Float32, extra: Float32): Int64 {
+// (< 64px) — 51 bits total. withinKeyBudget bounds each length and quantizeLength truncates, so every
+// field stays at or below 2^width - 1 and distinct shapes never collide onto one key.
+internal func meshKey(kind: Int64, w: Float32, h: Float32, radius: Float32, extra: Float32): Int64 {
     let qw = quantizeLength(w)
     let qh = quantizeLength(h)
     let qr = quantizeLength(radius)
     let qe = quantizeLength(extra)
-    kind | (qw << 1) | (qh << 16) | (qr << 31) | (qe << 42)
+    kind | (qw << 2) | (qh << 17) | (qr << 32) | (qe << 43)
 }
 
 // A tessellated shape in local coordinates, held in native buffers so per-frame emit is a tight

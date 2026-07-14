@@ -45,6 +45,8 @@ public class TextArea <: Widget {
     private let scrollBar: ScrollBar
     private let history: UndoHistory
     private let lineCache: TextLineCache
+    private var autofocusRequested = false
+    private let autofocusDone: State<Bool>
     private var frame = Rect.zero()
 
     public init(
@@ -78,11 +80,18 @@ public class TextArea <: Widget {
         this.scrollBar = ScrollBar("TextArea:${id}:thumb")
         this.history = localState<UndoHistory>("TextArea:${id}:history") {UndoHistory()}.value
         this.lineCache = localState<TextLineCache>("TextArea:${id}:lines") {TextLineCache()}.value
+        this.autofocusDone = localState<Bool>("TextArea:${id}:autofocused") {false}
         // A read-only text area is not an editing stop, so it stays out of Tab traversal.
         if (editable) {
             registerFocusable(id)
         }
         emit(this)
+    }
+
+    /** Claims keyboard focus the first time an editable area appears (e.g. a compose box). */
+    public func autofocus(): TextArea {
+        autofocusRequested = true
+        this
     }
 
     /** Reverts the last edit group; also bound to Ctrl+Z. */
@@ -171,6 +180,13 @@ public class TextArea <: Widget {
             case UiEvent.KeyDown(Key.End, _) => return navigate(ctx, {=> edit.moveToLineEnd()},
                 {=> edit.extendToLineEnd()})
             case UiEvent.KeyDown(Key.Letter(code), _) => return shortcut(ctx, edit, code)
+            case UiEvent.Frame(_) =>
+                // One-time initial focus for an editable area, applied after the frame's pointer
+                // events so a stray startup click cannot cancel it; mirrors TextField.
+                if (autofocusRequested && isEditable && !autofocusDone.value) {
+                    ctx.focus(id, viaKeyboard: true)
+                    autofocusDone.value = true
+                }
             case _ => ()
         }
         false

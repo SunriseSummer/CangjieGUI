@@ -19,6 +19,9 @@ public class Label <: Widget {
     private var cachedLines: ?Array<String> = None
     private var cachedLinesWidth: Float32 = -1.0
     private var cachedLinesPointSize: Float32 = -1.0
+    // The widest wrapped line, cached with the lines it derives from so a warm multi-line measure
+    // re-measures nothing instead of re-scanning every line each measure pass.
+    private var cachedLinesWidest: Float32 = 0.0
     private var cachedTextWidth: Float32 = -1.0
     private var cachedTextWidthPointSize: Float32 = -1.0
 
@@ -97,13 +100,10 @@ public class Label <: Widget {
             return Size(min(available.w, singleLineWidth(ctx, ps)), max(CUI_SMALL_H, lineHeight + 6.0))
         }
         let lines = linesFor(ctx, available.w, ps)
-        var widest: Float32 = 0.0
-        for (line in lines) {
-            widest = max(widest, ctx.renderer.textWidth(line, pointSize: ps))
-        }
         let count = max(1, lines.size)
         let textBlock = Float32(count) * lineHeight + Float32(count - 1) * LABEL_LINE_GAP
-        Size(min(available.w, widest), max(CUI_SMALL_H, textBlock + 6.0))
+        // widest was measured when the lines were wrapped and cached; a warm pass reuses it.
+        Size(min(available.w, cachedLinesWidest), max(CUI_SMALL_H, textBlock + 6.0))
     }
 
     public func layout(_: UiContext, rect: Rect): Unit {
@@ -115,7 +115,13 @@ public class Label <: Widget {
         let color = drawColor(ctx)
         let lineHeight = ctx.renderer.textHeight(pointSize: ps)
         if (lineLimit == 1) {
-            let fitted = ellipsize(ctx, text, frame.w, ps)
+            // Reuse the cached full-text width for the fit test: ellipsize (a binary search) runs
+            // only when the text overflows, so a fitting single-line label re-measures nothing.
+            let fitted = if (singleLineWidth(ctx, ps) <= frame.w) {
+                text
+            } else {
+                ellipsize(ctx, text, frame.w, ps)
+            }
             ctx.renderer.text(fitted, lineX(ctx, fitted, ps), frame.centerY() - lineHeight / 2.0, color, pointSize: ps)
             return
         }
@@ -163,19 +169,28 @@ public class Label <: Widget {
             case Some(lines) where cachedLinesWidth == width && cachedLinesPointSize == ps => lines
             case _ =>
                 let lines = wrapText(ctx, text, width, ps, lineLimit)
+                var widest: Float32 = 0.0
+                for (line in lines) {
+                    widest = max(widest, ctx.renderer.textWidth(line, pointSize: ps))
+                }
                 cachedLines = Some(lines)
                 cachedLinesWidth = width
                 cachedLinesPointSize = ps
+                cachedLinesWidest = widest
                 lines
         }
     }
 
     private func lineX(ctx: UiContext, line: String, ps: Float32): Float32 {
-        let lineW = ctx.renderer.textWidth(line, pointSize: ps)
+        // Leading (the default) does not need the line width, so the common case skips the measure.
         match (alignment) {
-            case TextAlign.Center => frame.x + max(0.0, frame.w - lineW) / 2.0
-            case TextAlign.Trailing => frame.right() - lineW
             case TextAlign.Leading => frame.x
+            case TextAlign.Center =>
+                let lineW = ctx.renderer.textWidth(line, pointSize: ps)
+                frame.x + max(0.0, frame.w - lineW) / 2.0
+            case TextAlign.Trailing =>
+                let lineW = ctx.renderer.textWidth(line, pointSize: ps)
+                frame.right() - lineW
         }
     }
 }
@@ -346,9 +361,7 @@ public class Button <: Widget {
      * between containers). Throws `IllegalArgumentException` when `value` is empty.
      */
     public func id(value: String): Button {
-        if (value.isEmpty()) {
-            throw IllegalArgumentException("Button id must not be empty")
-        }
+        requireControlId(value, "Button")
         reregisterFocusable(controlId, value)
         controlId = value
         this

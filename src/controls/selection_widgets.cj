@@ -1,7 +1,7 @@
 package cui.controls
 
 import sdl.{Color, FontSizes, Key, MouseButton, Rect, Size, UiEvent}
-import cui.core.{Bindable, CUI_CONTROL_H, CUI_SMALL_H, CursorShape, ScrollBar, Spring, State, UiContext, Widget,
+import cui.core.{Bindable, CUI_CONTROL_H, CUI_SMALL_H, CursorShape, ScrollBar, Spring, State, UiContext, Widget, requireControlId,
     claimHoverIfInside, clampScrollOffset, drawFocusRing, drawSurface, drawVerticalScrollBar, emit,
     focusableControlIdentity, localState, reregisterFocusable, scrollLineIndex, scrollLineRemainder,
     scrollOffsetAfterWheel}
@@ -33,9 +33,7 @@ public class Checkbox <: Widget {
      * Throws `IllegalArgumentException` when `value` is empty.
      */
     public func id(value: String): Checkbox {
-        if (value.isEmpty()) {
-            throw IllegalArgumentException("Checkbox id must not be empty")
-        }
+        requireControlId(value, "Checkbox")
         reregisterFocusable(controlId, value)
         controlId = value
         this
@@ -121,10 +119,24 @@ public class ListView <: Widget {
     private let lastRevealed: State<Int64>
     private var frame = Rect.zero()
 
-    public init(items: Array<String>, selected: Bindable<Int64>, scroll!: ?State<Float32> = None) {
+    public init(
+        items: Array<String>,
+        selected: Bindable<Int64>,
+        scroll!: ?State<Float32> = None,
+        id!: ?String = None
+    ) {
         this.items = items
         this.selected = selected
-        let cid = focusableControlIdentity("ListView")
+        // Identity is optional and auto-derived by build order by default (like SegmentedControl and
+        // TabView); pass `id` to give it a stable, addressable identity — e.g. to keep scroll/selection
+        // state across a structural change or to coordinate scroll externally. Non-empty when given.
+        let base = match (id) {
+            case Some(value) =>
+                requireControlId(value, "ListView")
+                value
+            case None => "ListView"
+        }
+        let cid = focusableControlIdentity(base)
         this.controlId = cid
         // Without an external scroll state, retain the offset across the per-frame rebuild via
         // localState keyed by control id — a fresh State each frame would reset the offset, so

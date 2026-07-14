@@ -86,3 +86,48 @@ func lazyColumnBuildsWindowAroundExternalScroll(): Unit {
     @Expect(built.high < 520, true)
     @Expect(column.isFlexible(), true)
 }
+
+// The data-driven `LazyColumn.of` must virtualize (build only a screenful) AND hand the row builder
+// the DATA elements at the visible indices — not the raw indices — so a list over `Array<T>` needs no
+// manual count or data[i] lookup.
+@Test
+func lazyColumnOfBuildsRowsFromData(): Unit {
+    // data[i] == i * 10, so a built value reveals which index it came from.
+    let data = Array<Int64>(1000, {i => i * 10})
+    let built = LazyBuiltIndices()
+    let scroll = State<Float32>(50000.0) // near row 500
+    let column = LazyColumn.of<Int64>("test.of", data, 100.0, scroll: scroll, key: {v => "v${v}"}) {
+        value =>
+        built.add(value)
+        emit(Spacer())
+    }
+    // Only a screenful materialized, not all 1000.
+    @Expect(built.count > 0, true)
+    @Expect(built.count < 20, true)
+    // The builder received data VALUES near row 500 (value == index*10 ~ 4980..5090), proving the
+    // index->data mapping, not raw indices (~498..509).
+    @Expect(built.low >= 4900, true)
+    @Expect(built.high <= 5200, true)
+    @Expect(column.isFlexible(), true)
+}
+
+// LazyGrid windows by row (data / columns), so a large collection builds only the cells of the
+// visible rows, and each built cell is the data element at its grid position.
+@Test
+func lazyGridBuildsVisibleCellsFromData(): Unit {
+    let data = Array<Int64>(1000, {i => i}) // cell value == data index
+    let built = LazyBuiltIndices()
+    let scroll = State<Float32>(10000.0) // near row 100 of 250 (1000 items / 4 columns)
+    let grid = LazyGrid<Int64>("test.grid", data, 4, 100.0, scroll: scroll) {
+        value =>
+        built.add(value)
+        emit(Spacer())
+    }
+    // Only a screenful of rows' cells built, not all 1000.
+    @Expect(built.count > 0, true)
+    @Expect(built.count < 60, true)
+    // Visible rows ~98..109 × 4 columns → data indices ~392..439.
+    @Expect(built.low >= 350, true)
+    @Expect(built.high <= 480, true)
+    @Expect(grid.isFlexible(), true) // LazyGrid returns the underlying LazyColumn
+}

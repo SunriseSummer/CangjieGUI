@@ -94,6 +94,7 @@ public import cui.core.ScrollBar
 public import cui.core.Spring
 public import cui.core.ScrollView
 public import cui.core.LazyColumn
+public import cui.core.LazyGrid
 public import cui.core.derive
 public import cui.core.emit
 public import cui.core.rememberState
@@ -108,6 +109,7 @@ public import cui.controls.Stepper
 public import cui.controls.Switch
 public import cui.controls.Table
 public import cui.controls.TableColumn
+public import cui.controls.DataColumn
 public import cui.controls.TabView
 public import cui.desktop.DesktopApp
 public import cui.media.CanvasWidget

@@ -1,7 +1,7 @@
 package cui.controls
 
 import sdl.{Color, FontSizes, Key, MouseButton, Pen, Rect, Size, UiEvent}
-import cui.core.{Bindable, CUI_SMALL_H, ScrollBar, State, UiContext, Widget, clampScrollOffset, drawSurface,
+import cui.core.{Bindable, CUI_SMALL_H, ScrollBar, State, UiContext, Widget, requireControlId, clampScrollOffset, drawSurface,
     drawVerticalScrollBar, emit, localState, registerFocusable, scrollLineIndex, scrollLineRemainder,
     scrollOffsetAfterWheel}
 
@@ -40,6 +40,34 @@ public class TableColumn {
 }
 
 /*
+ * A typed column for `Table.of`: header, width, numeric flag, and a `value` extractor that produces
+ * the cell string from a row of type `T` (used for both display and sorting, under the numeric rule).
+ * `cell` optionally paints the cell instead of drawing the string, exactly as `TableColumn.cell` —
+ * so a value can sort as a number yet render as a bar, with the source data staying typed.
+ */
+public class DataColumn<T> {
+    let title: String
+    let width: Float32
+    let numeric: Bool
+    let value: (T) -> String
+    let cell: ?(UiContext, Int64, String, Rect) -> Unit
+
+    public init(
+        title: String,
+        width: Float32,
+        numeric!: Bool = false,
+        cell!: ?(UiContext, Int64, String, Rect) -> Unit = None,
+        value!: (T) -> String
+    ) {
+        this.title = title
+        this.width = width
+        this.numeric = numeric
+        this.value = value
+        this.cell = cell
+    }
+}
+
+/*
  * A multi-column, sortable data table. Rows are `Array<String>` cells indexed by column. The
  * header stays fixed while the body scrolls; only visible rows are drawn (windowed), so a long
  * table stays cheap. Clicking a header sorts by that column (click again to reverse); the
@@ -48,8 +76,11 @@ public class TableColumn {
  * A column can replace its text rendering with a custom painter (`TableColumn.cell`) for
  * progress bars, badges and the like, without changing how the column sorts.
  *
- * Sorting runs each frame (stable merge sort) so it always reflects live cell values; for very
- * large datasets, sort in the model and pass rows pre-ordered with no active sort column.
+ * Sorting is a stable merge sort that still reflects live cell values, but the computed order is
+ * cached and reused across frames: each frame extracts the sort column's keys (as before) and, when
+ * they and the sort column/direction are unchanged, reuses the cached order instead of re-sorting.
+ * So a stable table costs O(n) per frame rather than O(n log n) — a large sorted grid stays cheap,
+ * yet an edit to a sorted cell is still picked up (the changed key invalidates the cache).
  */
 public class Table <: Widget {
     private let id: String
@@ -63,12 +94,13 @@ public class Table <: Widget {
     // The selection last scrolled into view, retained across rebuilds — so a changed selection
     // (however it changed, including an app setting it directly) is revealed, like ListView does.
     private let lastRevealed: State<Int64>
+    // The cached display order and the sort inputs it was computed from, retained across the
+    // per-frame rebuild so a stable table is not re-sorted every frame. See displayOrder.
+    private let sortCache: TableSortCache
     private var frame = Rect.zero()
 
     public init(id: String, columns: Array<TableColumn>, rows: Array<Array<String>>, selected: Bindable<Int64>) {
-        if (id.isEmpty()) {
-            throw IllegalArgumentException("Table id must not be empty")
-        }
+        requireControlId(id, "Table")
         this.id = id
         this.columns = columns
         this.rows = rows
@@ -80,8 +112,40 @@ public class Table <: Widget {
         this.sortAsc = localState<Bool>("Table:${id}:sortAsc") {true}
         this.scrollBar = ScrollBar("Table:${id}:thumb")
         this.lastRevealed = localState<Int64>("Table:${id}:revealed") {Int64.Min}
+        this.sortCache = localState<TableSortCache>("Table:${id}:sortCache") {TableSortCache()}.value
         registerFocusable(id)
         emit(this)
+    }
+
+    /**
+     * The data-driven form: builds a table from an `Array<T>` and typed columns, so the source data
+     * stays typed and each column's header and extraction sit together — no hand-built string matrix.
+     *
+     * ```
+     * Table.of("fleet", servers, [
+     *     DataColumn("主机", 180.0) {s => s.host},
+     *     DataColumn("负载", 100.0, numeric: true) {s => "${s.load}"},
+     *     DataColumn("地区", 140.0) {s => s.region}
+     * ], model.selected)
+     * ```
+     *
+     * The value extractors run per visible frame to form the cells the base table sorts and draws; for
+     * a very large dataset that is redrawn continuously, prefer the raw `Array<Array<String>>` form with
+     * a hoisted matrix. Selection is the original row index into `data`.
+     */
+    public static func of<T>(
+        id: String,
+        data: Array<T>,
+        columns: Array<DataColumn<T>>,
+        selected: Bindable<Int64>
+    ): Table {
+        let tableColumns = Array<TableColumn>(columns.size) {
+            i => TableColumn(columns[i].title, columns[i].width, numeric: columns[i].numeric, cell: columns[i].cell)
+        }
+        let rows = Array<Array<String>>(data.size) {
+            r => Array<String>(columns.size) {c => columns[c].value(data[r])}
+        }
+        Table(id, tableColumns, rows, selected)
     }
 
     public func measure(_: UiContext, available: Size): Size {
@@ -367,24 +431,55 @@ public class Table <: Widget {
     }
 
     // Original row indices in display order: identity when unsorted, else a stable sort by the
-    // active column's cells (numeric or lexical), ascending or descending.
+    // active column's cells (numeric or lexical), ascending or descending. The result is cached and
+    // reused while the sort inputs are unchanged, so a stable table is not re-sorted every frame.
     private func displayOrder(): Array<Int64> {
         let n = rows.size
-        let identity = Array<Int64>(n, {i => i})
         let col = sortCol.value
         if (col < 0 || col >= columns.size || n <= 1) {
-            return identity
+            return identityOrder(n)
         }
         let ascending = sortAsc.value
-        // Extract the sort keys once (O(n)) so each of the O(n log n) comparisons reads a flat
-        // array, instead of re-fetching the cell and (for numeric columns) re-parsing the number
-        // on every comparison. The order is identical; only redundant per-comparison work is cut.
-        if (columns[col].numeric) {
-            let keys = Array<Float64>(n, {i => numericKey(cellAt(i, col))})
-            return stableSort(identity, {a, b => lessByOrder(compareFloat(keys[a], keys[b]), ascending)})
+        // Extract the sort column's raw cells once (O(n)). These validate the cache for both column
+        // kinds: unchanged cells mean unchanged keys, so the cached order is reused and neither the
+        // sort nor (for numeric columns) the number parsing runs. On a miss, the parse and the
+        // O(n log n) stable sort run over these cells and the result is cached.
+        let cells = Array<String>(n, {i => cellAt(i, col)})
+        if (sortCache.valid && sortCache.col == col && sortCache.asc == ascending &&
+            stringKeysEqual(sortCache.cells, cells)) {
+            return sortCache.order
         }
-        let keys = Array<String>(n, {i => cellAt(i, col)})
-        stableSort(identity, {a, b => lessByOrder(compareBytes(keys[a], keys[b]), ascending)})
+        let order = if (columns[col].numeric) {
+            let keys = Array<Float64>(n, {i => numericKey(cells[i])})
+            stableSort(identityOrder(n), {a, b => lessByOrder(compareFloat(keys[a], keys[b]), ascending)})
+        } else {
+            stableSort(identityOrder(n), {a, b => lessByOrder(compareBytes(cells[a], cells[b]), ascending)})
+        }
+        storeSort(col, ascending, cells, order)
+        order
+    }
+
+    // The identity order [0, 1, ..., n-1], cached while the row count is unchanged so an unsorted
+    // (or about-to-be-sorted) table does not reallocate it every frame. A row-count change also
+    // invalidates any cached sorted order, since the row indices it referenced no longer hold.
+    private func identityOrder(n: Int64): Array<Int64> {
+        if (sortCache.rowCount == n && sortCache.identity.size == n) {
+            return sortCache.identity
+        }
+        let identity = Array<Int64>(n, {i => i})
+        sortCache.rowCount = n
+        sortCache.identity = identity
+        sortCache.valid = false
+        identity
+    }
+
+    // Records a freshly computed sort so the next frame with the same inputs can reuse it.
+    private func storeSort(col: Int64, ascending: Bool, cells: Array<String>, order: Array<Int64>): Unit {
+        sortCache.valid = true
+        sortCache.col = col
+        sortCache.asc = ascending
+        sortCache.cells = cells
+        sortCache.order = order
     }
 
     private func lessByOrder(comparison: Int64, ascending: Bool): Bool {
@@ -394,6 +489,38 @@ public class Table <: Widget {
             comparison > 0
         }
     }
+}
+
+/*
+ * The Table's retained sort state, persisted across the per-frame rebuild via localState. It holds
+ * the last computed display order together with the inputs it was computed from — the sort column,
+ * direction, and the raw cells of that column — plus a cached identity order for the unsorted case.
+ * displayOrder reuses `order` when the freshly extracted cells and the sort column/direction still
+ * match, so a stable sorted table is neither re-parsed nor re-sorted every frame.
+ */
+private class TableSortCache {
+    var rowCount: Int64 = -1
+    var identity: Array<Int64> = Array<Int64>()
+    var valid: Bool = false
+    var col: Int64 = -1
+    var asc: Bool = true
+    var cells: Array<String> = Array<String>()
+    var order: Array<Int64> = Array<Int64>()
+}
+
+// Element-wise value equality of two string key arrays, short-circuiting on the first difference.
+private func stringKeysEqual(a: Array<String>, b: Array<String>): Bool {
+    if (a.size != b.size) {
+        return false
+    }
+    var i = 0
+    while (i < a.size) {
+        if (a[i] != b[i]) {
+            return false
+        }
+        i += 1
+    }
+    true
 }
 
 private func clampPosition(pos: Int64, count: Int64): Int64 {

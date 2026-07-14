@@ -34,7 +34,7 @@ func toolbar(model: ProcessModel, worker: RefreshWorker): Unit {
                 .muted()
                 .fontSize(FontSizes.CAPTION)
         }
-    }.contentPadding(10.vp).flexible(false)
+    }.contentPadding(10.vp).hug()
 }
 
 /*
@@ -87,8 +87,8 @@ func factCard(fact: SystemFact): Unit {
             Label(fact.title).muted().fontSize(FontSizes.CAPTION)
             // 显示器型号等文案长度不可控，限两行以省略号收尾，防止溢出卡片。
             Label(fact.value).fontSize(FontSizes.TITLE).maxLines(2)
-        }.spacing(6.vp).flexible(false)
-    }.contentPadding(12.vp).flexible(false)
+        }.spacing(6.vp).hug()
+    }.contentPadding(12.vp).hug()
 }
 
 func snapshotCard(model: ProcessModel): Unit {
@@ -97,6 +97,6 @@ func snapshotCard(model: ProcessModel): Unit {
             Label("进程快照大小").muted().fontSize(FontSizes.CAPTION)
             ProgressBar(model.snapshotFraction)
             Label(model.snapshotBytes.value).muted().fontSize(FontSizes.CAPTION)
-        }.spacing(8.vp).flexible(false)
-    }.contentPadding(12.vp).flexible(false)
+        }.spacing(8.vp).hug()
+    }.contentPadding(12.vp).hug()
 }

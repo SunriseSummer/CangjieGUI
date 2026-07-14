@@ -47,10 +47,10 @@ func header(model: PaletteModel): Unit {
         VStack {
             Label("命令面板").fontSize(PALETTE_TITLE)
             Label("键入以筛选，↑ / ↓ 选择，回车执行").muted().fontSize(FontSizes.CAPTION)
-        }.spacing(3.vp).flexible(false)
+        }.spacing(3.vp).hug()
         Spacer()
         Label("${model.resultCount.value} 条").muted().fontSize(FontSizes.CAPTION)
-    }.crossAxisAlignment(CrossAxisAlignment.Center).flexible(false)
+    }.crossAxisAlignment(CrossAxisAlignment.Center).hug()
 }
 
 func searchBox(model: PaletteModel): Unit {
@@ -59,7 +59,7 @@ func searchBox(model: PaletteModel): Unit {
             Icon(IconName.ChevronRight).foregroundColor(Color.rgb(108, 140, 255)).iconSize(18.vp)
             TextField("palette.search", model.query).autofocus().flex()
         }.spacing(8.vp).crossAxisAlignment(CrossAxisAlignment.Center)
-    }.contentPadding(12.vp, 8.vp).flexible(false)
+    }.contentPadding(12.vp, 8.vp).hug()
 }
 
 func resultsPanel(model: PaletteModel): Unit {
@@ -84,7 +84,7 @@ func logPanel(model: PaletteModel): Unit {
                     for (entry in model.log.value) {
                         Label(entry).fontSize(FontSizes.CAPTION)
                     }
-                }.spacing(4.vp).flexible(false)
+                }.spacing(4.vp).hug()
             }
         }.spacing(8.vp)
     }.contentPadding(12.vp).flex()

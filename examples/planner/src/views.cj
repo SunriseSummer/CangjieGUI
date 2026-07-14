@@ -33,13 +33,13 @@ func appHeader(): Unit {
         VStack {
             Label("专注规划台").fontSize(FontSizes.TITLE)
             Label("把今天最重要的事，放在注意力最清醒的时段").muted().fontSize(FontSizes.CAPTION)
-        }.spacing(2.vp).flexible(false)
+        }.spacing(2.vp).hug()
         Spacer()
         FlowRow {
             statusPill("深度工作", Color.rgb(91, 79, 207))
             statusPill("连续 6 天", Color.rgb(20, 139, 105))
         }.spacing(8.vp)
-    }.crossAxisAlignment(CrossAxisAlignment.Center).flexible(false)
+    }.crossAxisAlignment(CrossAxisAlignment.Center).hug()
 }
 
 func navigation(model: PlannerModel): Unit {
@@ -54,7 +54,7 @@ func navigation(model: PlannerModel): Unit {
                 .fontSize(FontSizes.CAPTION)
                 .maxLines(3)
         }.spacing(10.vp)
-    }.contentPadding(14.vp).flexible(false).width(220.vp)
+    }.contentPadding(14.vp).hug().width(220.vp)
 }
 
 func navigationEntry(model: PlannerModel, page: Int64, title: String): Unit {
@@ -84,7 +84,7 @@ func overviewPage(model: PlannerModel): Unit {
                 suggestion("回复协作消息", "低专注")
                 suggestion("散步与补水", "恢复")
             }.spacing(10.vp)
-        }.spacing(14.vp).flexible(false)
+        }.spacing(14.vp).hug()
     }
 }
 
@@ -94,7 +94,7 @@ func metricCard(title: String, value: String, caption: String): Unit {
             Label(title).muted().fontSize(FontSizes.CAPTION)
             Label(value).fontSize(PLANNER_HEADING)
             Label(caption).muted().fontSize(FontSizes.CAPTION)
-        }.spacing(5.vp).flexible(false)
+        }.spacing(5.vp).hug()
     }.contentPadding(14.vp).style(softCard())
 }
 
@@ -105,13 +105,13 @@ func focusCard(model: PlannerModel): Unit {
                 VStack {
                     Label("季度方案 · 信息架构").fontSize(PLANNER_HEADING)
                     Label("当前专注块还有 31 分钟").muted().fontSize(FontSizes.CAPTION)
-                }.spacing(3.vp).flexible(false)
+                }.spacing(3.vp).hug()
                 Spacer()
                 Button("完成本轮", {=> model.completed.value = 1.0}).role(ButtonRole.Primary)
-            }.flexible(false)
+            }.hug()
             // ProgressBar 自带居中百分比显示（并附动画），无需再叠加标签。
             ProgressBar(model.completed).height(26.vp).fillWidth()
-        }.spacing(12.vp).flexible(false)
+        }.spacing(12.vp).hug()
     }.contentPadding(16.vp).style(accentCard())
 }
 
@@ -126,7 +126,7 @@ func quickNote(): Unit {
                     .muted()
                     .fontSize(FontSizes.CAPTION)
                     .maxLines(2)
-            }.spacing(8.vp).flexible(false)
+            }.spacing(8.vp).hug()
         }.contentPadding(14.vp)
     }
 }
@@ -136,7 +136,7 @@ func suggestion(title: String, level: String): Unit {
         VStack {
             Label(title)
             Label(level).muted().fontSize(FontSizes.CAPTION)
-        }.spacing(3.vp).flexible(false)
+        }.spacing(3.vp).hug()
     }.contentPadding(12.vp).style(softCard()).width(210.vp)
 }
 
@@ -149,7 +149,7 @@ func preferencesPage(model: PlannerModel): Unit {
                     Label("单次专注分钟数")
                     Spacer()
                     Stepper("planner.minutes", model.sessionMinutes).range(15, 120).step(5)
-                }.flexible(false)
+                }.hug()
                 Switch("到时桌面通知", model.notifications)
                 Switch("播放环境声音", model.ambientSound)
             }
@@ -165,7 +165,7 @@ func preferencesPage(model: PlannerModel): Unit {
                     Label("内容间距")
                     Spacer()
                     Dropdown("planner.density", ["紧凑", "舒适", "宽松"], model.density)
-                }.flexible(false)
+                }.hug()
             }
             settingsSection("常用地点") {
                 HStack {
@@ -174,9 +174,9 @@ func preferencesPage(model: PlannerModel): Unit {
                     // 长建议列表：超出周围空间时在弹层内部滚动（滚轮/拖动滑块/方向键揭示），
                     // 键入即过滤到匹配城市。
                     ComboBox("planner.city", model.location, majorCities()).width(180.vp)
-                }.flexible(false)
+                }.hug()
             }
-        }.spacing(14.vp).flexible(false)
+        }.spacing(14.vp).hug()
     }
 }
 
@@ -191,7 +191,7 @@ func settingsSection(title: String, body: () -> Unit): Unit {
         VStack {
             Label(title).fontSize(PLANNER_HEADING)
             body()
-        }.spacing(10.vp).flexible(false)
+        }.spacing(10.vp).hug()
     }.contentPadding(16.vp).style(softCard())
 }
 

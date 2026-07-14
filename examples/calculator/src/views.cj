@@ -17,7 +17,7 @@ func calculatorView(model: CalcModel): Unit {
             Label("计算器").fontSize(FontSizes.TITLE)
             Spacer()
             SegmentedControl(["标准", "科学"], model.mode)
-        }.flexible(false)
+        }.hug()
         displayPanel(model)
         if (model.mode.value == 1) {
             keypadRow(model, scientificRow())
@@ -41,8 +41,8 @@ func displayPanel(model: CalcModel): Unit {
                 .textAlign(TextAlign.Trailing)
                 .foregroundColor(Color.rgb(248, 250, 252))
                 .fontSize(FontSizes.DISPLAY)
-        }.spacing(6.vp).flexible(false)
-    }.contentPadding(18.vp, 16.vp).style(displaySurface()).flexible(false)
+        }.spacing(6.vp).hug()
+    }.contentPadding(18.vp, 16.vp).style(displaySurface()).hug()
 }
 
 // 结果上方的小字行：已存操作数与待定运算符；空占位保证显示屏高度稳定。

@@ -1,0 +1,9 @@
+[package]
+cjc-version = "1.0.5"
+name = "cui_gallery"
+version = "0.1.0"
+output-type = "executable"
+description = "CUI 示例：LazyGrid 虚拟化作品画廊，演示数据驱动的网格与按行窗口化。"
+
+[dependencies]
+cui = { path = "../.." }

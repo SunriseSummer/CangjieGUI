@@ -101,9 +101,7 @@ public class IconButton <: Widget {
      * Throws `IllegalArgumentException` when `value` is empty.
      */
     public func id(value: String): IconButton {
-        if (value.isEmpty()) {
-            throw IllegalArgumentException("IconButton id must not be empty")
-        }
+        requireControlId(value, "IconButton")
         reregisterFocusable(controlId, value)
         controlId = value
         this
@@ -253,10 +251,15 @@ public class Divider <: Widget {
         this
     }
 
-    /** Overrides the theme divider color. */
-    public func color(value: Color): Divider {
+    /** Overrides the theme divider color, matching Label/Icon's `foregroundColor` naming. */
+    public func foregroundColor(value: Color): Divider {
         dividerColor = Some(value)
         this
+    }
+
+    /** Deprecated alias for `foregroundColor`; kept so existing call sites keep working. */
+    public func color(value: Color): Divider {
+        foregroundColor(value)
     }
 
     public func measure(_: UiContext, _: Size): Size {

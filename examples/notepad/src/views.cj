@@ -72,7 +72,7 @@ func toolbar(model: NotepadModel, app: DesktopApp, documentPath: String): Unit {
             Spacer()
             Checkbox("只读", model.readOnly)
         }
-    }.contentPadding(10.vp).style(toolbarSurface()).flexible(false)
+    }.contentPadding(10.vp).style(toolbarSurface()).hug()
 }
 
 /*
@@ -88,7 +88,7 @@ func confirmNewBar(model: NotepadModel): Unit {
             Button("丢弃并新建", {=> confirmDiscardAndNew(model)}).role(ButtonRole.Danger)
             Button("取消", {=> cancelNewFile(model)})
         }.spacing(10.vp)
-    }.contentPadding(12.vp, 8.vp).style(confirmBarSurface()).flexible(false)
+    }.contentPadding(12.vp, 8.vp).style(confirmBarSurface()).hug()
 }
 
 // 状态栏的所有内容都由模型状态派生，自身不存副本，因此不可能与文档脱节。
@@ -101,7 +101,7 @@ func statusBar(model: NotepadModel): Unit {
             Label(documentName(model)).muted().fontSize(FontSizes.CAPTION).textAlign(TextAlign.Trailing)
         }
         Label(model.stats.value).muted().fontSize(FontSizes.CAPTION)
-    }.flexible(false)
+    }.hug()
 }
 
 func documentName(model: NotepadModel): String {

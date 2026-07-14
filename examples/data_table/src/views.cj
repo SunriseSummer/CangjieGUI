@@ -11,7 +11,8 @@ import cui.{CrossAxisAlignment, FontSizes, HStack, Label, LengthUnits, Panel, Sp
 func fleetView(model: FleetModel): Unit {
     VStack {
         header()
-        Table("fleet.table", serverColumns(), model.rows, model.selected).flex()
+        // Typed data table: rows stay `Array<Server>`, columns extract fields — no string matrix.
+        Table.of("fleet.table", model.servers, serverColumns(), model.selected).flex()
         detailBar(model)
     }.spacing(14.vp).padding(18.vp)
 }
@@ -20,7 +21,7 @@ func header(): Unit {
     VStack {
         Label("服务器机群监控").fontSize(TABLE_TITLE)
         Label("点击列头排序（数值列按数值），点击行或用方向键选择").muted().fontSize(FontSizes.CAPTION)
-    }.spacing(3.vp).flexible(false)
+    }.spacing(3.vp).hug()
 }
 
 func detailBar(model: FleetModel): Unit {
@@ -28,7 +29,7 @@ func detailBar(model: FleetModel): Unit {
         HStack {
             Label(model.summary.value)
             Spacer()
-            Label("共 ${model.rows.size} 台").muted().fontSize(FontSizes.CAPTION)
+            Label("共 ${model.servers.size} 台").muted().fontSize(FontSizes.CAPTION)
         }.crossAxisAlignment(CrossAxisAlignment.Center)
-    }.contentPadding(12.vp).flexible(false)
+    }.contentPadding(12.vp).hug()
 }

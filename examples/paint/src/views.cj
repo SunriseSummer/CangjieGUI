@@ -34,5 +34,5 @@ func toolbar(model: PaintModel): Unit {
                 ColorSwatch(swatch, model.color)
             }
         }
-    }.contentPadding(10.vp).flexible(false)
+    }.contentPadding(10.vp).hug()
 }

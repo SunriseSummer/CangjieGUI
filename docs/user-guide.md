@@ -124,8 +124,9 @@ Label(countText.value)          // 直接读取，卡片与计数永不脱节
 ProgressBar(completed)
 ```
 
-`derive` 支持一到三个来源。`DerivedState.observe` 仅在被观察期间订阅上游，
-不会在每帧构建中泄漏监听器。
+`derive` 有一到三个来源的定长重载；来源为动态数量的同型状态时，用
+`derive(sources: Array<Observable<A>>, {values => ...})` 聚合任意多个（如汇总一组计数器）。
+`DerivedState.observe` 仅在被观察期间订阅上游，不会在每帧构建中泄漏监听器。
 
 ### 4.4 双向绑定投影
 
@@ -310,6 +311,36 @@ Table("fleet.table", [
 TableColumn("CPU %", 100.0, numeric: true, cell: {ctx, _, value, cell =>
     drawLoadBar(ctx, value, cell) // 自绘负载条；"87" 仍按数值参与排序
 })
+```
+
+数据强类型时，`Table.of(id, data, columns, selected)` 免去手搭字符串矩阵：`data` 是 `Array<T>`，
+每个 `DataColumn<T>(title, width, numeric)` 以尾随抽取器从行取出单元格串（同时用于显示与排序），
+列头与取值就近成对；排序、选择与字符串形一致。抽取器逐帧运行，故超大且持续重绘的表仍宜用预建矩阵
+的原始形：
+
+```cangjie
+Table.of("fleet.table", model.servers, [
+    DataColumn("主机名", 180.0)                { s => s.host },
+    DataColumn("连接数", 120.0, numeric: true)  { s => "${s.connections}" }
+], model.selected).flex()
+```
+
+`ScrollView { VStack { ... } }` 会构建、布局、绘制全部子节点，内容越多越慢。列表很长时改用惰性虚拟化
+容器，只物化视口附近的行，每帧成本恒为一屏。`LazyColumn(id, count, itemHeight) { index => 行(index) }`
+是定高行、按索引惰性构建的纵向列表；数据驱动时用 `LazyColumn.of(id, data, itemHeight, key) { item => 行(item) }`
+——传入数据与行构建器，免去 `data.size` 与 `data[i]` 回查，`key` 令每行局部状态随项（而非槽位）走。
+行高为逻辑像素，须等于（或不小于）行的自然高度，否则按行裁剪截断，适合稳定定高、不因宽度回流的行：
+
+```cangjie
+LazyColumn.of("notes", model.notes, 72.0, key: {n => n.id}) { note => noteRow(note) }
+```
+
+`LazyGrid(id, data, columns, itemHeight, spacing, columnSpacing) { item => 单元格 }` 是数据驱动、按行
+窗口化的等宽网格：`data` 铺成 `columns` 等宽列，一行是一个 `Grid`，骑在纵向 `LazyColumn` 上，无需单独的
+横向滚动；单元格可为任意控件（不限字符串），适合卡片墙、图库（见 `examples/gallery`）：
+
+```cangjie
+LazyGrid("gallery", photos, 4, 180.0, spacing: 14.0, columnSpacing: 14.0) { photo => photoCard(photo) }
 ```
 
 `Tooltip(text: "...") { 控件 }` 为任意控件添加悬停提示：指针在控件上停留约半秒后，提示气泡

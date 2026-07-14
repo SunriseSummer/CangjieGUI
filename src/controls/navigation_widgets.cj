@@ -3,7 +3,7 @@ package cui.controls
 import std.collection.ArrayList
 import sdl.{Key, MouseButton, Rect, Size, UiEvent, clampF32}
 import cui.core.{Bindable, CUI_CONTROL_H, CUI_GAP, CursorShape, Spring, UiContext, Widget, buildChildren,
-    claimHoverIfInside, drawFocusRing, drawSurface, emit, focusableControlIdentity, localState,
+    claimHoverIfInside, drawFocusRing, drawSurface, emit, focusableControlIdentity, localState, requireControlId,
     unregisterFocusable}
 
 public class SegmentedControl <: Widget {
@@ -15,11 +15,18 @@ public class SegmentedControl <: Widget {
     private let indicatorSpring: Spring
     private var frame = Rect.zero()
 
-    public init(items: Array<String>, selected: Bindable<Int64>) {
+    public init(items: Array<String>, selected: Bindable<Int64>, id!: ?String = None) {
         this.items = items
         this.selected = selected
-        // A focus stop: Tab reaches the control, Left/Right switch the selected segment.
-        let cid = focusableControlIdentity("SegmentedControl")
+        // A focus stop: Tab reaches the control, Left/Right switch the selected segment. Identity is
+        // optional and auto-derived by build order; pass `id` for a stable, addressable one.
+        let base = match (id) {
+            case Some(value) =>
+                requireControlId(value, "SegmentedControl")
+                value
+            case None => "SegmentedControl"
+        }
+        let cid = focusableControlIdentity(base)
         this.controlId = cid
         let start = Float32(clampIndex(selected.value, items.size))
         this.indicatorSpring = localState<Spring>("${cid}:indicator") {Spring(start)}.value
@@ -86,13 +93,19 @@ public class TabView <: Widget {
     private var frame = Rect.zero()
     private var laidOutPage: Int64 = -1
 
-    public init(labels: Array<String>, selected: Bindable<Int64>, body!: () -> Unit) {
+    public init(labels: Array<String>, selected: Bindable<Int64>, id!: ?String = None, body!: () -> Unit) {
         this.labels = labels
         this.selected = selected
         // A focus stop: Tab reaches the strip, Left/Right switch the selected tab. Registered
         // before the pages build, so Tab lands on the strip before the controls inside a page —
         // matching the visual order (strip above content).
-        let cid = focusableControlIdentity("TabView")
+        let base = match (id) {
+            case Some(value) =>
+                requireControlId(value, "TabView")
+                value
+            case None => "TabView"
+        }
+        let cid = focusableControlIdentity(base)
         this.controlId = cid
         this.pages = buildChildren(body)
         // Only the active page can receive events, so stops on hidden pages would be dead

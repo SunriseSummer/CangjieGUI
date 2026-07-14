@@ -94,6 +94,47 @@ func autofocusClaimsFocusOnceOnFirstFrame(): Unit {
     @Expect(!ctx.hasFocus("s"))
 }
 
+// TextArea gained the same one-time autofocus as TextField (feature parity between the two text
+// controls) — it claims focus on the first frame and does not re-grab it afterwards.
+@Test
+func textAreaAutofocusClaimsFocusOnceOnFirstFrame(): Unit {
+    let ctx = historyTestContext()
+    let body = State<String>("")
+    let area = TextArea("ta", body).autofocus()
+    area.layout(ctx, Rect(0.0, 0.0, 200.0, 100.0))
+    @Expect(!ctx.hasFocus("ta"))
+
+    let _ = area.handle(ctx, UiEvent.Frame(FrameInfo(UInt64(0), UInt64(0))))
+    @Expect(ctx.hasFocus("ta")) // claimed on the first frame
+
+    ctx.clearFocus()
+    let _ = area.handle(ctx, UiEvent.Frame(FrameInfo(UInt64(16), UInt64(16))))
+    @Expect(!ctx.hasFocus("ta")) // one-time
+}
+
+// A read-only TextField ignores editing input even while focused (feature parity with TextArea's
+// `editable` flag), while an editable field still edits — proving the gate is editability, not focus.
+@Test
+func readOnlyTextFieldIgnoresEdits(): Unit {
+    let ctx = historyTestContext()
+    let locked = State<String>("locked")
+    let field = TextField("ro", locked, editable: false)
+    field.layout(ctx, Rect(0.0, 0.0, 200.0, 32.0))
+    ctx.focus("ro") // force focus so the only remaining gate is editability
+
+    let _ = field.handle(ctx, UiEvent.TextInput("X"))
+    @Expect(locked.value, "locked") // insertion ignored
+    let _ = field.handle(ctx, UiEvent.KeyDown(Key.Backspace, false))
+    @Expect(locked.value, "locked") // backspace ignored
+
+    let editable = State<String>("ab")
+    let writable = TextField("rw", editable)
+    writable.layout(ctx, Rect(0.0, 0.0, 200.0, 32.0))
+    ctx.focus("rw")
+    let _ = writable.handle(ctx, UiEvent.TextInput("c"))
+    @Expect(editable.value != "ab", true) // editable field still takes the edit
+}
+
 @Test
 func undoWithNothingRecordedIsSafeNoOp(): Unit {
     let ctx = historyTestContext()

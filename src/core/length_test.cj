@@ -93,6 +93,26 @@ func labelTextFittingEllipsizesAndWraps(): Unit {
     @Expect(lines[2], "ccc")
 }
 
+// Multi-line measure reports the widest wrapped line (cached alongside the lines). Guards the
+// widest-width cache: a warm re-measure must return the same value, never the unset 0, and the
+// wrapped width must sit below the single-line width of the same text (wrapping narrows it).
+@Test
+func labelMultiLineMeasureReportsCachedWidestLine(): Unit {
+    let ctx = UiContext(Renderer.headless(), Theme.light())
+    let label = Label("aaa bbb ccc").maxLines(3)
+
+    // Narrow width forces the three words onto separate lines; the reported width is one word's.
+    let first = label.measure(ctx, Size(30.0, 200.0))
+    @Expect(first.w > 0.0, true)
+    // A second pass hits the line cache and must agree (the widest is cached, not recomputed to 0).
+    @Expect(label.measure(ctx, Size(30.0, 200.0)).w, first.w)
+
+    // The same text on one line is wider than any single wrapped word, proving measure returns the
+    // widest wrapped line rather than the full-text width.
+    let singleLine = Label("aaa bbb ccc")
+    @Expect(first.w < singleLine.measure(ctx, Size(1000.0, 200.0)).w, true)
+}
+
 @Test
 func controlIdentityIsUniquePerBuildAndStableAcrossBuilds(): Unit {
     let store = StateStore()

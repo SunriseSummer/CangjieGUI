@@ -53,10 +53,10 @@ func appHeader(model: NotesModel): Unit {
         VStack {
             Label("笔记").fontSize(NOTES_TITLE)
             Label("左侧方向键切换，右侧编辑（Ctrl+Z 撤销）").muted().fontSize(FontSizes.CAPTION)
-        }.spacing(2.vp).flexible(false)
+        }.spacing(2.vp).hug()
         Spacer()
         toolbar(model)
-    }.crossAxisAlignment(CrossAxisAlignment.Center).flexible(false)
+    }.crossAxisAlignment(CrossAxisAlignment.Center).hug()
 }
 
 func toolbar(model: NotesModel): Unit {
@@ -71,7 +71,7 @@ func toolbar(model: NotesModel): Unit {
                 => model.confirmDelete.value = true
             }.label("删除").role(ButtonRole.Danger)
         }
-    }.spacing(8.vp).flexible(false)
+    }.spacing(8.vp).hug()
 }
 
 func sidebar(model: NotesModel): Unit {
@@ -84,7 +84,7 @@ func sidebar(model: NotesModel): Unit {
     ]) {
         Panel {
             ListView(model.titles(), model.selected)
-        }.contentPadding(6.vp).flexible(false).width(220.vp)
+        }.contentPadding(6.vp).hug().width(220.vp)
     }
 }
 

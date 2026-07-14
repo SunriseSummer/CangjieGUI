@@ -2,7 +2,7 @@ package cui.text
 
 import std.collection.ArrayList
 import sdl.{Color, FontSizes, Key, MouseButton, Pen, Rect, Size, SurfaceStyle, UiEvent}
-import cui.core.{Bindable, CUI_CONTROL_H, CUI_SMALL_H, Overlay, ScrollBar, State, UiContext, Widget, buildChild,
+import cui.core.{Bindable, CUI_CONTROL_H, CUI_SMALL_H, Overlay, ScrollBar, State, UiContext, Widget, requireControlId, buildChild,
     clampScrollOffset, drawSurface, drawVerticalScrollBar, emit, localState, scrollBarGutter, scrollOffsetAfterWheel}
 
 private let COMBO_POPUP_PAD: Float32 = 5.0
@@ -39,9 +39,7 @@ public class ComboBox <: Widget {
     private var frame = Rect.zero()
 
     public init(id: String, text: Bindable<String>, options: Array<String>) {
-        if (id.isEmpty()) {
-            throw IllegalArgumentException("ComboBox id must not be empty")
-        }
+        requireControlId(id, "ComboBox")
         this.fieldId = id
         this.text = text
         this.options = options

@@ -42,7 +42,7 @@ func boardHeader(model: BoardModel): Unit {
             VStack {
                 Label("产品看板").fontSize(FontSizes.TITLE)
                 Label("Northstar · 桌面端体验迭代").muted().fontSize(FontSizes.CAPTION)
-            }.spacing(2.vp).flexible(false)
+            }.spacing(2.vp).hug()
             Spacer()
             Picker("board.filter", FILTER_LABELS, model.filter)
             Switch("紧凑卡片", model.compact)
@@ -50,7 +50,7 @@ func boardHeader(model: BoardModel): Unit {
             Stepper("board.wip", model.wipLimit).range(2, 8)
             Button("新增任务", {=> model.addTask(model.planned)}).role(ButtonRole.Primary)
         }.crossAxisAlignment(CrossAxisAlignment.Center)
-    }.contentPadding(12.vp).flexible(false)
+    }.contentPadding(12.vp).hug()
 }
 
 func boardColumn(
@@ -67,7 +67,7 @@ func boardColumn(
                 Label(title).fontSize(BOARD_HEADING)
                 Spacer()
                 Label(count).foregroundColor(accent).fontSize(FontSizes.CAPTION)
-            }.flexible(false)
+            }.hug()
             // 卡片区在列内滚动：窗口调矮时卡片不会溢出面板，多出的卡片滚动可达，
             // “添加”按钮始终钉在列底。
             ScrollView("board.cards.${title}") {
@@ -75,7 +75,7 @@ func boardColumn(
                     ForEach(visible, key: {task => "task.${task.id}"}) {
                         task => taskCard(task, model.compact.value)
                     }
-                }.spacing(10.vp).flexible(false)
+                }.spacing(10.vp).hug()
             }.flex()
             Button("添加到${title}", {=> model.addTask(column)}).fillWidth()
         }.spacing(10.vp)
@@ -96,8 +96,8 @@ func taskCard(task: Task, compact: Bool): Unit {
                 Spacer()
                 Label(task.due).muted().fontSize(FontSizes.CAPTION)
             }.spacing(6.vp)
-        }.spacing(pick(compact, 5.vp, 8.vp)).flexible(false)
-    }.contentPadding(pick(compact, 10.vp, 14.vp)).style(taskSurface()).flexible(false)
+        }.spacing(pick(compact, 5.vp, 8.vp)).hug()
+    }.contentPadding(pick(compact, 10.vp, 14.vp)).style(taskSurface()).hug()
 }
 
 func tagPill(text: String): Unit {

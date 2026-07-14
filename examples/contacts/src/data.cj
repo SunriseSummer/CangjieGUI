@@ -42,7 +42,7 @@ func seedContacts(): Array<Contact> {
         Contact(7, "叶蓁", "云枢网络", "运营", "ye.zhen@yunshu.net"),
         Contact(8, "沈昭", "未来数据", "数据分析师", "shen.zhao@future.com"),
         Contact(9, "白露", "青柠工作室", "设计师", "bai.lu@limes.studio"),
-        Contact(10, "孟晚舟", "星河科技", "销售经理", "meng.wz@galaxy.io"),
+        Contact(10, "泊烟渚", "星河科技", "销售经理", "meng.wz@galaxy.io"),
         Contact(11, "江既明", "云枢网络", "产品经理", "jiang.jm@yunshu.net"),
         Contact(12, "温言", "青柠工作室", "内容运营", "wen.yan@limes.studio")
     ]

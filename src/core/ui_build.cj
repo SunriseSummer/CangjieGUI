@@ -147,6 +147,17 @@ protected func localState<T>(key: String, initial: () -> T): State<T> {
     }
 }
 
+/**
+ * Throws `IllegalArgumentException` when a required control id is empty, with one consistent message.
+ * Every id-taking control routes its check here so the guard and its wording live in a single place
+ * (previously each control inlined its own copy).
+ */
+protected func requireControlId(id: String, kind: String): Unit {
+    if (id.isEmpty()) {
+        throw IllegalArgumentException("${kind} id must not be empty")
+    }
+}
+
 /*
  * A focus/press identity for a control that declared no explicit id. During a build the
  * identity is scoped by `Keyed` and deduplicated in declaration order, so identical

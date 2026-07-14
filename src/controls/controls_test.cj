@@ -417,6 +417,26 @@ func sliderMouseAndKeyboardEventsUpdateState(): Unit {
 }
 
 @Test
+func sliderStepSnapsToDiscreteMultiples(): Unit {
+    let ctx = controlTestContext()
+    let value = State<Float32>(3.0)
+    // step 2 over [0, 10]: the legal values are 0, 2, 4, 6, 8, 10. Construction snaps the initial 3.
+    let slider = Slider("vol", value, lower: 0.0, upper: 10.0, step: 2.0)
+    @Expect(value.value, Float32(4.0))
+
+    slider.layout(ctx, Rect(0.0, 0.0, 116.0, 38.0))
+    // The track spans x in [8, 108] (width 100). x=70 -> amount 0.62 -> raw 6.2, which snaps to 6.
+    @Expect(slider.handle(ctx, UiEvent.MouseDown(MouseButton.Left, 70.0, 19.0)))
+    @Expect(value.value, Float32(6.0))
+
+    // Arrow keys move by exactly one increment, staying on the grid.
+    @Expect(slider.handle(ctx, UiEvent.KeyDown(Key.Right, false)))
+    @Expect(value.value, Float32(8.0))
+    @Expect(slider.handle(ctx, UiEvent.KeyDown(Key.Left, false)))
+    @Expect(value.value, Float32(6.0))
+}
+
+@Test
 func segmentedControlSelectsClickedSegment(): Unit {
     let ctx = controlTestContext()
     let selected = State<Int64>(0)
@@ -610,6 +630,112 @@ func tableDownFromNoSelectionSelectsFirstRow(): Unit {
 
     @Expect(table.handle(ctx, UiEvent.KeyDown(Key.Down, false)))
     @Expect(selected.value, Int64(0)) // unsorted display position 0 = original index 0
+}
+
+// The sort-order cache must still reflect live cell edits: after sorting, editing a cell so a
+// different row sorts first must change the order on the next frame. This guards the cache's
+// invalidation — a stale cache would keep the old order and select the wrong row.
+@Test
+func tableSortCacheReflectsCellEdits(): Unit {
+    let ctx = controlTestContext()
+    let selected = State<Int64>(-1)
+    let columns = [TableColumn("名称", 120.0)]
+    let rows = [["B"], ["A"], ["C"]]
+    let table = Table("editcache", columns, rows, selected)
+    table.layout(ctx, Rect(0.0, 0.0, 130.0, 200.0))
+
+    // Sort ascending: A(1), B(0), C(2). Home selects the first, "A" = original index 1.
+    @Expect(table.handle(ctx, UiEvent.MouseDown(MouseButton.Left, 40.0, 10.0)))
+    @Expect(table.handle(ctx, UiEvent.KeyDown(Key.Home, false)))
+    @Expect(selected.value, Int64(1))
+
+    // Edit the data in place so "A" becomes "Z"; ascending order is now B(0), C(2), Z(1).
+    rows[1][0] = "Z"
+    @Expect(table.handle(ctx, UiEvent.KeyDown(Key.Home, false)))
+    @Expect(selected.value, Int64(0)) // first is now "B" = original index 0, not the stale "A" (1)
+
+    // And End reflects the edit too: largest is now "Z" = original index 1.
+    @Expect(table.handle(ctx, UiEvent.KeyDown(Key.End, false)))
+    @Expect(selected.value, Int64(1))
+}
+
+// A row-count change must invalidate the cached order rather than index past the new bounds.
+@Test
+func tableSortCacheHandlesRowCountChange(): Unit {
+    let ctx = controlTestContext()
+    let selected = State<Int64>(-1)
+    let columns = [TableColumn("名称", 120.0)]
+    let rows = [["B"], ["A"], ["C"], ["D"]]
+    let table = Table("countcache", columns, rows, selected)
+    table.layout(ctx, Rect(0.0, 0.0, 130.0, 200.0))
+
+    @Expect(table.handle(ctx, UiEvent.MouseDown(MouseButton.Left, 40.0, 10.0))) // sort asc: A,B,C,D
+    @Expect(table.handle(ctx, UiEvent.KeyDown(Key.End, false)))
+    @Expect(selected.value, Int64(3)) // "D" = original index 3
+
+    // A shorter dataset through the same table id: End must land within the new bounds.
+    let shorter = [["B"], ["A"]]
+    let table2 = Table("countcache", columns, shorter, selected)
+    table2.layout(ctx, Rect(0.0, 0.0, 130.0, 200.0))
+    @Expect(table2.handle(ctx, UiEvent.MouseDown(MouseButton.Left, 40.0, 10.0)))
+    @Expect(table2.handle(ctx, UiEvent.KeyDown(Key.End, false)))
+    @Expect(selected.value, Int64(0)) // sorted A,B -> last is "B" = original index 0
+}
+
+struct TestServer {
+    let name: String
+    let load: Int64
+
+    init(name: String, load: Int64) {
+        this.name = name
+        this.load = load
+    }
+}
+
+// `Table.of` builds a table from typed data via per-column value extractors; sorting and selection
+// then work exactly as for the raw string form, so no hand-built string matrix is needed.
+@Test
+func tableOfSortsThroughTypedExtractors(): Unit {
+    let ctx = controlTestContext()
+    let selected = State<Int64>(-1)
+    let servers = [TestServer("B", 10), TestServer("A", 9), TestServer("C", 100)]
+    let table = Table.of<TestServer>("of.table", servers, [
+        DataColumn<TestServer>("名称", 120.0) {s => s.name},
+        DataColumn<TestServer>("负载", 80.0, numeric: true) {s => "${s.load}"}
+    ], selected)
+    table.layout(ctx, Rect(0.0, 0.0, 220.0, 200.0))
+
+    // Sort by the numeric 负载 column (x in [120, 200)); Home selects the smallest load.
+    @Expect(table.handle(ctx, UiEvent.MouseDown(MouseButton.Left, 140.0, 10.0)))
+    @Expect(table.handle(ctx, UiEvent.KeyDown(Key.Home, false)))
+    @Expect(selected.value, Int64(1)) // "A"/load 9 = original index 1 (numeric, not lexical)
+    @Expect(table.handle(ctx, UiEvent.KeyDown(Key.End, false)))
+    @Expect(selected.value, Int64(2)) // "C"/load 100 = original index 2
+}
+
+// ListView/SegmentedControl/TabView now accept an optional explicit id (previously auto-only, so
+// their identity was unaddressable); when given, it becomes the control's focus/state identity.
+@Test
+func listViewAcceptsOptionalExplicitId(): Unit {
+    let ctx = controlTestContext()
+    let sel = State<Int64>(-1)
+    let list = ListView(["a", "b", "c"], sel, id: "servers")
+    list.layout(ctx, Rect(0.0, 0.0, 120.0, 100.0))
+    match (list.focusableId()) {
+        case Some(fid) => @Expect(fid, "servers")
+        case None => @Expect(false, true)
+    }
+}
+
+// Stepper now accepts range/step in the constructor (aligning with Slider/ProgressBar), clamping the
+// initial value into range at construction just as the chained range() does.
+@Test
+func stepperConstructorBoundsClampInitialValue(): Unit {
+    let ctx = controlTestContext()
+    let value = State<Int64>(200) // above the ctor upper bound
+    let stepper = Stepper("age", value, lower: 0, upper: 100, step: 5)
+    stepper.layout(ctx, Rect(0.0, 0.0, 120.0, 32.0))
+    @Expect(value.value, Int64(100)) // clamped into [0, 100] by the constructor
 }
 
 private class ControlLayoutProbe <: Widget {

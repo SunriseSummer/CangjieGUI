@@ -30,12 +30,12 @@ func header(model: ContactsModel): Unit {
             VStack {
                 Label("通讯录").fontSize(CONTACTS_TITLE)
                 Label("Table 列表、表单对话框与组合框搜索的综合示例").muted().fontSize(FontSizes.CAPTION)
-            }.spacing(2.vp).flexible(false)
+            }.spacing(2.vp).hug()
             Spacer()
             toolbar(model)
-        }.crossAxisAlignment(CrossAxisAlignment.Center).flexible(false)
+        }.crossAxisAlignment(CrossAxisAlignment.Center).hug()
         searchRow(model)
-    }.spacing(12.vp).flexible(false)
+    }.spacing(12.vp).hug()
 }
 
 func toolbar(model: ContactsModel): Unit {
@@ -49,14 +49,14 @@ func toolbar(model: ContactsModel): Unit {
         Tooltip(text: "删除选中联系人") {
             Button("删除", {=> model.requestDelete()}, role: ButtonRole.Danger).enabled(hasSelection(model))
         }
-    }.spacing(8.vp).flexible(false)
+    }.spacing(8.vp).hug()
 }
 
 func searchRow(model: ContactsModel): Unit {
     HStack {
         Label("搜索").muted().fontSize(FontSizes.CAPTION)
         ComboBox("contacts.search", model.query, companySuggestions()).flex()
-    }.spacing(10.vp).crossAxisAlignment(CrossAxisAlignment.Center).flexible(false)
+    }.spacing(10.vp).crossAxisAlignment(CrossAxisAlignment.Center).hug()
 }
 
 func contactList(model: ContactsModel): Unit {
@@ -76,7 +76,7 @@ func statusBar(model: ContactsModel): Unit {
             Spacer()
             Label("共 ${model.contacts.value.size} 位联系人").muted().fontSize(FontSizes.CAPTION)
         }.crossAxisAlignment(CrossAxisAlignment.Center)
-    }.contentPadding(10.vp).flexible(false)
+    }.contentPadding(10.vp).hug()
 }
 
 func formModal(model: ContactsModel): Unit {
@@ -91,7 +91,7 @@ func formModal(model: ContactsModel): Unit {
             HStack {
                 Label("公司").width(56.vp)
                 ComboBox("contacts.form.company", model.draftCompany, companySuggestions()).flex()
-            }.crossAxisAlignment(CrossAxisAlignment.Center).flexible(false)
+            }.crossAxisAlignment(CrossAxisAlignment.Center).hug()
             formField("职务", "contacts.form.role", model.draftRole)
             formField("邮箱", "contacts.form.email", model.draftEmail)
             HStack {
@@ -111,7 +111,7 @@ func formField(label: String, id: String, value: State<String>, autofocus!: Bool
             let _ = field.autofocus()
         }
         field.flex()
-    }.crossAxisAlignment(CrossAxisAlignment.Center).flexible(false)
+    }.crossAxisAlignment(CrossAxisAlignment.Center).hug()
 }
 
 func deleteModal(model: ContactsModel): Unit {

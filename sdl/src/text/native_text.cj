@@ -158,7 +158,15 @@ protected class NativeTextRenderer {
             }
         }
         let font = openFont(fontPath, normalized)
-        font.attach(engine)
+        // Close the freshly opened font if it cannot attach: it is not yet in `fonts`, so closeFonts
+        // would never reach it, and there is no finalizer — a failed attach would otherwise leak the
+        // native TTF_Font handle. Mirrors the constructor, which closes fonts on an attach failure.
+        try {
+            font.attach(engine)
+        } catch (error: NativeTextException) {
+            font.close()
+            throw error
+        }
         fonts.add(font)
         font
     }

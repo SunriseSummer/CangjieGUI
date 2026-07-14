@@ -58,6 +58,15 @@ public class Panel <: Widget {
         this
     }
 
+    /**
+     * Sizes this panel to its content along the enclosing stack's main axis rather than filling the
+     * offered space — the intent-revealing name for the common `.flexible(false)`.
+     */
+    public func hug(): Panel {
+        isFlexiblePanel = false
+        this
+    }
+
     public func measure(ctx: UiContext, available: Size): Size {
         let insets = ctx.resolve(panelInsets)
         let inner = Size(max(0.0, available.w - insets.horizontal()), max(0.0, available.h - insets.vertical()))

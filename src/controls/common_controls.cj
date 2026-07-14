@@ -1,7 +1,7 @@
 package cui.controls
 
 import sdl.{FontSizes, Key, MouseButton, Pen, Rect, Size, UiEvent}
-import cui.core.{Bindable, CUI_CONTROL_H, CursorShape, Spring, UiContext, Widget, claimHoverIfInside, drawFocusRing,
+import cui.core.{Bindable, CUI_CONTROL_H, CursorShape, Spring, UiContext, Widget, requireControlId, claimHoverIfInside, drawFocusRing,
     drawSurface, emit, focusableControlIdentity, localState, reregisterFocusable, registerFocusable}
 
 private let SWITCH_TRACK_W: Float32 = 40.0
@@ -269,11 +269,28 @@ public class Stepper <: Widget {
     private var stepSize: Int64 = 1
     private var frame = Rect.zero()
 
-    public init(id: String, value: Bindable<Int64>) {
+    public init(
+        id: String,
+        value: Bindable<Int64>,
+        lower!: Int64 = Int64.Min,
+        upper!: Int64 = Int64.Max,
+        step!: Int64 = 1
+    ) {
         validateControlId(id, "Stepper")
+        if (step <= 0) {
+            throw IllegalArgumentException("Stepper step must be greater than zero")
+        }
         this.id = id
         this.value = value
+        this.lowerBound = min(lower, upper)
+        this.upperBound = max(lower, upper)
+        this.stepSize = step
         registerFocusable(id)
+        // Clamp the initial value into range, like range() does (write-on-change to avoid churn).
+        let clamped = clampInt(value.value)
+        if (clamped != value.value) {
+            value.value = clamped
+        }
         emit(this)
     }
 
@@ -431,9 +448,7 @@ private func toggleInteraction(
 
 /** Throws `IllegalArgumentException` when a focusable control receives an empty ID. */
 private func validateControlId(id: String, kind: String): Unit {
-    if (id.isEmpty()) {
-        throw IllegalArgumentException("${kind} id must not be empty")
-    }
+    requireControlId(id, kind)
 }
 
 private func clampControlIndex(index: Int64, count: Int64): Int64 {

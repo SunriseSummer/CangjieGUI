@@ -1,23 +1,43 @@
 /*
- * 表格的列定义与种子数据。行是 `Array<String>` 单元格，按列索引；数值列声明 `numeric: true`，
- * 由 `Table` 右对齐并按数值（而非字典序）排序。
+ * 表格的列定义与种子数据。数据是一份强类型的 `Server` 数组；`Table.of` 的每个 `DataColumn` 用 `value`
+ * 抽取器从 `Server` 取出单元格字符串，数值列声明 `numeric: true`，由 `Table` 右对齐并按数值（而非
+ * 字典序）排序——数据保持类型化，无需手搭 `Array<Array<String>>` 字符串矩阵。
  *
- * “CPU %” 列演示自定义单元格（`TableColumn.cell`）：单元格字符串仍是 “23” 这样的数值文本，
- * numeric 排序照常生效，绘制则由回调接管——迷你负载条 + 右对齐数值，负载越高颜色越警示。
- * 表格先画好行底与选中高亮并把回调裁剪在单元格内，回调只负责内容。
+ * “CPU %” 列演示自定义单元格（`DataColumn.cell`）：抽取器仍产出 “23” 这样的数值文本，numeric 排序照常
+ * 生效，绘制则由回调接管——迷你负载条 + 右对齐数值，负载越高颜色越警示。表格先画好行底与选中高亮并
+ * 把回调裁剪在单元格内，回调只负责内容。
  */
 package cui_data_table
 
-import cui.{Color, FontSizes, Rect, TableColumn, UiContext, clampF32}
+import cui.{Color, DataColumn, FontSizes, Rect, UiContext, clampF32}
 
-func serverColumns(): Array<TableColumn> {
+/** 一台服务器的类型化行数据；表格列由此抽取字段。 */
+struct Server {
+    let host: String
+    let region: String
+    let cpu: Int64
+    let memory: Int64
+    let connections: Int64
+    let status: String
+
+    init(host: String, region: String, cpu: Int64, memory: Int64, connections: Int64, status: String) {
+        this.host = host
+        this.region = region
+        this.cpu = cpu
+        this.memory = memory
+        this.connections = connections
+        this.status = status
+    }
+}
+
+func serverColumns(): Array<DataColumn<Server>> {
     [
-        TableColumn("主机名", 180.0),
-        TableColumn("区域", 100.0),
-        TableColumn("CPU %", 100.0, numeric: true, cell: cpuCellPainter),
-        TableColumn("内存 %", 100.0, numeric: true),
-        TableColumn("连接数", 120.0, numeric: true),
-        TableColumn("状态", 110.0)
+        DataColumn<Server>("主机名", 180.0) {s => s.host},
+        DataColumn<Server>("区域", 100.0) {s => s.region},
+        DataColumn<Server>("CPU %", 100.0, numeric: true, cell: cpuCellPainter) {s => "${s.cpu}"},
+        DataColumn<Server>("内存 %", 100.0, numeric: true) {s => "${s.memory}"},
+        DataColumn<Server>("连接数", 120.0, numeric: true) {s => "${s.connections}"},
+        DataColumn<Server>("状态", 110.0) {s => s.status}
     ]
 }
 
@@ -56,31 +76,31 @@ func leadingInt(text: String): Int64 {
     value
 }
 
-func seedServers(): Array<Array<String>> {
+func seedServers(): Array<Server> {
     [
-        ["web-01", "华东", "23", "41", "1280", "正常"],
-        ["web-02", "华东", "67", "58", "3410", "正常"],
-        ["web-03", "华南", "45", "39", "2050", "正常"],
-        ["api-01", "华北", "88", "72", "5120", "繁忙"],
-        ["api-02", "华北", "12", "33", "540", "正常"],
-        ["api-03", "华东", "76", "64", "4300", "繁忙"],
-        ["db-master", "华东", "54", "81", "220", "正常"],
-        ["db-replica-1", "华南", "9", "48", "180", "正常"],
-        ["db-replica-2", "华北", "7", "46", "160", "正常"],
-        ["cache-01", "华东", "31", "88", "9600", "正常"],
-        ["cache-02", "华南", "28", "85", "8700", "正常"],
-        ["queue-01", "华北", "19", "52", "760", "正常"],
-        ["worker-01", "华东", "94", "77", "40", "繁忙"],
-        ["worker-02", "华南", "5", "22", "0", "离线"],
-        ["gateway-01", "华北", "61", "55", "6100", "正常"],
-        ["monitor-01", "华东", "14", "29", "95", "正常"]
+        Server("web-01", "华东", 23, 41, 1280, "正常"),
+        Server("web-02", "华东", 67, 58, 3410, "正常"),
+        Server("web-03", "华南", 45, 39, 2050, "正常"),
+        Server("api-01", "华北", 88, 72, 5120, "繁忙"),
+        Server("api-02", "华北", 12, 33, 540, "正常"),
+        Server("api-03", "华东", 76, 64, 4300, "繁忙"),
+        Server("db-master", "华东", 54, 81, 220, "正常"),
+        Server("db-replica-1", "华南", 9, 48, 180, "正常"),
+        Server("db-replica-2", "华北", 7, 46, 160, "正常"),
+        Server("cache-01", "华东", 31, 88, 9600, "正常"),
+        Server("cache-02", "华南", 28, 85, 8700, "正常"),
+        Server("queue-01", "华北", 19, 52, 760, "正常"),
+        Server("worker-01", "华东", 94, 77, 40, "繁忙"),
+        Server("worker-02", "华南", 5, 22, 0, "离线"),
+        Server("gateway-01", "华北", 61, 55, 6100, "正常"),
+        Server("monitor-01", "华东", 14, 29, 95, "正常")
     ]
 }
 
-func serverSummary(rows: Array<Array<String>>, index: Int64): String {
-    if (index < 0 || index >= rows.size) {
+func serverSummary(servers: Array<Server>, index: Int64): String {
+    if (index < 0 || index >= servers.size) {
         return "未选择 · 点击任意行查看详情"
     }
-    let row = rows[index]
-    "${row[0]} · ${row[1]} · CPU ${row[2]}% · 内存 ${row[3]}% · ${row[4]} 连接 · ${row[5]}"
+    let s = servers[index]
+    "${s.host} · ${s.region} · CPU ${s.cpu}% · 内存 ${s.memory}% · ${s.connections} 连接 · ${s.status}"
 }

@@ -41,18 +41,22 @@ public class LazyColumn <: Widget {
     private let frameScroll: Float32
     private var frame = Rect.zero()
 
-    /** Throws `IllegalArgumentException` when `id` is empty. Row height is in logical pixels. */
+    /**
+     * The index form: `count` rows built on demand by index. Throws `IllegalArgumentException` when
+     * `id` is empty. Row height is in logical pixels. `key` optionally gives each row a stable
+     * identity string (so its per-row state follows the item across inserts/reorders); when omitted,
+     * rows are keyed by index — see `LazyColumn.of` for the data-driven form.
+     */
     public init(
         id: String,
         count: Int64,
         itemHeight: Float32,
         spacing!: Float32 = 0.0,
         scroll!: ?State<Float32> = None,
+        key!: ?((Int64) -> String) = None,
         item!: (Int64) -> Unit
     ) {
-        if (id.isEmpty()) {
-            throw IllegalArgumentException("LazyColumn id must not be empty")
-        }
+        requireControlId(id, "LazyColumn")
         this.id = id
         this.count = max(0, count)
         this.itemHeight = max(1.0, itemHeight)
@@ -68,8 +72,37 @@ public class LazyColumn <: Widget {
         let content = lazyContentHeight(this.count, this.itemHeight, this.spacing)
         this.frameScroll = clampScrollOffset(this.scrollStateValue.value, content, this.viewportHeightState.value)
         this.visibleItems = buildVisibleItems(this.id, this.count, this.itemHeight, this.spacing, this.frameScroll,
-            this.viewportHeightState.value, item)
+            this.viewportHeightState.value, rowKeyOrIndex(key), item)
         emit(this)
+    }
+
+    /**
+     * The data-driven form: builds a virtualized column from `data` and a per-item row builder, so a
+     * list of arbitrary item widgets over an `Array<T>` needs neither a manual `count` nor an
+     * index-into-data lookup. `key` gives each item a stable identity (its per-row state and position
+     * follow the item across inserts/reorders rather than the slot); omit it to key by index.
+     * `itemHeight` is the fixed row height in logical pixels, as for the index form.
+     *
+     * ```
+     * LazyColumn.of("notes", model.notes, 72.0, key: {n => n.id}) { note => noteRow(note) }
+     * ```
+     */
+    public static func of<T>(
+        id: String,
+        data: Array<T>,
+        itemHeight: Float32,
+        spacing!: Float32 = 0.0,
+        scroll!: ?State<Float32> = None,
+        key!: ?((T) -> String) = None,
+        item!: (T) -> Unit
+    ): LazyColumn {
+        let rowKey: ?((Int64) -> String) = match (key) {
+            case Some(k) => Some({index => k(data[index])})
+            case None => None
+        }
+        LazyColumn(id, data.size, itemHeight, spacing: spacing, scroll: scroll, key: rowKey) {
+            index => item(data[index])
+        }
     }
 
     public func measure(_: UiContext, available: Size): Size {
@@ -216,8 +249,9 @@ internal func lazyVisibleRange(
     (first, last)
 }
 
-// Materializes the visible rows during the build pass, each scoped by index so its local state
-// follows it across scrolls (and is dropped when it scrolls off — hoist anything that must persist).
+// Materializes the visible rows during the build pass, each scoped by `key(rowIndex)` so its local
+// state follows it (across scrolls, and — with a data key — across inserts/reorders); it is dropped
+// when the row scrolls off, so hoist anything that must persist.
 private func buildVisibleItems(
     id: String,
     count: Int64,
@@ -225,6 +259,7 @@ private func buildVisibleItems(
     spacing: Float32,
     scroll: Float32,
     viewportH: Float32,
+    key: (Int64) -> String,
     item: (Int64) -> Unit
 ): Array<(Int64, Widget)> {
     let (first, last) = lazyVisibleRange(scroll, viewportH, itemHeight, spacing, count, LAZY_OVERSCAN)
@@ -232,9 +267,59 @@ private func buildVisibleItems(
     var index = first
     while (index <= last) {
         let rowIndex = index
-        let widget = buildKeyedChild("LazyColumn:${id}:item:${rowIndex}") {=> item(rowIndex)}
+        let widget = buildKeyedChild("LazyColumn:${id}:item:${key(rowIndex)}") {=> item(rowIndex)}
         built.add((rowIndex, widget))
         index += 1
     }
     built.toArray()
+}
+
+// The effective row-key function: the caller's key, or the row index as a string. The index default
+// reproduces the historical per-row scope key exactly, so index-keyed lists are byte-for-byte unchanged.
+private func rowKeyOrIndex(key: ?((Int64) -> String)): (Int64) -> String {
+    match (key) {
+        case Some(k) => k
+        case None => {index => "${index}"}
+    }
+}
+
+/**
+ * A vertically scrolling, virtualized grid: `data` arranged in `columns` equal columns and windowed by
+ * row, so a large collection of uniform cells — a photo wall, a card grid — costs only a screenful.
+ * It composes the proven pieces (each virtualized row is a `Grid` of up to `columns` cells over the
+ * vertical `LazyColumn`), so it needs no separate horizontal scrolling. `itemHeight` is the fixed row
+ * height in logical pixels; `spacing` is the gap between rows and `columnSpacing` the gap between cells.
+ * Cells within a row are keyed by their position, so per-cell local state follows the slot — hoist
+ * anything that must persist across data reorders.
+ *
+ * ```
+ * LazyGrid("gallery", photos, 4, 160.0, spacing: 12.0, columnSpacing: 12.0) { photo => photoCell(photo) }
+ * ```
+ */
+public func LazyGrid<T>(
+    id: String,
+    data: Array<T>,
+    columns: Int64,
+    itemHeight: Float32,
+    spacing!: Float32 = 0.0,
+    columnSpacing!: Float32 = 0.0,
+    scroll!: ?State<Float32> = None,
+    item!: (T) -> Unit
+): LazyColumn {
+    let cols = max(1, columns)
+    let count = data.size
+    let rowCount = (count + cols - 1) / cols
+    LazyColumn(id, rowCount, itemHeight, spacing: spacing, scroll: scroll) {
+        rowIndex =>
+        Grid(cols) {
+            var c = 0
+            while (c < cols) {
+                let dataIndex = rowIndex * cols + c
+                if (dataIndex < count) {
+                    item(data[dataIndex])
+                }
+                c += 1
+            }
+        }.spacing(columnSpacing)
+    }
 }

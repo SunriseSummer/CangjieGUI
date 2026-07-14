@@ -1,5 +1,7 @@
 package cui.core
 
+import std.collection.ArrayList
+
 /*
  * Derived, read-only state and two-way bindings.
  *
@@ -144,6 +146,34 @@ public func derive<A, B, C, T>(
             [{=> one.close()}, {=> two.close()}, {=> three.close()}]
         }
     )
+}
+
+/**
+ * Returns a read-only state computed from any number of same-typed sources. `compute` receives their
+ * current values in source order. Use this when the source count is dynamic or exceeds the fixed
+ * arity overloads — for example aggregating a list of per-item counters or toggles into one total.
+ */
+public func derive<A, T>(sources: Array<Observable<A>>, compute: (Array<A>) -> T): DerivedState<T> {
+    DerivedState<T>(
+        {=> compute(currentValues(sources))},
+        {=> currentRevisions(sources)},
+        {onChange =>
+            let cancels = ArrayList<() -> Unit>()
+            for (source in sources) {
+                let observation = source.observe({_, _ => onChange()})
+                cancels.add({=> observation.close()})
+            }
+            cancels.toArray()
+        }
+    )
+}
+
+private func currentValues<A>(sources: Array<Observable<A>>): Array<A> {
+    Array<A>(sources.size, {i => sources[i].get()})
+}
+
+private func currentRevisions<A>(sources: Array<Observable<A>>): Array<UInt64> {
+    Array<UInt64>(sources.size, {i => sources[i].revision})
 }
 
 /**

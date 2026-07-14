@@ -592,6 +592,41 @@ func flexibleWeightSpansColumnsExactly(): Unit {
 }
 
 @Test
+func hugOptsStackOutOfParentFlexPass(): Unit {
+    // A stack fills its parent's main-axis slot by default; .hug() sizes it to content instead —
+    // the intent-revealing equivalent of the (far more common) .flexible(false).
+    @Expect((VStack {emit(LayoutProbe())}).isFlexible(), true)
+    @Expect((VStack {emit(LayoutProbe())}.hug()).isFlexible(), false)
+    @Expect((VStack {emit(LayoutProbe())}.flexible(false)).isFlexible(), false)
+    @Expect((HStack {emit(LayoutProbe())}.hug()).isFlexible(), false)
+}
+
+@Test
+func hugStackSizesToContentWhileFlexibleSiblingFills(): Unit {
+    let ctx = testContext()
+    // A 200-tall column whose first child holds a 30-tall probe; the trailing probe's y reveals how
+    // much room the first child consumed. With .hug() the first child takes only its content, so the
+    // tail sits near the top; by default the first child fills, shoving the tail to the bottom.
+    let hugTail = LayoutProbe()
+    let hugColumn = VStack {
+        VStack {emit(SizedLayoutProbe(Size(50.0, 30.0)))}.hug()
+        emit(hugTail)
+    }
+    hugColumn.layout(ctx, Rect(0.0, 0.0, 100.0, 200.0))
+
+    let fillTail = LayoutProbe()
+    let fillColumn = VStack {
+        VStack {emit(SizedLayoutProbe(Size(50.0, 30.0)))} // default flexible: fills the column
+        emit(fillTail)
+    }
+    fillColumn.layout(ctx, Rect(0.0, 0.0, 100.0, 200.0))
+
+    @Expect(hugTail.rect.y < fillTail.rect.y, true)
+    @Expect(hugTail.rect.y < 60.0, true) // content (30) + one gap, nowhere near the 200-tall column
+    @Expect(fillTail.rect.y > 150.0, true) // the filling child pushed the tail down the column
+}
+
+@Test
 func flexibleWeightRowsAlignWithUniformRows(): Unit {
     let ctx = testContext()
     let third = LayoutProbe()

@@ -24,7 +24,7 @@ func calendarView(model: CalendarModel): Unit {
             IconButton(IconName.ChevronRight) {
                 => model.shiftMonth(1)
             }
-        }.spacing(10.vp).flexible(false)
+        }.spacing(10.vp).hug()
         Panel {
             TabView(["月历", "日程"], model.tab) {
                 monthPage(model)
@@ -49,7 +49,7 @@ func weekdayHeader(): Unit {
         for (name in names) {
             Label(name).muted().textAlign(TextAlign.Center).fontSize(FontSizes.CAPTION).flex()
         }
-    }.spacing(8.vp).flexible(false)
+    }.spacing(8.vp).hug()
 }
 
 func weekRow(model: CalendarModel, week: Array<Int64>): Unit {
@@ -98,5 +98,5 @@ func agendaItem(time: String, title: String): Unit {
             Label(title)
             Spacer()
         }.spacing(14.vp)
-    }.contentPadding(12.vp).style(agendaCardSurface()).flexible(false)
+    }.contentPadding(12.vp).style(agendaCardSurface()).hug()
 }
