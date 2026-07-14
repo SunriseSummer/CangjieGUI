@@ -327,6 +327,8 @@ private func systemFontCandidates(): Array<String> {
         "C:\\Windows\\Fonts\\msyh.ttc",
         "C:\\Windows\\Fonts\\segoeui.ttf",
         "/System/Library/Fonts/PingFang.ttc",
+        "/System/Library/Fonts/Hiragino Sans GB.ttc",
+        "/System/Library/Fonts/STHeiti Medium.ttc",
         "/System/Library/Fonts/SFNS.ttf",
         "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
         "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",

@@ -151,7 +151,9 @@ CangjieGUI/
 
 ## 构建与测试
 
-当前模块要求仓颉工具链 `1.0.5`。在 Windows 上，仓库已按 cjpm 链接约定放置 SDL 动态库。
+当前模块要求仓颉工具链 `1.0.5`。在 Windows 上，仓库已按 cjpm 链接约定放置 SDL 动态库；
+macOS 上可使用 Homebrew 提供的 SDL，并由仓库脚本复制到同一个 FFI 搜索目录。该过程只增加
+被 Git 忽略的 `.dylib`，不会替换仓库内的 Windows DLL。
 分别验证底层模块与 GUI 模块：
 
 ```powershell
@@ -166,6 +168,17 @@ cjpm test
 
 发布原生可执行文件时，必须保证 `SDL3.dll` 与 `SDL3_ttf.dll` 位于可执行文件同目录，或位于
 操作系统动态库搜索路径中。详细说明见 [SDL 部署与 FFI](sdl/docs/deployment-and-ffi.md)。
+
+macOS arm64 开发机可执行：
+
+```bash
+brew install sdl3 sdl3_ttf
+./scripts/verify-macos.sh
+./scripts/run-macos.sh notepad
+```
+
+`verify-macos.sh` 验证框架与默认 Notepad 示例的编译链接。设置 `CANGHUI_RUN_TESTS=1` 时还会运行
+根模块和 SDL 模块测试；仓颉测试运行器需要绑定本地端口，因此受限沙箱可能需要额外宿主权限。
 
 ## 渲染与字体
 
