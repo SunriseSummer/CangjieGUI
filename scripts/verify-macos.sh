@@ -15,7 +15,7 @@ echo "==> building SDL"
 echo "==> linking Notepad example"
 (cd "${ROOT_DIR}/examples/notepad" && cjpm build)
 
-if [[ "${CANGHUI_RUN_TESTS:-0}" == "1" ]]; then
+if [[ "${CANGJIEGUI_RUN_TESTS:-0}" == "1" ]]; then
     echo "==> testing CUI"
     (cd "${ROOT_DIR}" && cjpm test)
 

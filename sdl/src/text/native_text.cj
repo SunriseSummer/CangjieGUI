@@ -344,7 +344,7 @@ private func systemFontCandidates(): Array<String> {
 }
 
 private func configuredFontPath(): ?String {
-    let name = unsafe { LibC.mallocCString("CANGHUI_FONT_PATH") }
+    let name = unsafe { LibC.mallocCString("CANGJIEGUI_FONT_PATH") }
     var configured: ?String = None
     try (nameResource = name.asResource()) {
         let value = unsafe { getenv(nameResource.value) }
