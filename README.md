@@ -167,6 +167,52 @@ cjpm test
 发布原生可执行文件时，必须保证 `SDL3.dll` 与 `SDL3_ttf.dll` 位于可执行文件同目录，或位于
 操作系统动态库搜索路径中。详细说明见 [SDL 部署与 FFI](sdl/docs/deployment-and-ffi.md)。
 
+macOS 开发机可直接安装 Homebrew SDL，并将当前架构的动态库放入现有 FFI 搜索目录：
+
+```bash
+brew install sdl3 sdl3_ttf
+cp "$(brew --prefix sdl3)/lib/libSDL3.dylib" sdl/.sdl3/
+cp "$(brew --prefix sdl3_ttf)/lib/libSDL3_ttf.dylib" sdl/.sdl3/
+cjpm build
+cd examples/notepad
+cjpm run
+```
+
+复制的 `.dylib` 已被 Git 忽略，不会替换仓库内原有的 Windows DLL。Homebrew bottle 的最低系统版本
+由其构建环境决定；开发机链接运行成功不等于已生成兼容旧版 macOS 的便携发行包。
+
+macOS 自带的 PingFang、Hiragino Sans GB 与 STHeiti 会作为中文系统字体候选。SDL_ttf/FreeType 支持
+`.ttc` 字体集合，当前通过 `TTF_OpenFont` 使用集合中的第一个 face。
+
+推荐需要统一中文显示的用户通过独立 CangUI CLI 安装 HarmonyOS Sans SC：
+
+```bash
+cd ../CangUI-CLI
+cjpm build
+./bin/cuic font install macos
+./bin/cuic font status macos
+```
+
+该命令将字体安装到当前用户的 `~/Library/Fonts/HarmonyOS_Sans_SC.ttf`，框架会优先使用已安装字体，
+但不会读取自定义字体路径环境变量。也可从以下官方资源下载后，用 macOS“字体册”安装，或手工复制到
+`~/Library/Fonts/`：
+
+```text
+https://alliance-communityfile-drcn.dbankcdn.com/FileServer/getFile/cmtyManage/011/111/111/0000000000011111111.20260627152129.89276966309836366526585265125586:50001231000000:2800:A0161E048334FE0271F9F5ECBBD5070D17381C7846125F4D7109DBC7B532C715.zip?needInitFileName=true
+```
+
+安装字体后需要重新启动正在运行的应用。HarmonyOS Sans SC 不随 CangjieGUI 仓库分发。
+
+## macOS 真机运行截图
+
+以下截图由仓颉版 `cuic prnt` 在 macOS arm64 主机上直接捕获 CangjieGUI 渲染表面生成。
+
+| 记事本 | 通讯录 |
+|---|---|
+| <img src="docs/images/macos/notepad.png" alt="CangjieGUI 记事本 macOS 真机截图" width="100%"> | <img src="docs/images/macos/contacts.png" alt="CangjieGUI 通讯录 macOS 真机截图" width="100%"> |
+| 日历 | 产品看板 |
+| <img src="docs/images/macos/calendar.png" alt="CangjieGUI 日历 macOS 真机截图" width="100%"> | <img src="docs/images/macos/data_board.png" alt="CangjieGUI 产品看板 macOS 真机截图" width="100%"> |
+
 ## 渲染与字体
 
 CUI 将矢量图元绘制到高分辨率离屏纹理，再以线性过滤缩放到窗口，从而改善圆角、曲线和斜线边缘。
