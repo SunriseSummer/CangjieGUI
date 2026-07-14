@@ -323,39 +323,16 @@ private func openFont(path: String, pointSize: Float32): NativeFont {
 }
 
 private func systemFontCandidates(): Array<String> {
-    let candidates = ArrayList<String>()
-    if (let Some(path) <- configuredFontPath()) {
-        candidates.add(path)
-    }
-    candidates.add("assets/fonts/HarmonyOS_Sans_SC.ttf")
-    candidates.add("../assets/fonts/HarmonyOS_Sans_SC.ttf")
-    candidates.add("../../assets/fonts/HarmonyOS_Sans_SC.ttf")
-    candidates.add("C:\\Windows\\Fonts\\msyh.ttc")
-    candidates.add("C:\\Windows\\Fonts\\segoeui.ttf")
-    candidates.add("/System/Library/Fonts/PingFang.ttc")
-    candidates.add("/System/Library/Fonts/Hiragino Sans GB.ttc")
-    candidates.add("/System/Library/Fonts/STHeiti Medium.ttc")
-    candidates.add("/System/Library/Fonts/SFNS.ttf")
-    candidates.add("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc")
-    candidates.add("/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc")
-    candidates.add("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc")
-    candidates.add("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
-    candidates.toArray()
-}
-
-private func configuredFontPath(): ?String {
-    let name = unsafe { LibC.mallocCString("CANGJIEGUI_FONT_PATH") }
-    var configured: ?String = None
-    try (nameResource = name.asResource()) {
-        let value = unsafe { getenv(nameResource.value) }
-        if (!value.isNull()) {
-            let path = value.toString()
-            if (!path.isEmpty()) {
-                configured = Some(path)
-            }
-        }
-    }
-    configured
+    [
+        "C:\\Windows\\Fonts\\msyh.ttc",
+        "C:\\Windows\\Fonts\\segoeui.ttf",
+        "/System/Library/Fonts/PingFang.ttc",
+        "/System/Library/Fonts/SFNS.ttf",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+    ]
 }
 
 private func normalizePointSize(pointSize: Float32): Float32 {

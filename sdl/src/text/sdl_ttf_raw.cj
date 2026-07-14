@@ -1,8 +1,6 @@
 package sdl.text
 
 foreign {
-    func getenv(name: CString): CString
-
     func TTF_Init(): Bool
 
     func TTF_OpenFont(file: CString, pointSize: Float32): CPointer<Unit>
