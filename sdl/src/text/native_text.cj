@@ -1,6 +1,7 @@
 package sdl.text
 
 import std.collection.ArrayList
+import std.env.getVariable
 import std.math.abs
 
 private let DEFAULT_POINT_SIZE: Float32 = 15.0
@@ -323,10 +324,22 @@ private func openFont(path: String, pointSize: Float32): NativeFont {
 }
 
 private func systemFontCandidates(): Array<String> {
+    let home = match (getVariable("HOME")) {
+        case Some(value) => value
+        case None => ""
+    }
+    let userFonts = if (home.isEmpty()) { "/Library/Fonts" } else { "${home}/Library/Fonts" }
     [
         "C:\\Windows\\Fonts\\msyh.ttc",
         "C:\\Windows\\Fonts\\segoeui.ttf",
         "/System/Library/Fonts/PingFang.ttc",
+        "${userFonts}/HarmonyOS_Sans_SC.ttf",
+        "${userFonts}/HarmonyOS Sans SC.ttf",
+        "/Library/Fonts/HarmonyOS_Sans_SC.ttf",
+        "/Library/Fonts/HarmonyOS Sans SC.ttf",
+        "/System/Library/Fonts/Hiragino Sans GB.ttc",
+        "/System/Library/Fonts/STHeiti Medium.ttc",
+        "/System/Library/Fonts/STHeiti Light.ttc",
         "/System/Library/Fonts/SFNS.ttf",
         "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
         "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
