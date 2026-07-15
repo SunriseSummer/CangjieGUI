@@ -95,7 +95,7 @@ func editorArea(model: NotesModel): Unit {
                 Label("还没有笔记。点击“新建”开始。").muted()
             }
             if (!model.notes.value.isEmpty()) {
-                TextArea(model.editorId(), model.body)
+                TextArea(model.body, key: model.editorId())
             }
             Label(model.stats.value).muted().fontSize(FontSizes.CAPTION)
         }.spacing(10.vp)

@@ -42,33 +42,34 @@ public class LazyColumn <: Widget {
     private var frame = Rect.zero()
 
     /**
-     * The index form: `count` rows built on demand by index. Throws `IllegalArgumentException` when
-     * `id` is empty. Row height is in logical pixels. `key` optionally gives each row a stable
-     * identity string (so its per-row state follows the item across inserts/reorders); when omitted,
-     * rows are keyed by index — see `LazyColumn.of` for the data-driven form.
+     * The index form: `count` rows built on demand by index. `id` is the optional container identity
+     * (auto-derived by build order when omitted; an explicit one must be non-empty). Row height is in
+     * logical pixels. `key` optionally gives each row a stable identity string (so its per-row state
+     * follows the item across inserts/reorders); when omitted, rows are keyed by index — see
+     * `LazyColumn.of` for the data-driven form.
      */
     public init(
-        id: String,
         count: Int64,
         itemHeight: Float32,
         spacing!: Float32 = 0.0,
         scroll!: ?State<Float32> = None,
         key!: ?((Int64) -> String) = None,
+        id!: ?String = None,
         item!: (Int64) -> Unit
     ) {
-        requireControlId(id, "LazyColumn")
-        this.id = id
+        let ident = resolveControlKey(id, "LazyColumn")
+        this.id = ident
         this.count = max(0, count)
         this.itemHeight = max(1.0, itemHeight)
         this.spacing = max(0.0, spacing)
         this.scrollStateValue = match (scroll) {
             case Some(value) => value
-            case None => localState<Float32>("LazyColumn:${id}:scroll") {0.0}
+            case None => localState<Float32>("LazyColumn:${ident}:scroll") {0.0}
         }
         // Retained so the build pass (which has no layout rect yet) knows how tall the viewport was
         // last frame and thus which rows to materialize; layout updates it for the next frame.
-        this.viewportHeightState = localState<Float32>("LazyColumn:${id}:viewportH") {LAZY_DEFAULT_VIEWPORT}
-        this.scrollBar = ScrollBar("LazyColumn:${id}:thumb")
+        this.viewportHeightState = localState<Float32>("LazyColumn:${ident}:viewportH") {LAZY_DEFAULT_VIEWPORT}
+        this.scrollBar = ScrollBar("LazyColumn:${ident}:thumb")
         let content = lazyContentHeight(this.count, this.itemHeight, this.spacing)
         this.frameScroll = clampScrollOffset(this.scrollStateValue.value, content, this.viewportHeightState.value)
         this.visibleItems = buildVisibleItems(this.id, this.count, this.itemHeight, this.spacing, this.frameScroll,
@@ -84,23 +85,23 @@ public class LazyColumn <: Widget {
      * `itemHeight` is the fixed row height in logical pixels, as for the index form.
      *
      * ```
-     * LazyColumn.of("notes", model.notes, 72.0, key: {n => n.id}) { note => noteRow(note) }
+     * LazyColumn.of(model.notes, 72.0, key: {n => n.id}) { note => noteRow(note) }
      * ```
      */
     public static func of<T>(
-        id: String,
         data: Array<T>,
         itemHeight: Float32,
         spacing!: Float32 = 0.0,
         scroll!: ?State<Float32> = None,
         key!: ?((T) -> String) = None,
+        id!: ?String = None,
         item!: (T) -> Unit
     ): LazyColumn {
         let rowKey: ?((Int64) -> String) = match (key) {
             case Some(k) => Some({index => k(data[index])})
             case None => None
         }
-        LazyColumn(id, data.size, itemHeight, spacing: spacing, scroll: scroll, key: rowKey) {
+        LazyColumn(data.size, itemHeight, spacing: spacing, scroll: scroll, key: rowKey, id: id) {
             index => item(data[index])
         }
     }
@@ -293,23 +294,23 @@ private func rowKeyOrIndex(key: ?((Int64) -> String)): (Int64) -> String {
  * anything that must persist across data reorders.
  *
  * ```
- * LazyGrid("gallery", photos, 4, 160.0, spacing: 12.0, columnSpacing: 12.0) { photo => photoCell(photo) }
+ * LazyGrid(photos, 4, 160.0, spacing: 12.0, columnSpacing: 12.0) { photo => photoCell(photo) }
  * ```
  */
 public func LazyGrid<T>(
-    id: String,
     data: Array<T>,
     columns: Int64,
     itemHeight: Float32,
     spacing!: Float32 = 0.0,
     columnSpacing!: Float32 = 0.0,
     scroll!: ?State<Float32> = None,
+    id!: ?String = None,
     item!: (T) -> Unit
 ): LazyColumn {
     let cols = max(1, columns)
     let count = data.size
     let rowCount = (count + cols - 1) / cols
-    LazyColumn(id, rowCount, itemHeight, spacing: spacing, scroll: scroll) {
+    LazyColumn(rowCount, itemHeight, spacing: spacing, scroll: scroll, id: id) {
         rowIndex =>
         Grid(cols) {
             var c = 0

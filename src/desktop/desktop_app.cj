@@ -11,7 +11,7 @@ import sdl.system.AppMetadata
 import sdl.system.ApplicationMetadata
 import sdl.system.SdlHintSetting
 import sdl.system.SdlHints
-import cui.core.{CursorShape, StateStore, Theme, UiContext, Widget, buildRoot, drawTooltip}
+import cui.core.{CursorShape, StateStore, Theme, UiContext, Widget, buildRoot, currentStateGeneration, drawTooltip}
 
 // Long enough for the first paint to settle and for background work started at launch
 // (dialog-free examples fetch data on worker threads) to land in the frame.
@@ -111,29 +111,57 @@ public class DesktopApp {
                 case None => ()
             }
             var previousTick = window.ticks()
+            // Dirty-frame skipping (档 0): a frame is built, laid out, and drawn only when something can
+            // have changed — the first frame, pending input, a state write since the last render, a
+            // resize, or a continuous-frame request (a blinking caret, a tooltip counting down, a
+            // per-frame FrameHandler). Otherwise the loop keeps polling input at the frame cadence but
+            // leaves the last presented frame on screen, so an idle window costs nothing to build, lay
+            // out, or draw. State is snapshotted at the TOP of each rendered frame, so a write made
+            // during that frame's layout/dispatch/draw reliably triggers the reflecting render next.
+            var lastRenderedGen = currentStateGeneration()
+            var continuousRequested = true // force the first frame
+            var renderedWidth: Int32 = -1
+            var renderedHeight: Int32 = -1
             while (!ctx.shouldClose) {
                 let frame = nextFrame(previousTick)
                 previousTick = frame.elapsedMs
                 ctx.frame = frame
-                ctx.viewportWidth = Float32(window.width)
-                ctx.viewportHeight = Float32(window.height)
-                let tBuild = FrameProfiler.now()
-                let widget = buildRoot(body, stateStore)
-                let tLayout = FrameProfiler.now()
-                ctx.adoptFocusRing(stateStore.focusRing())
-                widget.layout(ctx, Rect(0.0, 0.0, Float32(window.width), Float32(window.height)))
-                let tEvents = FrameProfiler.now()
-                drainEvents(widget)
-                dispatchEvent(widget, UiEvent.Frame(frame))
-                let tDraw = FrameProfiler.now()
-                frames += 1
-                let (beginNs, treeNs, resolveNs, presentNs) = draw(widget)
-                window.delay(frameDelay)
-                match (profiler) {
-                    case Some(p) => p.record(tLayout - tBuild, tEvents - tLayout, tDraw - tEvents, beginNs, treeNs,
-                        resolveNs, presentNs)
-                    case None => ()
+                let viewportW = window.width
+                let viewportH = window.height
+                ctx.viewportWidth = Float32(viewportW)
+                ctx.viewportHeight = Float32(viewportH)
+
+                let events = collectPendingEvents()
+                let stateGen = currentStateGeneration()
+                let mustRender = continuousRequested || !events.isEmpty() || stateGen != lastRenderedGen ||
+                    viewportW != renderedWidth || viewportH != renderedHeight || snapshotPath.isSome() ||
+                    profiler.isSome()
+
+                if (mustRender) {
+                    let tBuild = FrameProfiler.now()
+                    let widget = buildRoot(body, stateStore)
+                    let tLayout = FrameProfiler.now()
+                    ctx.adoptFocusRing(stateStore.focusRing())
+                    widget.layout(ctx, Rect(0.0, 0.0, Float32(viewportW), Float32(viewportH)))
+                    let tEvents = FrameProfiler.now()
+                    dispatchCollectedEvents(widget, events)
+                    dispatchEvent(widget, UiEvent.Frame(frame))
+                    let tDraw = FrameProfiler.now()
+                    frames += 1
+                    let (beginNs, treeNs, resolveNs, presentNs) = draw(widget)
+                    lastRenderedGen = stateGen
+                    continuousRequested = ctx.takeFrameRequest()
+                    renderedWidth = viewportW
+                    renderedHeight = viewportH
+                    match (profiler) {
+                        case Some(p) => p.record(tLayout - tBuild, tEvents - tLayout, tDraw - tEvents, beginNs, treeNs,
+                            resolveNs, presentNs)
+                        case None => ()
+                    }
+                } else {
+                    continuousRequested = ctx.takeFrameRequest()
                 }
+                window.delay(frameDelay)
             }
         } finally {
             closeManagedResources()
@@ -141,13 +169,26 @@ public class DesktopApp {
         }
     }
 
-    private func drainEvents(widget: Widget): Unit {
+    // Polls every event SDL has queued into a buffer, so the render decision can tell whether any input
+    // arrived before deciding whether to build a frame at all. Dispatch is deferred (see below).
+    private func collectPendingEvents(): ArrayList<UiEvent> {
+        let events = ArrayList<UiEvent>()
         var current = window.pollEvent()
         while (let Some(event) <- current) {
+            events.add(event)
+            current = window.pollEvent()
+        }
+        events
+    }
+
+    // Dispatches the collected events in arrival order against the freshly built tree, bracketing each
+    // with the same pointer bookkeeping the loop used to do inline — the per-event sequence
+    // (prepare, route, complete) is unchanged, only deferred past the render decision.
+    private func dispatchCollectedEvents(widget: Widget, events: ArrayList<UiEvent>): Unit {
+        for (event in events) {
             preparePointer(event)
             routeEvent(widget, event)
             completePointer(event)
-            current = window.pollEvent()
         }
     }
 

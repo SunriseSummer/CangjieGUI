@@ -56,9 +56,24 @@ public class Spring {
     }
 
     /*
-     * The common draw-time step in one call: retarget, advance by the frame delta, and read the
-     * new value. `let t = spring.animate(target: goal, deltaMs: ctx.frame.deltaMs)` replaces the
-     * three-line target/tick/value dance a widget otherwise writes every frame.
+     * The widget draw-time step: retarget, advance by this frame's delta, and — while still in
+     * motion — request the next frame so the dirty-frame loop (档 0) keeps rendering instead of idling
+     * mid-transition and freezing the animation. This is the form controls use; a settled spring asks
+     * for nothing, so an idle control still costs no frames. Returns the new value.
+     */
+    public func animate(ctx: UiContext, target!: Float32): Float32 {
+        goal = target
+        tick(ctx.frame.deltaMs)
+        if (!settled()) {
+            ctx.requestFrame()
+        }
+        current
+    }
+
+    /*
+     * The raw step: retarget, advance by an explicit delta, and read the new value, with no frame
+     * request. For tests and non-draw callers that drive time themselves; widgets rendering under the
+     * dirty-frame loop want `animate(ctx, target:)` so the transition is not frozen.
      */
     public func animate(target!: Float32, deltaMs!: UInt64): Float32 {
         goal = target

@@ -1,5 +1,7 @@
 package cui.core
 
+import sdl.FrameInfo
+
 /*
  * The spring eases toward its target across ticks and settles exactly onto it, so an idle
  * spring is free and a static first frame (target == start) never animates. A clamped
@@ -94,4 +96,36 @@ func springClampsHugeTimestepInsteadOfDiverging(): Unit {
     spring.tick(UInt64(100000)) // a 100-second hitch
     @Expect(spring.value >= Float32(0.0))
     @Expect(spring.value <= Float32(2.0)) // bounded: the clamp prevented a blow-up
+}
+
+// The ctx form keeps frames coming while the spring is in motion, so the dirty-frame loop (档 0) does
+// not idle mid-transition and freeze a switch/radio/progress animation; a settled spring asks for
+// nothing, so an idle control still costs no frames.
+@Test
+func springCtxAnimateRequestsFrameWhileMoving(): Unit {
+    let ctx = testContext()
+    ctx.frame = FrameInfo(UInt64(16), UInt64(16)) // deltaMs = 16
+    let spring = Spring(0.0)
+
+    // Already at its target: no motion, no request.
+    let _ = ctx.takeFrameRequest()
+    let _ = spring.animate(ctx, target: 0.0)
+    @Expect(!ctx.takeFrameRequest())
+
+    // Retargeted away: now moving, so it must ask for the next frame.
+    let _ = ctx.takeFrameRequest()
+    let _ = spring.animate(ctx, target: 1.0)
+    @Expect(!spring.settled())
+    @Expect(ctx.takeFrameRequest())
+
+    // Drive it to rest, then it stops asking.
+    var i = 0
+    while (i < 400 && !spring.settled()) {
+        let _ = spring.animate(ctx, target: 1.0)
+        i += 1
+    }
+    @Expect(spring.settled())
+    let _ = ctx.takeFrameRequest()
+    let _ = spring.animate(ctx, target: 1.0)
+    @Expect(!ctx.takeFrameRequest())
 }

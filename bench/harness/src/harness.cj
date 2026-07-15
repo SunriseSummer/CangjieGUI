@@ -60,6 +60,20 @@ private func elapsed(start: UInt64, end: UInt64): UInt64 {
     }
 }
 
+/*
+ * A raw nanosecond timestamp from the SDL performance clock. Exposed for phase-split benchmarks that
+ * time the sub-phases of one frame (build / layout / draw) separately, the way the desktop
+ * FrameProfiler does, instead of the single elapsed span `timeit` reports.
+ */
+public func nowNanos(): UInt64 {
+    PerformanceClock.ticksNanoseconds()
+}
+
+/** The nanoseconds from `start` to `end`, guarding against a same-or-backwards clock reading. */
+public func spanNs(start: UInt64, end: UInt64): UInt64 {
+    elapsed(start, end)
+}
+
 /** Prints a section title with surrounding blank line. */
 public func printSection(title: String): Unit {
     println("")

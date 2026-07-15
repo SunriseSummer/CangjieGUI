@@ -313,10 +313,11 @@ public class ScrollView <: Widget {
     private var frame = Rect.zero()
     private var contentHeight: Float32 = 0.0
 
-    public init(id: String, body!: () -> Unit) {
+    public init(key!: ?String = None, body!: () -> Unit) {
+        let ident = resolveControlKey(key, "ScrollView")
         child = buildChild(body)
-        scrollOffset = localState<Float32>("ScrollView:${id}:offset") {0.0}
-        scrollBar = ScrollBar("ScrollView:${id}:thumb")
+        scrollOffset = localState<Float32>("ScrollView:${ident}:offset") {0.0}
+        scrollBar = ScrollBar("ScrollView:${ident}:thumb")
         emit(this)
     }
 

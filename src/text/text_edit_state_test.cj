@@ -12,7 +12,7 @@ func textAreaScrollbarThumbDragScrollsAndTakesPriorityOverTextDrag(): Unit {
     let ctx = textTestContext()
     let text = State<String>("one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\nnine\nten")
     let scroll = State<Float32>(0.0)
-    let area = TextArea("notes", text, scroll: Some(scroll))
+    let area = TextArea(text, key: "notes", scroll: Some(scroll))
     area.layout(ctx, Rect(0.0, 0.0, 200.0, 100.0))
 
     // Press in the scrollbar lane (right edge), not the text — then drag the thumb down.
@@ -26,7 +26,7 @@ func textAreaScrollbarThumbDragScrollsAndTakesPriorityOverTextDrag(): Unit {
 @Test
 func editableTextAreaRequestsTextCursorButReadOnlyDoesNot(): Unit {
     let editableCtx = textTestContext()
-    let editable = TextArea("editable", State<String>("hi"))
+    let editable = TextArea(State<String>("hi"), key: "editable")
     editable.layout(editableCtx, Rect(0.0, 0.0, 200.0, 120.0))
     editableCtx.beginHoverTest()
     let _ = editable.handle(editableCtx, UiEvent.MouseMove(20.0, 20.0))
@@ -34,7 +34,7 @@ func editableTextAreaRequestsTextCursorButReadOnlyDoesNot(): Unit {
     @Expect(editableCtx.desiredCursor() == CursorShape.Text)
 
     let readOnlyCtx = textTestContext()
-    let readOnly = TextArea("readonly", State<String>("hi"), editable: false)
+    let readOnly = TextArea(State<String>("hi"), key: "readonly", editable: false)
     readOnly.layout(readOnlyCtx, Rect(0.0, 0.0, 200.0, 120.0))
     readOnlyCtx.beginHoverTest()
     let _ = readOnly.handle(readOnlyCtx, UiEvent.MouseMove(20.0, 20.0))
@@ -45,11 +45,11 @@ func editableTextAreaRequestsTextCursorButReadOnlyDoesNot(): Unit {
 @Test
 func editableTextAreaJoinsFocusRingButReadOnlyDoesNot(): Unit {
     let editableStore = StateStore()
-    let _ = buildRoot({=> TextArea("editable", State<String>("hi"))}, editableStore)
+    let _ = buildRoot({=> TextArea(State<String>("hi"), key: "editable")}, editableStore)
     @Expect(editableStore.focusRing().size, 1)
 
     let readOnlyStore = StateStore()
-    let _ = buildRoot({=> TextArea("readonly", State<String>("hi"), editable: false)}, readOnlyStore)
+    let _ = buildRoot({=> TextArea(State<String>("hi"), key: "readonly", editable: false)}, readOnlyStore)
     @Expect(readOnlyStore.focusRing().size, 0)
 }
 
@@ -58,7 +58,7 @@ func textAreaWheelUpdatesSharedScrollState(): Unit {
     let ctx = textTestContext()
     let text = State<String>("one\ntwo\nthree\nfour\nfive\nsix\nseven\neight")
     let scroll = State<Float32>(0.0)
-    let area = TextArea("notes", text, scroll: Some(scroll))
+    let area = TextArea(text, key: "notes", scroll: Some(scroll))
 
     area.layout(ctx, Rect(0.0, 0.0, 180.0, 100.0))
 
@@ -107,7 +107,7 @@ func textFieldUsesExternalCursorState(): Unit {
     let ctx = textTestContext()
     let text = State<String>("abc")
     let cursor = State<Int64>(1)
-    let field = TextField("field", text, cursor: Some(cursor))
+    let field = TextField(text, key: "field", cursor: Some(cursor))
 
     field.layout(ctx, Rect(0.0, 0.0, 180.0, 34.0))
     ctx.focus("field")
@@ -127,7 +127,7 @@ func textAreaReadOnlyStillMovesCursor(): Unit {
     let ctx = textTestContext()
     let text = State<String>("abc")
     let cursor = State<Int64>(2)
-    let area = TextArea("output", text, cursor: Some(cursor), editable: false)
+    let area = TextArea(text, key: "output", cursor: Some(cursor), editable: false)
 
     area.layout(ctx, Rect(0.0, 0.0, 180.0, 80.0))
     ctx.focus("output")
@@ -145,12 +145,12 @@ func textFieldImplicitCursorSurvivesKeyedRebuild(): Unit {
     let store = StateStore()
     let text = State<String>("abc")
 
-    let first = buildRoot({=> TextField("remembered.field", text)}, store)
+    let first = buildRoot({=> TextField(text, key: "remembered.field")}, store)
     first.layout(ctx, Rect(0.0, 0.0, 180.0, 34.0))
     let _ = first.handle(ctx, UiEvent.MouseDown(MouseButton.Left, 170.0, 10.0))
     let _ = first.handle(ctx, UiEvent.KeyDown(Key.Left, false))
 
-    let second = buildRoot({=> TextField("remembered.field", text)}, store)
+    let second = buildRoot({=> TextField(text, key: "remembered.field")}, store)
     second.layout(ctx, Rect(0.0, 0.0, 180.0, 34.0))
     let _ = second.handle(ctx, UiEvent.TextInput("X"))
 

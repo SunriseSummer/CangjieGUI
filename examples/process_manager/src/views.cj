@@ -49,7 +49,7 @@ func processPage(model: ProcessModel): Unit {
         }.contentPadding(12.vp).flex()
     }
     if (!rows.isEmpty()) {
-        Table("process.table", processColumns(), rows, model.selectedRow).flex()
+        Table(processColumns(), rows, model.selectedRow).flex()
     }
 }
 

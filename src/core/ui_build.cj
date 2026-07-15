@@ -159,6 +159,22 @@ protected func requireControlId(id: String, kind: String): Unit {
 }
 
 /*
+ * Resolves a control's identity from an optional explicit key (the unified `key!` parameter). A
+ * given key is used verbatim after a non-empty check; when absent, the identity is auto-derived by
+ * declaration order within the current `Keyed` scope. This is the single seam behind every control's
+ * optional identity: state that must survive structural change passes an explicit key, everything
+ * else lets build order name it.
+ */
+protected func resolveControlKey(key: ?String, kind: String): String {
+    match (key) {
+        case Some(value) =>
+            requireControlId(value, kind)
+            value
+        case None => controlIdentity(kind)
+    }
+}
+
+/*
  * A focus/press identity for a control that declared no explicit id. During a build the
  * identity is scoped by `Keyed` and deduplicated in declaration order, so identical
  * default names (two icon-only buttons, two "确定" buttons) never share interaction
@@ -214,7 +230,7 @@ protected func focusablesSince(start: Int64): Array<String> {
     }
 }
 
-/** Keeps the focus ring consistent when a control's `.id(...)` overrides its auto id. */
+/** Keeps the focus ring consistent when a control's `.key(...)` overrides its auto id. */
 protected func reregisterFocusable(previous: String, replacement: String): Unit {
     match (activeStateStore) {
         case Some(store) => store.reregisterFocusable(previous, replacement)

@@ -15,12 +15,12 @@ public class SegmentedControl <: Widget {
     private let indicatorSpring: Spring
     private var frame = Rect.zero()
 
-    public init(items: Array<String>, selected: Bindable<Int64>, id!: ?String = None) {
+    public init(items: Array<String>, selected: Bindable<Int64>, key!: ?String = None) {
         this.items = items
         this.selected = selected
         // A focus stop: Tab reaches the control, Left/Right switch the selected segment. Identity is
-        // optional and auto-derived by build order; pass `id` for a stable, addressable one.
-        let base = match (id) {
+        // optional and auto-derived by build order; pass `key` for a stable, addressable one.
+        let base = match (key) {
             case Some(value) =>
                 requireControlId(value, "SegmentedControl")
                 value
@@ -48,7 +48,7 @@ public class SegmentedControl <: Widget {
         }
         drawSurface(ctx, frame, ctx.theme.fieldSurface(false))
         let target = Float32(clampIndex(selected.value, items.size))
-        drawSlidingSegments(ctx, frame, items, indicatorSpring.animate(target: target, deltaMs: ctx.frame.deltaMs))
+        drawSlidingSegments(ctx, frame, items, indicatorSpring.animate(ctx, target: target))
         if (ctx.showFocusRing(controlId)) {
             drawFocusRing(ctx, frame, ctx.theme.controlRadius)
         }
@@ -93,13 +93,13 @@ public class TabView <: Widget {
     private var frame = Rect.zero()
     private var laidOutPage: Int64 = -1
 
-    public init(labels: Array<String>, selected: Bindable<Int64>, id!: ?String = None, body!: () -> Unit) {
+    public init(labels: Array<String>, selected: Bindable<Int64>, key!: ?String = None, body!: () -> Unit) {
         this.labels = labels
         this.selected = selected
         // A focus stop: Tab reaches the strip, Left/Right switch the selected tab. Registered
         // before the pages build, so Tab lands on the strip before the controls inside a page —
         // matching the visual order (strip above content).
-        let base = match (id) {
+        let base = match (key) {
             case Some(value) =>
                 requireControlId(value, "TabView")
                 value
@@ -219,7 +219,7 @@ public class TabView <: Widget {
         let header = Rect(frame.x, frame.y, frame.w, CUI_CONTROL_H)
         drawSurface(ctx, header, ctx.theme.fieldSurface(false))
         let target = Float32(clampIndex(selected.value, labels.size))
-        drawSlidingSegments(ctx, header, labels, indicatorSpring.animate(target: target, deltaMs: ctx.frame.deltaMs))
+        drawSlidingSegments(ctx, header, labels, indicatorSpring.animate(ctx, target: target))
         if (ctx.showFocusRing(controlId)) {
             drawFocusRing(ctx, header, ctx.theme.controlRadius)
         }

@@ -57,7 +57,7 @@ func searchBox(model: PaletteModel): Unit {
     Panel {
         HStack {
             Icon(IconName.ChevronRight).foregroundColor(Color.rgb(108, 140, 255)).iconSize(18.vp)
-            TextField("palette.search", model.query).autofocus().flex()
+            TextField(model.query).autofocus().flex()
         }.spacing(8.vp).crossAxisAlignment(CrossAxisAlignment.Center)
     }.contentPadding(12.vp, 8.vp).hug()
 }
@@ -76,7 +76,7 @@ func logPanel(model: PaletteModel): Unit {
     Panel {
         VStack {
             Label("执行记录").muted().fontSize(FontSizes.CAPTION)
-            ScrollView("palette.log") {
+            ScrollView {
                 VStack {
                     if (model.log.value.isEmpty()) {
                         Label("尚无记录。选中一条命令后按回车执行。").muted().fontSize(FontSizes.CAPTION)

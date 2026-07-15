@@ -67,7 +67,7 @@ func navigationEntry(model: PlannerModel, page: Int64, title: String): Unit {
 }
 
 func overviewPage(model: PlannerModel): Unit {
-    ScrollView("planner.overview.scroll") {
+    ScrollView {
         VStack {
             Label("今天，保持轻盈但坚定").fontSize(FontSizes.TITLE)
             Grid(3) {
@@ -121,7 +121,7 @@ func quickNote(): Unit {
         Panel {
             VStack {
                 Label("随手记").fontSize(PLANNER_HEADING)
-                TextField("planner.quick_note.field", note).fillWidth()
+                TextField(note).fillWidth()
                 Label("这段文字由局部状态保存，切换页面卸载后会按身份规则重置。")
                     .muted()
                     .fontSize(FontSizes.CAPTION)
@@ -141,14 +141,14 @@ func suggestion(title: String, level: String): Unit {
 }
 
 func preferencesPage(model: PlannerModel): Unit {
-    ScrollView("planner.preferences.scroll") {
+    ScrollView {
         VStack {
             Label("偏好设置").fontSize(FontSizes.TITLE)
             settingsSection("专注时段") {
                 HStack {
                     Label("单次专注分钟数")
                     Spacer()
-                    Stepper("planner.minutes", model.sessionMinutes).range(15, 120).step(5)
+                    Stepper(model.sessionMinutes).range(15, 120).step(5)
                 }.hug()
                 Switch("到时桌面通知", model.notifications)
                 Switch("播放环境声音", model.ambientSound)
@@ -164,7 +164,7 @@ func preferencesPage(model: PlannerModel): Unit {
                 HStack {
                     Label("内容间距")
                     Spacer()
-                    Dropdown("planner.density", ["紧凑", "舒适", "宽松"], model.density)
+                    Dropdown(["紧凑", "舒适", "宽松"], model.density)
                 }.hug()
             }
             settingsSection("常用地点") {
@@ -173,7 +173,7 @@ func preferencesPage(model: PlannerModel): Unit {
                     Spacer()
                     // 长建议列表：超出周围空间时在弹层内部滚动（滚轮/拖动滑块/方向键揭示），
                     // 键入即过滤到匹配城市。
-                    ComboBox("planner.city", model.location, majorCities()).width(180.vp)
+                    ComboBox(model.location, majorCities()).width(180.vp)
                 }.hug()
             }
         }.spacing(14.vp).hug()

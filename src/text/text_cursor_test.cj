@@ -73,3 +73,20 @@ func focusedCaretReportsImeAnchorInBothBlinkPhases(): Unit {
     drawTextFieldCursor(ctx, frame, "field", "abc", 1)
     @Expect(ctx.textInputAnchorRect().getOrThrow().x, Float32(26.25))
 }
+
+// A focused caret blinks on the frame clock, so drawing it must request the next frame — otherwise the
+// dirty-frame loop (档 0) would idle and freeze the blink. An unfocused field asks for nothing.
+@Test
+func focusedCaretRequestsContinuousFrame(): Unit {
+    let ctx = UiContext(Renderer.headless(), Theme.light())
+    let frame = Rect(0.0, 0.0, 200.0, 38.0)
+
+    let _ = ctx.takeFrameRequest()
+    drawTextFieldCursor(ctx, frame, "field", "abc", 1)
+    @Expect(!ctx.takeFrameRequest()) // unfocused: no request
+
+    ctx.focus("field")
+    let _ = ctx.takeFrameRequest()
+    drawTextFieldCursor(ctx, frame, "field", "abc", 1)
+    @Expect(ctx.takeFrameRequest()) // focused: keep frames flowing for the blink
+}

@@ -88,6 +88,9 @@ public class FrameHandler <: Widget {
     public func handle(ctx: UiContext, event: UiEvent): Bool {
         match (event) {
             case UiEvent.Frame(info) =>
+                // A frame hook is a per-frame contract: keep the loop rendering so onFrame keeps
+                // firing (animations, dialog polling) instead of being frozen by dirty-frame skipping.
+                ctx.requestFrame()
                 onFrame(info)
                 let _ = child.handle(ctx, event)
                 return false

@@ -1,5 +1,5 @@
 /*
- * 画廊数据与视图。卡片是强类型的 `GalleryItem`，网格用 `LazyGrid(id, data, columns, itemHeight){ item => ... }`
+ * 画廊数据与视图。卡片是强类型的 `GalleryItem`，网格用 `LazyGrid(data, columns, itemHeight){ item => ... }`
  * 一行构建器搭出——数据保持类型化，行按视口窗口化，卡片可为任意控件（这里是色块＋标题＋副标题的面板）。
  */
 package cui_gallery
@@ -41,7 +41,7 @@ func galleryView(items: Array<GalleryItem>): Unit {
             Label("LazyGrid 虚拟化网格：${items.size} 张卡片，仅渲染视口附近的行").muted().fontSize(FontSizes.CAPTION)
         }.spacing(3.vp).hug()
         Panel {
-            LazyGrid("gallery.grid", items, 4, 180.0, spacing: 14.0, columnSpacing: 14.0) {
+            LazyGrid(items, 4, 180.0, spacing: 14.0, columnSpacing: 14.0) {
                 item => galleryCard(item)
             }
         }.contentPadding(14.vp).flex()

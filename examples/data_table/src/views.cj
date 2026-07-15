@@ -12,7 +12,7 @@ func fleetView(model: FleetModel): Unit {
     VStack {
         header()
         // Typed data table: rows stay `Array<Server>`, columns extract fields — no string matrix.
-        Table.of("fleet.table", model.servers, serverColumns(), model.selected).flex()
+        Table.of(model.servers, serverColumns(), model.selected).flex()
         detailBar(model)
     }.spacing(14.vp).padding(18.vp)
 }

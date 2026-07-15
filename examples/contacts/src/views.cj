@@ -55,7 +55,7 @@ func toolbar(model: ContactsModel): Unit {
 func searchRow(model: ContactsModel): Unit {
     HStack {
         Label("搜索").muted().fontSize(FontSizes.CAPTION)
-        ComboBox("contacts.search", model.query, companySuggestions()).flex()
+        ComboBox(model.query, companySuggestions()).flex()
     }.spacing(10.vp).crossAxisAlignment(CrossAxisAlignment.Center).hug()
 }
 
@@ -65,7 +65,7 @@ func contactList(model: ContactsModel): Unit {
         MenuItem("编辑", {=> model.startEdit()}),
         MenuItem("删除", {=> model.requestDelete()})
     ]) {
-        Table("contacts.table", contactColumns(), model.rows(), model.selected)
+        Table(contactColumns(), model.rows(), model.selected)
     }
 }
 
@@ -90,7 +90,7 @@ func formModal(model: ContactsModel): Unit {
             // 与页面级组合框一致；也允许键入建议之外的公司。
             HStack {
                 Label("公司").width(56.vp)
-                ComboBox("contacts.form.company", model.draftCompany, companySuggestions()).flex()
+                ComboBox(model.draftCompany, companySuggestions(), key: "contacts.form.company").flex()
             }.crossAxisAlignment(CrossAxisAlignment.Center).hug()
             formField("职务", "contacts.form.role", model.draftRole)
             formField("邮箱", "contacts.form.email", model.draftEmail)
@@ -106,7 +106,7 @@ func formModal(model: ContactsModel): Unit {
 func formField(label: String, id: String, value: State<String>, autofocus!: Bool = false): Unit {
     HStack {
         Label(label).width(56.vp)
-        let field = TextField(id, value)
+        let field = TextField(value, key: id)
         if (autofocus) {
             let _ = field.autofocus()
         }

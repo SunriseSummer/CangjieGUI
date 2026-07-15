@@ -17,7 +17,7 @@ public func controlsFormScene(scroll: State<Float32>, sections: Int64): Widget {
     let minutes = State<Int64>(45)
     let density = State<Int64>(1)
     let volume = State<Float32>(0.6)
-    let view = ScrollView("bench.controls") {
+    let view = ScrollView(key: "bench.controls") {
         VStack {
             var i = 0
             while (i < sections) {
@@ -44,7 +44,7 @@ private func controlsSection(
             HStack {
                 Label("单次专注分钟数")
                 Spacer()
-                Stepper("form.min.${index}", minutes).range(15, 120).step(5)
+                Stepper(minutes, key: "form.min.${index}").range(15, 120).step(5)
             }.flexible(false)
             Switch("到时桌面通知", notify)
             FlowRow {
@@ -55,12 +55,12 @@ private func controlsSection(
             HStack {
                 Label("提示音量")
                 Spacer()
-                Slider("form.vol.${index}", volume).width(200.vp)
+                Slider(volume, key: "form.vol.${index}").width(200.vp)
             }.flexible(false)
             HStack {
                 Label("内容间距")
                 Spacer()
-                Dropdown("form.dens.${index}", ["紧凑", "舒适", "宽松"], density)
+                Dropdown(["紧凑", "舒适", "宽松"], density, key: "form.dens.${index}")
             }.flexible(false)
             Button("保存", {=> ()}).fillWidth()
         }.spacing(10.vp).flexible(false)

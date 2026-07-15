@@ -23,7 +23,7 @@ private let LAZY_BLOCK_HEIGHT: Float32 = 330.0
 
 /** Builds the scrollable content page over `blocks` repeated sections, bound to `scroll`. */
 public func contentScrollScene(scroll: State<Float32>, blocks: Int64): Widget {
-    let view = ScrollView("bench.content") {
+    let view = ScrollView(key: "bench.content") {
         VStack {
             var i = 0
             while (i < blocks) {
@@ -84,7 +84,7 @@ private func progressFor(index: Int64): Float32 {
  * O(blocks). Blocks are uniform, so a fixed row height fits LazyColumn's model.
  */
 public func lazyContentScrollScene(scroll: State<Float32>, blocks: Int64): Widget {
-    LazyColumn("bench.lazy", blocks, LAZY_BLOCK_HEIGHT, spacing: 12.0, scroll: scroll) {
+    LazyColumn(blocks, LAZY_BLOCK_HEIGHT, spacing: 12.0, scroll: scroll, id: "bench.lazy") {
         index => contentBlock(index)
     }
 }

@@ -129,7 +129,7 @@ func textAreaDragSelectsAcrossText(): Unit {
     let ctx = UiContext(Renderer.headless(), Theme.light())
     let body = State<String>("hello world")
     let cursor = State<Int64>(0)
-    let area = TextArea("a", body, cursor: Some(cursor))
+    let area = TextArea(body, key: "a", cursor: Some(cursor))
     area.layout(ctx, Rect(0.0, 0.0, 300.0, 120.0))
 
     // Viewport insets 8px; line 0 baseline near y=12. Press at the start, drag past "hello".
@@ -187,7 +187,7 @@ func textFieldDoubleClickSelectsWordUnderPointer(): Unit {
     let ctx = UiContext(Renderer.headless(), Theme.light())
     let body = State<String>("hello world")
     let cursor = State<Int64>(0)
-    let field = TextField("f", body, cursor: Some(cursor))
+    let field = TextField(body, key: "f", cursor: Some(cursor))
     field.layout(ctx, Rect(0.0, 0.0, 200.0, 32.0))
 
     ctx.clickCount = 2
@@ -202,7 +202,7 @@ func textFieldDragSelectsWithoutEditing(): Unit {
     let ctx = UiContext(Renderer.headless(), Theme.light())
     let body = State<String>("hello")
     let cursor = State<Int64>(0)
-    let field = TextField("f", body, cursor: Some(cursor))
+    let field = TextField(body, key: "f", cursor: Some(cursor))
     field.layout(ctx, Rect(0.0, 0.0, 200.0, 32.0))
 
     // Headless metrics: each ASCII byte is 8.25px at BODY=15, and text starts 8px in.
@@ -224,7 +224,7 @@ func textFieldFollowsCaretHorizontally(): Unit {
     let body = State<String>("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     let cursor = State<Int64>(body.value.size)
     let anchor = State<Int64>(body.value.size)
-    let field = TextField("f", body, cursor: Some(cursor), anchor: Some(anchor))
+    let field = TextField(body, key: "f", cursor: Some(cursor), anchor: Some(anchor))
     field.layout(ctx, Rect(0.0, 0.0, 200.0, 32.0))
     ctx.focus("f")
 
@@ -262,7 +262,7 @@ func textAreaFollowsCaretLineVertically(): Unit {
     let cursor = State<Int64>(body.value.size)
     let anchor = State<Int64>(body.value.size)
     let scroll = State<Float32>(0.0)
-    let area = TextArea("a", body, scroll: Some(scroll), cursor: Some(cursor), anchor: Some(anchor))
+    let area = TextArea(body, key: "a", scroll: Some(scroll), cursor: Some(cursor), anchor: Some(anchor))
     area.layout(ctx, Rect(0.0, 0.0, 300.0, 120.0))
     ctx.focus("a")
 

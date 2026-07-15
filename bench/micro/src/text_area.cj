@@ -24,7 +24,7 @@ private func measureTextArea(name: String, lines: Int64, frames: Int64): Unit {
     let rect = Rect(0.0, 0.0, 640.0, 480.0)
     let document = State<String>(makeDocument(lines))
     let scroll = State<Float32>(0.0)
-    let area = TextArea("bench.area", document, scroll: scroll, editable: false)
+    let area = TextArea(document, key: "bench.area", scroll: scroll, editable: false)
     area.layout(ctx, rect)
     let sweep = ScrollSweep(Float32(lines) * 18.0, 72.0)
     report("frame", "文本区域滚动", timeit(name, frames, {=>

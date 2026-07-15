@@ -1,7 +1,7 @@
 package cui.controls
 
 import sdl.{Color, FontSizes, Key, MouseButton, Pen, Rect, Size, SurfaceStyle, UiEvent}
-import cui.core.{Bindable, CUI_CONTROL_H, CUI_SMALL_H, CursorShape, Overlay, ScrollBar, State, UiContext, Widget, requireControlId,
+import cui.core.{Bindable, CUI_CONTROL_H, CUI_SMALL_H, CursorShape, Overlay, ScrollBar, State, UiContext, Widget, resolveControlKey,
     claimHoverIfInside, clampScrollOffset, drawSurface, drawVerticalScrollBar, emit, localState, registerFocusable,
     scrollBarGutter, scrollOffsetAfterWheel}
 
@@ -34,16 +34,16 @@ public class Dropdown <: Widget {
     private let popupBar: ScrollBar
     private var frame = Rect.zero()
 
-    public init(id: String, items: Array<String>, selected: Bindable<Int64>) {
-        requireControlId(id, "Dropdown")
-        this.id = id
+    public init(items: Array<String>, selected: Bindable<Int64>, key!: ?String = None) {
+        let ident = resolveControlKey(key, "Dropdown")
+        this.id = ident
         this.items = items
         this.selected = selected
-        this.overlayOwner = "Dropdown:${id}"
-        this.open = localState<Bool>("Dropdown:${id}:open") {false}
-        this.popupScroll = localState<Float32>("Dropdown:${id}:popupScroll") {0.0}
-        this.popupBar = ScrollBar("Dropdown:${id}:popupBar")
-        registerFocusable(id)
+        this.overlayOwner = "Dropdown:${ident}"
+        this.open = localState<Bool>("Dropdown:${ident}:open") {false}
+        this.popupScroll = localState<Float32>("Dropdown:${ident}:popupScroll") {0.0}
+        this.popupBar = ScrollBar("Dropdown:${ident}:popupBar")
+        registerFocusable(ident)
         emit(this)
     }
 
@@ -181,7 +181,9 @@ public class Dropdown <: Widget {
         if (items.isEmpty()) {
             return
         }
-        selected.value = clampDropdownIndex(selected.value + delta, items.size)
+        // Clamp the current index into range before stepping (matching SegmentedControl/TabView),
+        // so the move is relative to the displayed selection and the addition cannot overflow.
+        selected.value = clampDropdownIndex(clampDropdownIndex(selected.value, items.size) + delta, items.size)
         revealRow(selected.value, popup)
     }
 

@@ -59,7 +59,7 @@ func lazyVisibleRangeClampsToBounds(): Unit {
 func lazyColumnMaterializesOnlyAScreenful(): Unit {
     let counter = LazyBuildCounter()
     // A thousand rows, but only the default-viewport window (720px / 100px + overscan) is built.
-    let column = LazyColumn("test.lazy", 1000, 100.0) {
+    let column = LazyColumn(1000, 100.0, id: "test.lazy") {
         _ =>
         counter.bump()
         emit(Spacer())
@@ -75,7 +75,7 @@ func lazyColumnBuildsWindowAroundExternalScroll(): Unit {
     let built = LazyBuiltIndices()
     // Scroll near row 500 (500 * 100 px). The materialized window should centre there, not at 0.
     let scroll = State<Float32>(50000.0)
-    let column = LazyColumn("test.lazy.scroll", 1000, 100.0, scroll: scroll) {
+    let column = LazyColumn(1000, 100.0, scroll: scroll, id: "test.lazy.scroll") {
         index =>
         built.add(index)
         emit(Spacer())
@@ -96,7 +96,7 @@ func lazyColumnOfBuildsRowsFromData(): Unit {
     let data = Array<Int64>(1000, {i => i * 10})
     let built = LazyBuiltIndices()
     let scroll = State<Float32>(50000.0) // near row 500
-    let column = LazyColumn.of<Int64>("test.of", data, 100.0, scroll: scroll, key: {v => "v${v}"}) {
+    let column = LazyColumn.of<Int64>(data, 100.0, scroll: scroll, key: {v => "v${v}"}, id: "test.of") {
         value =>
         built.add(value)
         emit(Spacer())
@@ -118,7 +118,7 @@ func lazyGridBuildsVisibleCellsFromData(): Unit {
     let data = Array<Int64>(1000, {i => i}) // cell value == data index
     let built = LazyBuiltIndices()
     let scroll = State<Float32>(10000.0) // near row 100 of 250 (1000 items / 4 columns)
-    let grid = LazyGrid<Int64>("test.grid", data, 4, 100.0, scroll: scroll) {
+    let grid = LazyGrid<Int64>(data, 4, 100.0, scroll: scroll, id: "test.grid") {
         value =>
         built.add(value)
         emit(Spacer())

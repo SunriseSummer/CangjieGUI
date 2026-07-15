@@ -2,6 +2,16 @@ package cui.core
 
 import std.collection.{ArrayList, HashMap, HashSet}
 
+/*
+ * A process-global counter bumped on every `State` assignment, used by the desktop loop's dirty-frame
+ * skipping (档 0): when it has not moved since the last rendered frame, no state changed and — with no
+ * input events and no animation pending — the frame can be skipped. A background thread's write bumps
+ * it too; the increment is not atomic, but a lost increment still leaves the value different from the
+ * last snapshot (it only ever advances), so a real change is never missed, only occasionally
+ * over-counted into a harmless extra render.
+ */
+var stateWriteGeneration: UInt64 = 0
+
 class StateListener<T> {
     let callback: (T, T) -> Unit
     var isActive = true
@@ -76,7 +86,7 @@ public interface Bindable<T> <: Observable<T> {
      *
      *     let form = State<Profile>(Profile("林", true))
      *     let name = form.project(get: {p => p.name}, set: {p, v => Profile(v, p.subscribed)})
-     *     TextField("profile.name", name)
+     *     TextField(name)
      */
     func project<U>(get!: (T) -> U, set!: (T, U) -> T): Binding<U> {
         bindingOf<T, U>(this, get, set)
@@ -109,6 +119,7 @@ public class State<T> <: Bindable<T> {
             let previous = storedValue
             storedValue = next
             stateRevision = nextRevision(stateRevision)
+            stateWriteGeneration = nextRevision(stateWriteGeneration)
             notify(previous, next)
         }
     }
@@ -176,6 +187,11 @@ internal func nextRevision(current: UInt64): UInt64 {
     } else {
         current + UInt64(1)
     }
+}
+
+/** The current global state-write generation. The desktop loop compares this across frames. */
+public func currentStateGeneration(): UInt64 {
+    stateWriteGeneration
 }
 
 /**
@@ -302,7 +318,7 @@ public class StateStore {
 
     /*
      * Replaces a previously registered focus id with an explicit one. A control registers
-     * its build-order id in its constructor; a chained `.id(...)` overrides that id and
+     * its build-order id in its constructor; a chained `.key(...)` overrides that id and
      * calls this so the ring stays consistent with what the control checks in `hasFocus`.
      * The auto id is almost always the last entry, so the search from the end is O(1).
      */

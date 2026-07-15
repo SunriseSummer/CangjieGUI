@@ -16,7 +16,7 @@ private func comboTestContext(): UiContext {
 func comboBoxChevronOpensAndClickSelects(): Unit {
     let ctx = comboTestContext()
     let text = State<String>("")
-    let combo = ComboBox("city", text, ["北京", "上海", "广州", "深圳"])
+    let combo = ComboBox(text, ["北京", "上海", "广州", "深圳"], key: "city")
     combo.layout(ctx, Rect(0.0, 0.0, 200.0, 38.0))
 
     // The chevron occupies the right ~30px; a press there opens the list.
@@ -35,7 +35,7 @@ func comboBoxChevronOpensAndClickSelects(): Unit {
 func comboBoxFiltersAndEnterCommits(): Unit {
     let ctx = comboTestContext()
     let text = State<String>("")
-    let combo = ComboBox("city2", text, ["北京", "上海", "广州", "深圳"])
+    let combo = ComboBox(text, ["北京", "上海", "广州", "深圳"], key: "city2")
     combo.layout(ctx, Rect(0.0, 0.0, 200.0, 38.0))
     ctx.focus("city2")
 
@@ -58,7 +58,7 @@ func comboBoxInsideModalTypesAndCommitsWithoutClosingDialog(): Unit {
     let presented = State<Bool>(true)
     let text = State<String>("")
     let modal = Modal(presented) {
-        ComboBox("company", text, ["华为", "华夏", "同望"])
+        ComboBox(text, ["华为", "华夏", "同望"], key: "company")
     }
     modal.layout(ctx, Rect.zero())
     modal.draw(ctx)
@@ -97,7 +97,7 @@ func comboBoxInsideModalTypesAndCommitsWithoutClosingDialog(): Unit {
 func comboBoxLongListScrollsInsidePopup(): Unit {
     let ctx = comboTestContext()
     let text = State<String>("")
-    let combo = ComboBox("long", text, Array<String>(30, {i => "选项 ${i}"}))
+    let combo = ComboBox(text, Array<String>(30, {i => "选项 ${i}"}), key: "long")
     combo.layout(ctx, Rect(0.0, 0.0, 200.0, 38.0))
     let _ = combo.handle(ctx, UiEvent.MouseDown(MouseButton.Left, 185.0, 19.0))
     combo.draw(ctx)
@@ -125,7 +125,7 @@ func comboBoxLongListScrollsInsidePopup(): Unit {
 func comboBoxKeyboardWalksBeyondFirstScreen(): Unit {
     let ctx = comboTestContext()
     let text = State<String>("")
-    let combo = ComboBox("walk", text, Array<String>(30, {i => "城市 ${i}"}))
+    let combo = ComboBox(text, Array<String>(30, {i => "城市 ${i}"}), key: "walk")
     combo.layout(ctx, Rect(0.0, 0.0, 200.0, 38.0))
     ctx.focus("walk")
     let _ = combo.handle(ctx, UiEvent.KeyDown(Key.Down, false)) // opens the list
@@ -145,7 +145,7 @@ func comboBoxKeyboardWalksBeyondFirstScreen(): Unit {
 func comboBoxEscapeKeepsText(): Unit {
     let ctx = comboTestContext()
     let text = State<String>("自定义值")
-    let combo = ComboBox("c3", text, ["one", "two"])
+    let combo = ComboBox(text, ["one", "two"], key: "c3")
     combo.layout(ctx, Rect(0.0, 0.0, 200.0, 38.0))
 
     let _ = combo.handle(ctx, UiEvent.MouseDown(MouseButton.Left, 185.0, 19.0))

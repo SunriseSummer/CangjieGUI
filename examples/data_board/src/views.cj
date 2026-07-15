@@ -44,10 +44,10 @@ func boardHeader(model: BoardModel): Unit {
                 Label("Northstar · 桌面端体验迭代").muted().fontSize(FontSizes.CAPTION)
             }.spacing(2.vp).hug()
             Spacer()
-            Picker("board.filter", FILTER_LABELS, model.filter)
+            Picker(FILTER_LABELS, model.filter)
             Switch("紧凑卡片", model.compact)
             Label("在制上限").muted().fontSize(FontSizes.CAPTION)
-            Stepper("board.wip", model.wipLimit).range(2, 8)
+            Stepper(model.wipLimit).range(2, 8)
             Button("新增任务", {=> model.addTask(model.planned)}).role(ButtonRole.Primary)
         }.crossAxisAlignment(CrossAxisAlignment.Center)
     }.contentPadding(12.vp).hug()
@@ -70,7 +70,7 @@ func boardColumn(
             }.hug()
             // 卡片区在列内滚动：窗口调矮时卡片不会溢出面板，多出的卡片滚动可达，
             // “添加”按钮始终钉在列底。
-            ScrollView("board.cards.${title}") {
+            ScrollView {
                 VStack {
                     ForEach(visible, key: {task => "task.${task.id}"}) {
                         task => taskCard(task, model.compact.value)

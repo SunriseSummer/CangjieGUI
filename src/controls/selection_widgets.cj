@@ -32,7 +32,7 @@ public class Checkbox <: Widget {
      * Sets an explicit focus and press identity; defaults are unique per build.
      * Throws `IllegalArgumentException` when `value` is empty.
      */
-    public func id(value: String): Checkbox {
+    public func key(value: String): Checkbox {
         requireControlId(value, "Checkbox")
         reregisterFocusable(controlId, value)
         controlId = value
@@ -53,7 +53,7 @@ public class Checkbox <: Widget {
         } else {
             0.0
         }
-        let t = fillSpring.animate(target: goal, deltaMs: ctx.frame.deltaMs)
+        let t = fillSpring.animate(ctx, target: goal)
         let box = Rect(frame.x, frame.y + 7.0, 18.0, 18.0)
         drawSurface(ctx, box, ctx.theme.fieldSurface(false).withBorder(ctx.theme.panelEdge.lerp(ctx.theme.accent, t)))
         // The fill grows from the centre to fill the box as it is ticked.
@@ -123,14 +123,14 @@ public class ListView <: Widget {
         items: Array<String>,
         selected: Bindable<Int64>,
         scroll!: ?State<Float32> = None,
-        id!: ?String = None
+        key!: ?String = None
     ) {
         this.items = items
         this.selected = selected
         // Identity is optional and auto-derived by build order by default (like SegmentedControl and
-        // TabView); pass `id` to give it a stable, addressable identity — e.g. to keep scroll/selection
+        // TabView); pass `key` to give it a stable, addressable identity — e.g. to keep scroll/selection
         // state across a structural change or to coordinate scroll externally. Non-empty when given.
-        let base = match (id) {
+        let base = match (key) {
             case Some(value) =>
                 requireControlId(value, "ListView")
                 value

@@ -3,9 +3,9 @@
 基于 SDL3 图形接口，使用仓颉编程语言实现了一个自渲染、声明式的桌面 GUI 框架，提供声明式界面构建、
 状态管理、常用布局容器、常用控件、文本渲染、矢量绘制以及系统能力集成等。
 
-仓库由两个边界清晰、可独立使用的模块组成：
+本项目由两个边界清晰的核心包组成：
 
-- `sdl`：SDL3/SDL3_ttf 的仓颉安全封装，可脱离 CUI 单独用于游戏和图形软件等。
+- `sdl`：SDL/SDL_ttf 的仓颉安全封装，可脱离 CUI 单独用于游戏和图形软件等。
 - `cui`：在 `sdl` 基础上实现的自渲染、声明式 GUI 框架。
 
 <table>
@@ -35,45 +35,79 @@
     </tr>
 </table>
 
-
 ## 核心能力
 
-- 基于仓颉尾随 Lambda 等特性构建声明式 UI 编码范式。
-- 尺寸以“整数 + 单位”表达：`100.px`（物理像素）、`100.vp`（虚拟像素）、`15.fp`（字体像素），
-  由类型系统携带单位、在布局时按窗口缩放与字体缩放解析。
-- 提供 `VStack`、`HStack`、`ZStack`、`Grid`、`FlowRow`、`ScrollView` 与 `Panel` 等容器，
-  以及数据驱动、只渲染视口附近行的惰性虚拟化 `LazyColumn`/`LazyGrid`（长列表与网格恒为一屏成本）。
-- 使用有顺序语义的链式修饰器配置尺寸、约束、内边距、表面、弹性、可见性和可用性。
-- 提供按钮、图标按钮、复选框、开关、单选项、选择器、步进器、滑块、进度条、列表、数据表格、分段控件、
-  标签页、下拉、组合框和文本输入等控件，以及提示、下拉/右键菜单与模态对话框等浮层；
-  浮层按栈管理、可嵌套，对话框内可继续打开下拉、组合框与右键菜单。
-- 以 `Observable`/`Bindable` 组织状态：可写 `State<T>`、带缓存的派生只读 `DerivedState`
+- 基于 SDL3 实现自渲染 GUI 引擎。通过 SDL3_ttf 渲染平台字体，完整支持 UTF-8 中文文本。
+- 基于仓颉尾随 lambda、extend、prop 等特性构建声明式 UI 编码范式。
+- 提供 `VStack`、`HStack`、`ZStack`、`Grid`、`FlowRow`、`ScrollView` 与 `Panel` 等布局容器，
+  以及数据驱动、只渲染视口附近行的惰性虚拟化 `LazyColumn`/`LazyGrid`。
+- 提供按钮、文本框、开关、复选框、单选框、选择器、步进器、滑块、进度条、列表、数据表格、分段控件、
+  标签页、下拉和组合框等控件。
+- 提供下拉/右键菜单、提示与模态对话框等浮层，浮层按栈管理、可嵌套，对话框内可继续打开下拉、组合框与右键菜单。
+- 使用有顺序语义的链式修饰器配置尺寸、约束、内边距、表面、弹性、可见性和可用性，支持
+  `.px`，`.vp`，`.fp` 尺寸单位表达。
+- 以 `Observable`/`Bindable` 实现状态管理：可写 `State<T>`、带缓存的派生只读 `DerivedState`
   （`derive`/`map`）、双向投影 `Binding`（`project`），控件按读写需要接受对应抽象。
-- 以 `Keyed`、`rememberState`、`ForEach` 明确复杂嵌套树与列表中的局部状态身份；
-  控件交互身份按构建顺序自动唯一。
-- 支持主轴/交叉轴排列、权重布局、内容自适应、流式换行、裁剪滚动和可复用组件组合；
-  文本超宽自动省略号，可选 `maxLines` 换行。
-- 通过 SDL3_ttf 使用平台字体，完整支持 UTF-8 中文文本。
+- 以 `Keyed`、`rememberState`、`ForEach` 明确复杂嵌套树与列表中的局部状态身份，控件交互身份按构建顺序自动唯一。
+- 支持主轴/交叉轴排列、权重布局、内容自适应、流式换行、裁剪滚动和可复用组件组合。
+- 文本超宽自动省略号，可选 `maxLines` 换行。
 - 使用 GPU 几何图元和超采样渲染圆角、描边、图标、阴影及抗锯齿图形。
 - 提供文件对话框、消息框、剪贴板、光标、显示器、文件系统、时间、系统信息等平台能力接口。
 
+## 构建运行
+
+```text
+CangjieGUI/
+├── cjpm.toml              # CUI 项目配置
+├── src/                   # CUI 框架实现
+├── examples/              # CUI 示例应用，端到端测试
+├── bench/                 # CUI 性能测试
+├── docs/                  # CUI 使用指南、API 与架构文档
+└── sdl/                   # SDL 仓颉封装库，目前聚焦于图形接口
+    ├── cjpm.toml          
+    ├── .sdl3/             # SDL 与 SDL_ttf 运行库
+    ├── src/               # SDL 仓颉核心封装
+    └── docs/              # SDL 使用指南、API 与部署文档
+```
+
+本项目依赖跨平台多媒体库 [SDL-3.4.12](https://github.com/libsdl-org/SDL/releases/tag/release-3.4.12) 及其字体增强库 [SDL_ttf-3.2.2](https://github.com/libsdl-org/SDL_ttf/releases/tag/release-3.2.2)，其中 `Windows x64` 版本动态库已经预置到 `sdl/.sdl3` 目录，在此平台本项目开箱即用。
+
+对于 Linux、Mac、Android 等平台，请打开以上超链接，在 release 板块下载相关发布件，解压后将动态库文件放到 `sdl/.sdl3` 目录中。如果官方 release 中没有匹配平台规格的发布件，可以用系统包管理工具安装（如 Mac 上执行 `brew install sdl3 sdl3_ttf`），或直接从 SDL 项目源码构建。
+
+依赖库配置后，可以先跑一遍单元测试，在项目目录下执行 `cjpm test`，确保所有测试用例通过。
+
+然后测试运行示例项目（对框架的端到端测试），`sdl/examples/` 下是基于 `sdl` 基础图形接口开发的小游戏，`examples/` 下则是基于 `cui` 桌面图形界面框架开发的小应用。选择您感兴趣的示例项目，在项目根目录执行 `cjpm run`，感受仓颉在桌面端的生动呈现。
+
+发布和部署基于 CUI 的桌面软件时，请确保 SDL 和 SDL_ttf 动态库位于仓颉可执行文件同目录，或在目标平台的动态库搜索路径中。
+
+> [!WARNING]
+>
+> 部分 Linux 发行版上，系统 `libglib-2.0.so.0`（`SDL3_ttf` 的间接依赖）编译时链接了带
+> 版本符号的 PCRE2，而仓颉运行时中的 `libpcre2-8.so.0` 不带版本符号。链接器若优先找到
+> 运行时自带的 PCRE2，会出现大量 `undefined reference to ...@PCRE2_10.47` 链接错误。
+>
+> 遇到这种情况，请在项目 `cjpm.toml` 中通过 `link-option` 显式指定系统 PCRE2：
+>
+> ```toml
+> [target.x86_64-unknown-linux-gnu]
+> link-option = "/usr/lib/libpcre2-8.so"
+> ```
+
 ## 快速开始
 
-在应用的 `cjpm.toml` 中声明本地依赖：
+新建仓颉项目，在 `cjpm.toml` 配置 CUI 依赖：
 
 ```toml
 [dependencies]
-cui = { path = "../CangjieGUI" }
+cui = { path = "<path/to>/CangjieGUI" }
 ```
 
-创建一个最小窗口：
+创建一个简单窗口：
 
 ```cangjie
-package hello_cui
+import cui.*
 
-import cui.{Button, ButtonRole, DesktopApp, Label, LengthUnits, Panel, State, VStack, WindowSpec}
-
-main(): Unit {
+main() {
     let message = State<String>("你好，CUI")
     let app = DesktopApp(WindowSpec("CUI 示例", 640, 420))
 
@@ -90,28 +124,22 @@ main(): Unit {
 }
 ```
 
-在应用目录执行：
+在项目目录执行：
 
-```powershell
+```shell
 cjpm run
 ```
 
-更完整的安装、生命周期和布局说明见[快速入门](docs/getting-started.md)与
-[CUI 使用指南](docs/user-guide.md)。
-
 ## 文档
 
-- [文档中心](docs/README.md)
-- [快速入门](docs/getting-started.md)
 - [CUI 使用指南](docs/user-guide.md)
-- [CUI API 参考](docs/api-reference.md)
-- [架构与设计说明](docs/architecture.md)
-- [SDL 独立模块文档](sdl/docs/README.md)
-- [示例应用说明](examples/README.md)
+- [CUI 组件文档](docs/components.md)
+- [CUI API 文档](docs/api-reference.md)
+- [SDL API 文档](sdl/docs/README.md)
 
 ## 示例应用
 
-`examples/` 中包含十一个可独立构建运行的应用：
+`examples/` 中包含 11 个可独立构建运行的演示应用：
 
 | 示例 | 主要内容 |
 |---|---|
@@ -126,63 +154,6 @@ cjpm run
 | `paint` | 自定义 Widget、画布绘制、事件边界处理、滑块和系统光标 |
 | `planner` | 局部状态、进度条、组合框、文本换行、滚动与桌面控件 |
 | `process_manager` | 后台任务、互斥邮箱、异常兜底、进程数据表格与系统信息 |
-
-运行示例：
-
-```powershell
-cd examples/calendar
-cjpm run
-```
-
-## 项目结构
-
-```text
-CangjieGUI/
-├── cjpm.toml              # cui 模块，依赖 ./sdl
-├── src/                   # cui、cui.core、controls、text、media、desktop
-├── docs/                  # CUI 使用指南、API 与架构文档
-├── examples/              # 独立示例应用
-└── sdl/
-    ├── cjpm.toml          # 可独立引用的 sdl 模块
-    ├── .sdl3/             # SDL3 与 SDL3_ttf 链接库和运行库
-    ├── src/               # sdl、dialogs、displays、input、system、text
-    └── docs/              # SDL 使用指南、API 与部署文档
-```
-
-## 构建与测试
-
-当前模块要求仓颉工具链 `1.0.5`。在 Windows 上，仓库已按 cjpm 链接约定放置 SDL 动态库。
-分别验证底层模块与 GUI 模块：
-
-```powershell
-cd sdl
-cjpm build
-cjpm test
-
-cd ..
-cjpm build
-cjpm test
-```
-
-发布原生可执行文件时，必须保证 `SDL3.dll` 与 `SDL3_ttf.dll` 位于可执行文件同目录，或位于
-操作系统动态库搜索路径中。详细说明见 [SDL 部署与 FFI](sdl/docs/deployment-and-ffi.md)。
-
-## 渲染与字体
-
-CUI 将矢量图元绘制到高分辨率离屏纹理，再以线性过滤缩放到窗口，从而改善圆角、曲线和斜线边缘。
-文本走独立于几何缩放的专用通道：字形按“字号 × 有效渲染缩放”由 FreeType 光栅化，以 1:1 缩放绘制在
-对齐物理像素的坐标上——避免小尺寸字形位图被几何缩放拉伸产生的模糊；布局与光标度量取自同一份缩放
-光栅化结果，与实际绘制像素严格一致。字体按“字号 × 缩放”缓存，中英文共用同一条渲染路径。
-标准字号由 `FontSizes` 统一提供，包括说明文字、正文、控件、标题和大号展示文本。
-
-## 设计约束
-
-- UI 树在 UI 线程逐帧重建，耗时任务不得阻塞事件循环。
-- 状态遵循单一事实源；共享状态向共同祖先提升，局部状态使用稳定 key 明确身份。
-- 链式修饰器按源码顺序形成包装节点，调整顺序可能改变布局、绘制和命中区域。
-- 长时任务应通过 `spawn` 执行，并以同步保护的数据结构向 UI 帧回传结果。
-- 实现 `Resource` 的对象应交由 `DesktopApp.manage` 管理，或由调用方显式关闭。
-- 应用通常只需从 `cui` 根包显式导入所需 API；底层图形应用可直接依赖 `sdl`。
 
 ## 许可证
 

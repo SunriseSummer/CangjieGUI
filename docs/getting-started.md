@@ -63,7 +63,7 @@ main(): Unit {
 关键点：
 
 - `DesktopApp` 持有窗口、渲染器、主题和事件循环。
-- `app.run` 的尾随 Lambda 是根视图构建函数，每帧都会重新执行。
+- `app.run` 的尾随 Lambda 是根视图构建函数，在需要重绘的帧重新执行（空闲帧跳过以省开销）。
 - `State<String>` 位于构建闭包外，因此状态不会随控件实例重建而丢失。
 - 在容器构建块中创建的控件会自动成为该容器的子项。
 - 构造函数只承载文本、状态、事件等必要信息；尺寸和外观通过链式修饰器表达。
@@ -80,7 +80,7 @@ import cui.{Keyed, LengthUnits, TextField, rememberState}
 
 Keyed("profile.editor") {
     let nickname = rememberState<String>("nickname") { "仓颉开发者" }
-    TextField("profile.nickname", nickname).width(260.vp)
+    TextField(nickname, key: "profile.nickname").width(260.vp)
 }
 ```
 

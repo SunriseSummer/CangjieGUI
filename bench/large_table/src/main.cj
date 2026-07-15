@@ -42,6 +42,6 @@ main(): Int64 {
 func largeTableView(rows: Array<Array<String>>, selected: State<Int64>): Unit {
     VStack {
         Label("大表滚动帧率基准：跑满固定帧数后自动退出（可手动点击列头排序、滚动体感）。").fontSize(FontSizes.BODY)
-        Table("bench.table", columns(), rows, selected).flex()
+        Table(columns(), rows, selected, key: "bench.table").flex()
     }.spacing(12.vp).padding(16.vp)
 }

@@ -2,7 +2,7 @@ package cui.text
 
 import std.collection.ArrayList
 import sdl.{Color, FontSizes, Key, MouseButton, Pen, Rect, Size, SurfaceStyle, UiEvent}
-import cui.core.{Bindable, CUI_CONTROL_H, CUI_SMALL_H, Overlay, ScrollBar, State, UiContext, Widget, requireControlId, buildChild,
+import cui.core.{Bindable, CUI_CONTROL_H, CUI_SMALL_H, Overlay, ScrollBar, State, UiContext, Widget, resolveControlKey, buildChild,
     clampScrollOffset, drawSurface, drawVerticalScrollBar, emit, localState, scrollBarGutter, scrollOffsetAfterWheel}
 
 private let COMBO_POPUP_PAD: Float32 = 5.0
@@ -38,23 +38,25 @@ public class ComboBox <: Widget {
     private let popupBar: ScrollBar
     private var frame = Rect.zero()
 
-    public init(id: String, text: Bindable<String>, options: Array<String>) {
-        requireControlId(id, "ComboBox")
-        this.fieldId = id
+    public init(text: Bindable<String>, options: Array<String>, key!: ?String = None) {
+        let ident = resolveControlKey(key, "ComboBox")
+        this.fieldId = ident
         this.text = text
         this.options = options
         // Own the field's caret and anchor, so choosing a suggestion can move the caret to the
         // end and collapse the selection (otherwise a stale anchor leaves the value highlighted).
-        let cursor = localState<Int64>("ComboBox:${id}:cursor") {text.value.size}
-        let anchor = localState<Int64>("ComboBox:${id}:anchor") {text.value.size}
+        let cursor = localState<Int64>("ComboBox:${ident}:cursor") {text.value.size}
+        let anchor = localState<Int64>("ComboBox:${ident}:anchor") {text.value.size}
         this.cursorState = cursor
         this.anchorState = anchor
-        this.field = buildChild({=> TextField(id, text, cursor: Some(cursor), anchor: Some(anchor))})
-        this.overlayOwner = "ComboBox:${id}"
-        this.open = localState<Bool>("ComboBox:${id}:open") {false}
-        this.highlight = localState<Int64>("ComboBox:${id}:hl") {0}
-        this.popupScroll = localState<Float32>("ComboBox:${id}:popupScroll") {0.0}
-        this.popupBar = ScrollBar("ComboBox:${id}:popupBar")
+        // The embedded field shares this control's identity (so focus and state line up), passed as
+        // its explicit key.
+        this.field = buildChild({=> TextField(text, key: ident, cursor: Some(cursor), anchor: Some(anchor))})
+        this.overlayOwner = "ComboBox:${ident}"
+        this.open = localState<Bool>("ComboBox:${ident}:open") {false}
+        this.highlight = localState<Int64>("ComboBox:${ident}:hl") {0}
+        this.popupScroll = localState<Float32>("ComboBox:${ident}:popupScroll") {0.0}
+        this.popupBar = ScrollBar("ComboBox:${ident}:popupBar")
         emit(this)
     }
 

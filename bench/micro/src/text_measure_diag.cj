@@ -40,7 +40,7 @@ private func diagContentPage(ctx: UiContext, name: String, blocks: Int64, lazy: 
 private func diagTable(ctx: UiContext, name: String, rows: Int64): Unit {
     let rect = Rect(0.0, 0.0, 560.0, 480.0)
     let data = makeTableRows(rows)
-    reportPair(ctx, name, rect) {=> Table("diag", diagColumns(), data, State<Int64>(-1))}
+    reportPair(ctx, name, rect) {=> Table(diagColumns(), data, State<Int64>(-1), key: "diag")}
 }
 
 private func diagList(ctx: UiContext, name: String, count: Int64): Unit {

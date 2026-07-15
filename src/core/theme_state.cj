@@ -255,6 +255,28 @@ public class UiContext {
         shouldClose = true
     }
 
+    // Set by a widget during handle or draw when it needs the next frame rendered even without any
+    // input event or state change — a blinking caret, a tooltip counting down its reveal delay, a
+    // per-frame FrameHandler. The desktop loop reads and clears it each rendered frame (takeFrameRequest)
+    // so these animations stay alive while the loop otherwise skips idle frames (档 0).
+    private var continuousFrameRequested = false
+
+    /**
+     * Requests that the next frame be rendered even if no input arrived and no state changed. Call this
+     * from a widget that animates on the frame clock (a caret, a spinner, a countdown); without it the
+     * desktop loop may skip rendering while the screen is otherwise idle.
+     */
+    public func requestFrame(): Unit {
+        continuousFrameRequested = true
+    }
+
+    /** Reads and clears the continuous-frame request. The desktop loop calls this once per rendered frame. */
+    protected func takeFrameRequest(): Bool {
+        let requested = continuousFrameRequested
+        continuousFrameRequested = false
+        requested
+    }
+
     /*
      * Adopts the focus ring gathered by the latest build. The shell calls this once per
      * frame after building the tree, so keyboard traversal always reflects the controls

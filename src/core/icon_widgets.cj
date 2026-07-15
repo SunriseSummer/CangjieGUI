@@ -100,7 +100,7 @@ public class IconButton <: Widget {
      * set one when identity must survive tree reshapes.
      * Throws `IllegalArgumentException` when `value` is empty.
      */
-    public func id(value: String): IconButton {
+    public func key(value: String): IconButton {
         requireControlId(value, "IconButton")
         reregisterFocusable(controlId, value)
         controlId = value

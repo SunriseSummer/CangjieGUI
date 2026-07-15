@@ -23,7 +23,7 @@ private func columns(): Array<TableColumn> {
 // Builds a table over `rows` and activates a sort on the column under `headerX`, ready for draws.
 private func sortedTable(rows: Array<Array<String>>, headerX: Float32): (Table, UiContext) {
     let ctx = headlessContext()
-    let table = Table("bench", columns(), rows, State<Int64>(-1))
+    let table = Table(columns(), rows, State<Int64>(-1), key: "bench")
     table.layout(ctx, Rect(0.0, 0.0, 560.0, 480.0))
     let _ = table.handle(ctx, UiEvent.MouseDown(MouseButton.Left, headerX, 10.0)) // activate sort
     (table, ctx)

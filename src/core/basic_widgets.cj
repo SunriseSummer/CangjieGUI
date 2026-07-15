@@ -360,7 +360,7 @@ public class Button <: Widget {
      * set one when identity must survive tree reshapes (for example a button that moves
      * between containers). Throws `IllegalArgumentException` when `value` is empty.
      */
-    public func id(value: String): Button {
+    public func key(value: String): Button {
         requireControlId(value, "Button")
         reregisterFocusable(controlId, value)
         controlId = value

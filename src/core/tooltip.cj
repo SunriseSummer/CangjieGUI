@@ -46,6 +46,11 @@ public class Tooltip <: Widget {
                 hoverStart.value = now
             } else if (now >= hoverStart.value && now - hoverStart.value >= TOOLTIP_DELAY_MS) {
                 ctx.showTooltip(text, frame)
+            } else {
+                // Still counting down to the reveal: request the next frame so the clock keeps
+                // advancing while the pointer rests, otherwise the dirty-frame loop (档 0) would idle
+                // here and the tooltip would never appear.
+                ctx.requestFrame()
             }
         } else if (hoverStart.value != UInt64.Max) {
             hoverStart.value = UInt64.Max // reset once; a per-frame write would be wasted churn

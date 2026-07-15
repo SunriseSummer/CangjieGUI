@@ -46,7 +46,7 @@ func undoThenRedoRestoresAndNewEditClearsRedo(): Unit {
 func textFieldUndoRedoRevertsAndReappliesTyping(): Unit {
     let ctx = historyTestContext()
     let body = State<String>("")
-    let field = TextField("f", body)
+    let field = TextField(body, key: "f")
     field.layout(ctx, Rect(0.0, 0.0, 200.0, 32.0))
     ctx.focus("f")
 
@@ -65,7 +65,7 @@ func textFieldUndoRedoRevertsAndReappliesTyping(): Unit {
 func textAreaUndoRevertsMultiLineEdit(): Unit {
     let ctx = historyTestContext()
     let body = State<String>("start")
-    let area = TextArea("a", body)
+    let area = TextArea(body, key: "a")
     area.layout(ctx, Rect(0.0, 0.0, 200.0, 120.0))
     ctx.focus("a")
 
@@ -81,7 +81,7 @@ func textAreaUndoRevertsMultiLineEdit(): Unit {
 func autofocusClaimsFocusOnceOnFirstFrame(): Unit {
     let ctx = historyTestContext()
     let body = State<String>("")
-    let field = TextField("s", body).autofocus()
+    let field = TextField(body, key: "s").autofocus()
     field.layout(ctx, Rect(0.0, 0.0, 200.0, 32.0))
     @Expect(!ctx.hasFocus("s"))
 
@@ -100,7 +100,7 @@ func autofocusClaimsFocusOnceOnFirstFrame(): Unit {
 func textAreaAutofocusClaimsFocusOnceOnFirstFrame(): Unit {
     let ctx = historyTestContext()
     let body = State<String>("")
-    let area = TextArea("ta", body).autofocus()
+    let area = TextArea(body, key: "ta").autofocus()
     area.layout(ctx, Rect(0.0, 0.0, 200.0, 100.0))
     @Expect(!ctx.hasFocus("ta"))
 
@@ -118,7 +118,7 @@ func textAreaAutofocusClaimsFocusOnceOnFirstFrame(): Unit {
 func readOnlyTextFieldIgnoresEdits(): Unit {
     let ctx = historyTestContext()
     let locked = State<String>("locked")
-    let field = TextField("ro", locked, editable: false)
+    let field = TextField(locked, key: "ro", editable: false)
     field.layout(ctx, Rect(0.0, 0.0, 200.0, 32.0))
     ctx.focus("ro") // force focus so the only remaining gate is editability
 
@@ -128,7 +128,7 @@ func readOnlyTextFieldIgnoresEdits(): Unit {
     @Expect(locked.value, "locked") // backspace ignored
 
     let editable = State<String>("ab")
-    let writable = TextField("rw", editable)
+    let writable = TextField(editable, key: "rw")
     writable.layout(ctx, Rect(0.0, 0.0, 200.0, 32.0))
     ctx.focus("rw")
     let _ = writable.handle(ctx, UiEvent.TextInput("c"))
@@ -139,7 +139,7 @@ func readOnlyTextFieldIgnoresEdits(): Unit {
 func undoWithNothingRecordedIsSafeNoOp(): Unit {
     let ctx = historyTestContext()
     let body = State<String>("keep")
-    let field = TextField("f", body)
+    let field = TextField(body, key: "f")
     field.layout(ctx, Rect(0.0, 0.0, 200.0, 32.0))
 
     field.undo() // nothing recorded yet
@@ -153,7 +153,7 @@ func undoWithNothingRecordedIsSafeNoOp(): Unit {
 func caretJumpBreaksUndoCoalescing(): Unit {
     let ctx = historyTestContext()
     let body = State<String>("")
-    let field = TextField("f", body)
+    let field = TextField(body, key: "f")
     field.layout(ctx, Rect(0.0, 0.0, 200.0, 32.0))
     ctx.focus("f")
 

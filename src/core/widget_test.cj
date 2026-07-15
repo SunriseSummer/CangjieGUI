@@ -459,7 +459,7 @@ func scrollViewUsesExternalOffsetAndClampsWheelInput(): Unit {
     let ctx = testContext()
     let offset = State<Float32>(0.0)
     let child = SizedLayoutProbe(Size(120.0, 240.0))
-    let view = ScrollView("audit") {
+    let view = ScrollView(key: "audit") {
         emit(child)
     }.scrollState(offset)
 
@@ -495,7 +495,7 @@ func scrollViewThumbDragUpdatesOffset(): Unit {
     let ctx = testContext()
     let offset = State<Float32>(0.0)
     let child = SizedLayoutProbe(Size(120.0, 300.0))
-    let view = ScrollView("bar") {
+    let view = ScrollView(key: "bar") {
         emit(child)
     }.scrollState(offset)
     view.layout(ctx, Rect(0.0, 0.0, 120.0, 100.0))
@@ -512,7 +512,7 @@ func scrollViewTrackClickPagesTowardClick(): Unit {
     let ctx = testContext()
     let offset = State<Float32>(0.0)
     let child = SizedLayoutProbe(Size(120.0, 300.0))
-    let view = ScrollView("bar2") {
+    let view = ScrollView(key: "bar2") {
         emit(child)
     }.scrollState(offset)
     view.layout(ctx, Rect(0.0, 0.0, 120.0, 100.0))
@@ -697,7 +697,7 @@ class RigidLayoutProbe <: Widget {
 func scrollViewReservesBarGutterOnlyWhenContentOverflows(): Unit {
     let ctx = testContext()
     let tall = SizedLayoutProbe(Size(300.0, 240.0))
-    let overflowing = ScrollView("gutter.tall") {
+    let overflowing = ScrollView(key: "gutter.tall") {
         emit(tall)
     }
     overflowing.layout(ctx, Rect(0.0, 0.0, 120.0, 80.0))
@@ -705,7 +705,7 @@ func scrollViewReservesBarGutterOnlyWhenContentOverflows(): Unit {
     @Expect(tall.rect.w, Float32(110.0))
 
     let short = SizedLayoutProbe(Size(300.0, 40.0))
-    let fitting = ScrollView("gutter.short") {
+    let fitting = ScrollView(key: "gutter.short") {
         emit(short)
     }
     fitting.layout(ctx, Rect(0.0, 0.0, 120.0, 80.0))
@@ -822,7 +822,7 @@ func modalRoutesToContentAndBackdropDismisses(): Unit {
     let presented = State<Bool>(true)
     let clicked = State<Bool>(false)
     let modal = Modal(presented) {
-        Button("确定", {=> clicked.value = true}).id("ok")
+        Button("确定", {=> clicked.value = true}).key("ok")
     }
     modal.layout(ctx, Rect.zero())
     modal.draw(ctx)
@@ -848,7 +848,7 @@ func modalEscapeDismissesAndHiddenRegistersNothing(): Unit {
 
     let open = State<Bool>(true)
     let modal = Modal(open) {
-        Button("x", {=> ()}).id("x")
+        Button("x", {=> ()}).key("x")
     }
     modal.layout(ctx, Rect.zero())
     modal.draw(ctx)
@@ -860,7 +860,7 @@ func modalEscapeDismissesAndHiddenRegistersNothing(): Unit {
     // A dialog that starts hidden builds no content and registers no overlay.
     let hidden = State<Bool>(false)
     let quiet = Modal(hidden) {
-        Button("y", {=> ()}).id("y")
+        Button("y", {=> ()}).key("y")
     }
     quiet.layout(ctx, Rect.zero())
     quiet.draw(ctx)
@@ -876,7 +876,7 @@ func modalWaitsForBodyBeforeRegistering(): Unit {
     ctx.viewportHeight = 300.0
     let presented = State<Bool>(false) // built hidden -> content is None
     let modal = Modal(presented) {
-        Button("x", {=> ()}).id("x")
+        Button("x", {=> ()}).key("x")
     }
     modal.layout(ctx, Rect.zero())
 
@@ -897,7 +897,7 @@ func modalForwardsFrameTickToContent(): Unit {
     let ticks = State<Int64>(0)
     let modal = Modal(presented) {
         FrameHandler(onFrame: {_ => ticks.value = ticks.value + 1}) {
-            Button("x", {=> ()}).id("x")
+            Button("x", {=> ()}).key("x")
         }
     }
     modal.layout(ctx, Rect.zero())
@@ -917,10 +917,10 @@ func modalTabCyclesDialogFocusOnly(): Unit {
     let captured = State<?Modal>(None)
     let _ = buildRoot({
         =>
-        Button("背景", {=> ()}).id("bg")
+        Button("背景", {=> ()}).key("bg")
         captured.value = Some(Modal(presented) {
-            Button("甲", {=> ()}).id("m1")
-            Button("乙", {=> ()}).id("m2")
+            Button("甲", {=> ()}).key("m1")
+            Button("乙", {=> ()}).key("m2")
         })
     }, store)
     let modal = captured.value.getOrThrow()
@@ -944,9 +944,9 @@ func disabledControlLeavesFocusRing(): Unit {
     let store = StateStore()
     let _ = buildRoot({
         =>
-        Button("甲", {=> ()}).id("a")
-        Button("乙", {=> ()}).id("b").enabled(false)
-        Button("丙", {=> ()}).id("c").enabled(true)
+        Button("甲", {=> ()}).key("a")
+        Button("乙", {=> ()}).key("b").enabled(false)
+        Button("丙", {=> ()}).key("c").enabled(true)
     }, store)
     let ring = store.focusRing()
     @Expect(ring.size, 2)
@@ -1202,12 +1202,12 @@ func disabledContainerRemovesSubtreeFocusStops(): Unit {
     let store = StateStore()
     let _ = buildRoot({
         =>
-        Button("先", {=> ()}).id("head")
+        Button("先", {=> ()}).key("head")
         HStack {
-            Button("甲", {=> ()}).id("row.a")
-            Button("乙", {=> ()}).id("row.b")
+            Button("甲", {=> ()}).key("row.a")
+            Button("乙", {=> ()}).key("row.b")
         }.enabled(false)
-        Button("后", {=> ()}).id("tail")
+        Button("后", {=> ()}).key("tail")
     }, store)
     let ring = store.focusRing()
     @Expect(ring.size, 2)

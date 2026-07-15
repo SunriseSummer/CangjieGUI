@@ -132,10 +132,8 @@ internal func startOfTextLine(text: String, lineIndex: Int64): Int64 {
     while (line < lineIndex && current < text.size) {
         if (text[current] == NEWLINE_BYTE) {
             line += 1
-            current = nextTextBoundary(text, current)
-        } else {
-            current = nextTextBoundary(text, current)
         }
+        current = nextTextBoundary(text, current)
     }
     current
 }

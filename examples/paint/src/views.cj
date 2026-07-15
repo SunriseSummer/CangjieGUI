@@ -26,7 +26,7 @@ func toolbar(model: PaintModel): Unit {
             }.label("清空").role(ButtonRole.Danger)
             // 画笔图标实时染成当前颜色，兼作“正在用哪支笔”的预览。
             Icon(IconName.Brush).foregroundColor(model.color.value)
-            Slider("paint.brush", model.brushSize).range(BRUSH_MIN, BRUSH_MAX)
+            Slider(model.brushSize).range(BRUSH_MIN, BRUSH_MAX)
             Label(model.brushText.value).muted().fontSize(FontSizes.CAPTION)
             Label(model.strokeCountText.value).muted().fontSize(FontSizes.CAPTION)
             Spacer()

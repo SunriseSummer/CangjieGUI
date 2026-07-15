@@ -1,7 +1,7 @@
 package cui.controls
 
 import sdl.{Color, FontSizes, Key, MouseButton, Pen, Rect, Size, UiEvent}
-import cui.core.{Bindable, CUI_SMALL_H, ScrollBar, State, UiContext, Widget, requireControlId, clampScrollOffset, drawSurface,
+import cui.core.{Bindable, CUI_SMALL_H, ScrollBar, State, UiContext, Widget, resolveControlKey, clampScrollOffset, drawSurface,
     drawVerticalScrollBar, emit, localState, registerFocusable, scrollLineIndex, scrollLineRemainder,
     scrollOffsetAfterWheel}
 
@@ -99,21 +99,22 @@ public class Table <: Widget {
     private let sortCache: TableSortCache
     private var frame = Rect.zero()
 
-    public init(id: String, columns: Array<TableColumn>, rows: Array<Array<String>>, selected: Bindable<Int64>) {
-        requireControlId(id, "Table")
-        this.id = id
+    public init(columns: Array<TableColumn>, rows: Array<Array<String>>, selected: Bindable<Int64>,
+        key!: ?String = None) {
+        let ident = resolveControlKey(key, "Table")
+        this.id = ident
         this.columns = columns
         this.rows = rows
         this.selected = selected
         // Keys carry the widget-type prefix like every sibling control, so they can never
         // collide with an app's own rememberState keys (or another widget's) built from `id`.
-        this.scrollOffset = localState<Float32>("Table:${id}:scroll") {0.0}
-        this.sortCol = localState<Int64>("Table:${id}:sortCol") {-1}
-        this.sortAsc = localState<Bool>("Table:${id}:sortAsc") {true}
-        this.scrollBar = ScrollBar("Table:${id}:thumb")
-        this.lastRevealed = localState<Int64>("Table:${id}:revealed") {Int64.Min}
-        this.sortCache = localState<TableSortCache>("Table:${id}:sortCache") {TableSortCache()}.value
-        registerFocusable(id)
+        this.scrollOffset = localState<Float32>("Table:${ident}:scroll") {0.0}
+        this.sortCol = localState<Int64>("Table:${ident}:sortCol") {-1}
+        this.sortAsc = localState<Bool>("Table:${ident}:sortAsc") {true}
+        this.scrollBar = ScrollBar("Table:${ident}:thumb")
+        this.lastRevealed = localState<Int64>("Table:${ident}:revealed") {Int64.Min}
+        this.sortCache = localState<TableSortCache>("Table:${ident}:sortCache") {TableSortCache()}.value
+        registerFocusable(ident)
         emit(this)
     }
 
@@ -122,7 +123,7 @@ public class Table <: Widget {
      * stays typed and each column's header and extraction sit together — no hand-built string matrix.
      *
      * ```
-     * Table.of("fleet", servers, [
+     * Table.of(servers, [
      *     DataColumn("主机", 180.0) {s => s.host},
      *     DataColumn("负载", 100.0, numeric: true) {s => "${s.load}"},
      *     DataColumn("地区", 140.0) {s => s.region}
@@ -134,10 +135,10 @@ public class Table <: Widget {
      * a hoisted matrix. Selection is the original row index into `data`.
      */
     public static func of<T>(
-        id: String,
         data: Array<T>,
         columns: Array<DataColumn<T>>,
-        selected: Bindable<Int64>
+        selected: Bindable<Int64>,
+        key!: ?String = None
     ): Table {
         let tableColumns = Array<TableColumn>(columns.size) {
             i => TableColumn(columns[i].title, columns[i].width, numeric: columns[i].numeric, cell: columns[i].cell)
@@ -145,7 +146,7 @@ public class Table <: Widget {
         let rows = Array<Array<String>>(data.size) {
             r => Array<String>(columns.size) {c => columns[c].value(data[r])}
         }
-        Table(id, tableColumns, rows, selected)
+        Table(tableColumns, rows, selected, key: key)
     }
 
     public func measure(_: UiContext, available: Size): Size {

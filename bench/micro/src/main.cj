@@ -20,6 +20,8 @@ main(): Int64 {
     runLayoutBench()
     runControlsFormBench()
     runContentScrollBench()
+    runRebuildPhaseBench()
+    runInstanceReuseBench()
     runTextMeasureDiag()
     println("")
     return 0

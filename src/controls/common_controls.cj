@@ -2,7 +2,7 @@ package cui.controls
 
 import sdl.{FontSizes, Key, MouseButton, Pen, Rect, Size, UiEvent}
 import cui.core.{Bindable, CUI_CONTROL_H, CursorShape, Spring, UiContext, Widget, requireControlId, claimHoverIfInside, drawFocusRing,
-    drawSurface, emit, focusableControlIdentity, localState, reregisterFocusable, registerFocusable}
+    drawSurface, emit, focusableControlIdentity, localState, reregisterFocusable, registerFocusable, resolveControlKey}
 
 private let SWITCH_TRACK_W: Float32 = 40.0
 private let SWITCH_TRACK_H: Float32 = 22.0
@@ -36,7 +36,7 @@ public class Switch <: Widget {
     }
 
     /** Sets an explicit focus and press identity; defaults are unique per build. */
-    public func id(value: String): Switch {
+    public func key(value: String): Switch {
         validateControlId(value, "Switch")
         reregisterFocusable(controlId, value)
         controlId = value
@@ -57,7 +57,7 @@ public class Switch <: Widget {
         } else {
             0.0
         }
-        let t = knobSpring.animate(target: goal, deltaMs: ctx.frame.deltaMs)
+        let t = knobSpring.animate(ctx, target: goal)
 
         let track = Rect(frame.x, frame.centerY() - SWITCH_TRACK_H / 2.0, SWITCH_TRACK_W, SWITCH_TRACK_H)
         // Track colour and knob position share the spring, so both cross together smoothly.
@@ -109,7 +109,7 @@ public class RadioButton <: Widget {
     }
 
     /** Sets an explicit focus and press identity; defaults are unique per build. */
-    public func id(value: String): RadioButton {
+    public func key(value: String): RadioButton {
         validateControlId(value, "RadioButton")
         reregisterFocusable(controlId, value)
         controlId = value
@@ -130,7 +130,7 @@ public class RadioButton <: Widget {
         } else {
             0.0
         }
-        let t = dotSpring.animate(target: goal, deltaMs: ctx.frame.deltaMs)
+        let t = dotSpring.animate(ctx, target: goal)
         let centerX = frame.x + 9.0
         let centerY = frame.centerY()
         ctx.renderer.fillCircle(centerX, centerY, 9.0, ctx.theme.field)
@@ -167,12 +167,11 @@ public class Picker <: Widget {
     private let selected: Bindable<Int64>
     private var frame = Rect.zero()
 
-    public init(id: String, items: Array<String>, selected: Bindable<Int64>) {
-        validateControlId(id, "Picker")
-        this.id = id
+    public init(items: Array<String>, selected: Bindable<Int64>, key!: ?String = None) {
+        this.id = resolveControlKey(key, "Picker")
         this.items = items
         this.selected = selected
-        registerFocusable(id)
+        registerFocusable(this.id)
         emit(this)
     }
 
@@ -270,22 +269,21 @@ public class Stepper <: Widget {
     private var frame = Rect.zero()
 
     public init(
-        id: String,
         value: Bindable<Int64>,
+        key!: ?String = None,
         lower!: Int64 = Int64.Min,
         upper!: Int64 = Int64.Max,
         step!: Int64 = 1
     ) {
-        validateControlId(id, "Stepper")
         if (step <= 0) {
             throw IllegalArgumentException("Stepper step must be greater than zero")
         }
-        this.id = id
+        this.id = resolveControlKey(key, "Stepper")
         this.value = value
         this.lowerBound = min(lower, upper)
         this.upperBound = max(lower, upper)
         this.stepSize = step
-        registerFocusable(id)
+        registerFocusable(this.id)
         // Clamp the initial value into range, like range() does (write-on-change to avoid churn).
         let clamped = clampInt(value.value)
         if (clamped != value.value) {
@@ -377,16 +375,22 @@ public class Stepper <: Widget {
     }
 
     private func decrement(): Unit {
-        value.value = clampInt(if (value.value < lowerBound + stepSize) {
-            lowerBound
+        // Saturate at Int64.Min before clamping so a step near the low extreme cannot underflow;
+        // clampInt then applies the range floor. (`lowerBound + stepSize` could itself overflow
+        // when the range sits within a step of Int64.Max.)
+        value.value = clampInt(if (value.value < Int64.Min + stepSize) {
+            Int64.Min
         } else {
             value.value - stepSize
         })
     }
 
     private func increment(): Unit {
-        value.value = clampInt(if (value.value > upperBound - stepSize) {
-            upperBound
+        // Saturate at Int64.Max before clamping so a step near the high extreme cannot overflow;
+        // clampInt then applies the range ceiling. (`upperBound - stepSize` could itself underflow
+        // when the range sits within a step of Int64.Min.)
+        value.value = clampInt(if (value.value > Int64.Max - stepSize) {
+            Int64.Max
         } else {
             value.value + stepSize
         })

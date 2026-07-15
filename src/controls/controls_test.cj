@@ -110,7 +110,7 @@ func dropdownOpensThenSelectsAnItemViaTheOverlay(): Unit {
     ctx.viewportWidth = 300.0
     ctx.viewportHeight = 400.0
     let selected = State<Int64>(0)
-    let dropdown = Dropdown("theme", ["浅色", "深色", "跟随系统"], selected)
+    let dropdown = Dropdown(["浅色", "深色", "跟随系统"], selected, key: "theme")
     dropdown.layout(ctx, Rect(20.0, 40.0, 180.0, 34.0))
 
     // A click opens it; drawing registers the popup as the interactive overlay.
@@ -131,7 +131,7 @@ func dropdownDismissesOnOutsideClickAndEscape(): Unit {
     ctx.viewportWidth = 300.0
     ctx.viewportHeight = 400.0
     let selected = State<Int64>(1)
-    let dropdown = Dropdown("d2", ["A", "B", "C"], selected)
+    let dropdown = Dropdown(["A", "B", "C"], selected, key: "d2")
     dropdown.layout(ctx, Rect(20.0, 40.0, 180.0, 34.0))
 
     let _ = dropdown.handle(ctx, UiEvent.MouseDown(MouseButton.Left, 30.0, 50.0))
@@ -152,7 +152,7 @@ func dropdownArrowsMoveHighlightWhileOpen(): Unit {
     ctx.viewportWidth = 300.0
     ctx.viewportHeight = 400.0
     let selected = State<Int64>(0)
-    let dropdown = Dropdown("d3", ["A", "B", "C"], selected)
+    let dropdown = Dropdown(["A", "B", "C"], selected, key: "d3")
     dropdown.layout(ctx, Rect(20.0, 40.0, 180.0, 34.0))
 
     let _ = dropdown.handle(ctx, UiEvent.MouseDown(MouseButton.Left, 30.0, 50.0))
@@ -179,7 +179,7 @@ func dropdownInsideModalSelectsWithoutClosingDialog(): Unit {
     let presented = State<Bool>(true)
     let selected = State<Int64>(0)
     let modal = Modal(presented) {
-        Dropdown("city", ["北京", "上海", "广州"], selected)
+        Dropdown(["北京", "上海", "广州"], selected, key: "city")
     }
     modal.layout(ctx, Rect.zero())
     modal.draw(ctx)
@@ -213,7 +213,7 @@ func dropdownLongListScrollsInsidePopup(): Unit {
     ctx.viewportWidth = 300.0
     ctx.viewportHeight = 300.0
     let selected = State<Int64>(0)
-    let dropdown = Dropdown("long", Array<String>(30, {i => "项 ${i}"}), selected)
+    let dropdown = Dropdown(Array<String>(30, {i => "项 ${i}"}), selected, key: "long")
     dropdown.layout(ctx, Rect(20.0, 40.0, 180.0, 34.0))
 
     // Below the control there are 218px, above only 32px: the popup opens below at 218px
@@ -260,7 +260,7 @@ func dropdownPopupScrollbarDragsAndStaysOpen(): Unit {
     ctx.viewportWidth = 300.0
     ctx.viewportHeight = 300.0
     let selected = State<Int64>(0)
-    let dropdown = Dropdown("bar", Array<String>(30, {i => "row ${i}"}), selected)
+    let dropdown = Dropdown(Array<String>(30, {i => "row ${i}"}), selected, key: "bar")
     dropdown.layout(ctx, Rect(20.0, 40.0, 180.0, 34.0))
     let _ = dropdown.handle(ctx, UiEvent.MouseDown(MouseButton.Left, 30.0, 50.0))
     dropdown.draw(ctx)
@@ -297,7 +297,7 @@ func tableCustomCellPainterFollowsDisplayOrder(): Unit {
         TableColumn("进度", 120.0, numeric: true, cell: painter)
     ]
     let rows: Array<Array<String>> = [["乙", "30%"], ["甲", "90%"], ["丙", "60%"]]
-    let table = Table("cells", columns, rows, selected)
+    let table = Table(columns, rows, selected, key: "cells")
     table.layout(ctx, Rect(0.0, 0.0, 260.0, 200.0))
 
     table.draw(ctx)
@@ -380,8 +380,8 @@ func tabViewHiddenPageLeavesFocusRing(): Unit {
         let _ = buildRoot({
             =>
             let _ = TabView(["一", "二"], page) {
-                Button("甲", {=> ()}).id("p1.a")
-                Button("乙", {=> ()}).id("p2.a")
+                Button("甲", {=> ()}).key("p1.a")
+                Button("乙", {=> ()}).key("p2.a")
             }
         }, store)
     }
@@ -401,7 +401,7 @@ func tabViewHiddenPageLeavesFocusRing(): Unit {
 func sliderMouseAndKeyboardEventsUpdateState(): Unit {
     let ctx = controlTestContext()
     let value = State<Float32>(0.0)
-    let slider = Slider("volume", value, lower: 0.0, upper: 10.0)
+    let slider = Slider(value, key: "volume", lower: 0.0, upper: 10.0)
 
     slider.layout(ctx, Rect(0.0, 0.0, 116.0, 38.0))
     @Expect(slider.handle(ctx, UiEvent.MouseDown(MouseButton.Left, 58.0, 19.0)))
@@ -421,7 +421,7 @@ func sliderStepSnapsToDiscreteMultiples(): Unit {
     let ctx = controlTestContext()
     let value = State<Float32>(3.0)
     // step 2 over [0, 10]: the legal values are 0, 2, 4, 6, 8, 10. Construction snaps the initial 3.
-    let slider = Slider("vol", value, lower: 0.0, upper: 10.0, step: 2.0)
+    let slider = Slider(value, key: "vol", lower: 0.0, upper: 10.0, step: 2.0)
     @Expect(value.value, Float32(4.0))
 
     slider.layout(ctx, Rect(0.0, 0.0, 116.0, 38.0))
@@ -451,7 +451,7 @@ func segmentedControlSelectsClickedSegment(): Unit {
 func switchActivatesOnReleaseAndSupportsKeyboard(): Unit {
     let ctx = controlTestContext()
     let checked = State<Bool>(false)
-    let control = Switch("Notifications", checked).id("notifications")
+    let control = Switch("Notifications", checked).key("notifications")
     control.layout(ctx, Rect(0.0, 0.0, 180.0, 38.0))
 
     @Expect(control.handle(ctx, UiEvent.MouseDown(MouseButton.Left, 12.0, 12.0)))
@@ -479,7 +479,7 @@ func radioButtonsShareOneSelectionState(): Unit {
 func pickerWrapsSelectionAndRespondsToArrowKeys(): Unit {
     let ctx = controlTestContext()
     let selected = State<Int64>(0)
-    let picker = Picker("density", ["Compact", "Comfortable", "Spacious"], selected)
+    let picker = Picker(["Compact", "Comfortable", "Spacious"], selected, key: "density")
     picker.layout(ctx, Rect(0.0, 0.0, 190.0, 38.0))
 
     @Expect(picker.handle(ctx, UiEvent.MouseDown(MouseButton.Left, 8.0, 12.0)))
@@ -492,13 +492,37 @@ func pickerWrapsSelectionAndRespondsToArrowKeys(): Unit {
 func stepperClampsRangeWithoutIntegerOverflow(): Unit {
     let ctx = controlTestContext()
     let value = State<Int64>(9)
-    let stepper = Stepper("quantity", value).range(0, 10).step(3)
+    let stepper = Stepper(value, key: "quantity").range(0, 10).step(3)
     stepper.layout(ctx, Rect(0.0, 0.0, 144.0, 38.0))
 
     @Expect(stepper.handle(ctx, UiEvent.MouseDown(MouseButton.Left, 136.0, 12.0)))
     @Expect(value.value, Int64(10))
     @Expect(stepper.handle(ctx, UiEvent.KeyDown(Key.Left, false)))
     @Expect(value.value, Int64(7))
+}
+
+// A range pressed against the Int64 extremes must not overflow when stepping: the guard saturates
+// at the type bound before clamping to the range, so `lowerBound + step` / `upperBound - step` are
+// never evaluated into an over/underflow.
+@Test
+func stepperStepsAtInt64ExtremesWithoutOverflow(): Unit {
+    let ctx = controlTestContext()
+
+    // Range crammed against Int64.Max: pressing decrement saturates at Int64.Min then clamps to the
+    // floor, rather than evaluating `lowerBound + step` (= Int64.Max + 3) into an overflow.
+    let high = State<Int64>(Int64.Max)
+    let highStepper = Stepper(high, key: "high", lower: Int64.Max - 2, upper: Int64.Max, step: 5)
+    highStepper.layout(ctx, Rect(0.0, 0.0, 144.0, 38.0))
+    @Expect(highStepper.handle(ctx, UiEvent.MouseDown(MouseButton.Left, 18.0, 12.0)))
+    @Expect(high.value, Int64.Max - 2)
+
+    // Range crammed against Int64.Min: pressing increment saturates at Int64.Max then clamps to the
+    // ceiling, rather than evaluating `upperBound - step` (= Int64.Min - 3) into an underflow.
+    let low = State<Int64>(Int64.Min)
+    let lowStepper = Stepper(low, key: "low", lower: Int64.Min, upper: Int64.Min + 2, step: 5)
+    lowStepper.layout(ctx, Rect(0.0, 0.0, 144.0, 38.0))
+    @Expect(lowStepper.handle(ctx, UiEvent.MouseDown(MouseButton.Left, 126.0, 12.0)))
+    @Expect(low.value, Int64.Min + 2)
 }
 
 @Test
@@ -539,7 +563,7 @@ func tableSortsNumericColumnByValue(): Unit {
     let columns = [TableColumn("名称", 120.0), TableColumn("负载", 80.0, numeric: true)]
     // original indices — 0:"10", 1:"9", 2:"100"; numeric order is 9 < 10 < 100.
     let rows = [["B", "10"], ["A", "9"], ["C", "100"]]
-    let table = Table("servers", columns, rows, selected)
+    let table = Table(columns, rows, selected, key: "servers")
     table.layout(ctx, Rect(0.0, 0.0, 200.0, 200.0))
 
     @Expect(table.handle(ctx, UiEvent.MouseDown(MouseButton.Left, 140.0, 10.0))) // sort by 负载, asc
@@ -561,7 +585,7 @@ func tableSelectionFollowsRowAcrossSort(): Unit {
     let selected = State<Int64>(0) // original row 0 = "B"
     let columns = [TableColumn("名称", 120.0)]
     let rows = [["B"], ["A"], ["C"]]
-    let table = Table("names", columns, rows, selected)
+    let table = Table(columns, rows, selected, key: "names")
     table.layout(ctx, Rect(0.0, 0.0, 130.0, 200.0))
 
     @Expect(table.handle(ctx, UiEvent.MouseDown(MouseButton.Left, 40.0, 10.0))) // sort asc: A,B,C
@@ -583,7 +607,7 @@ func tableRowClickSelectsThroughSort(): Unit {
     let selected = State<Int64>(-1)
     let columns = [TableColumn("名称", 120.0)]
     let rows = [["B"], ["A"], ["C"]]
-    let table = Table("names2", columns, rows, selected)
+    let table = Table(columns, rows, selected, key: "names2")
     table.layout(ctx, Rect(0.0, 0.0, 130.0, 200.0))
 
     @Expect(table.handle(ctx, UiEvent.MouseDown(MouseButton.Left, 40.0, 10.0))) // sort asc: A,B,C
@@ -624,7 +648,7 @@ func tableDownFromNoSelectionSelectsFirstRow(): Unit {
     let selected = State<Int64>(-1)
     let columns = [TableColumn("名称", 120.0)]
     let rows = [["B"], ["A"], ["C"]]
-    let table = Table("names3", columns, rows, selected)
+    let table = Table(columns, rows, selected, key: "names3")
     table.layout(ctx, Rect(0.0, 0.0, 130.0, 200.0))
     ctx.focus("names3")
 
@@ -641,7 +665,7 @@ func tableSortCacheReflectsCellEdits(): Unit {
     let selected = State<Int64>(-1)
     let columns = [TableColumn("名称", 120.0)]
     let rows = [["B"], ["A"], ["C"]]
-    let table = Table("editcache", columns, rows, selected)
+    let table = Table(columns, rows, selected, key: "editcache")
     table.layout(ctx, Rect(0.0, 0.0, 130.0, 200.0))
 
     // Sort ascending: A(1), B(0), C(2). Home selects the first, "A" = original index 1.
@@ -666,7 +690,7 @@ func tableSortCacheHandlesRowCountChange(): Unit {
     let selected = State<Int64>(-1)
     let columns = [TableColumn("名称", 120.0)]
     let rows = [["B"], ["A"], ["C"], ["D"]]
-    let table = Table("countcache", columns, rows, selected)
+    let table = Table(columns, rows, selected, key: "countcache")
     table.layout(ctx, Rect(0.0, 0.0, 130.0, 200.0))
 
     @Expect(table.handle(ctx, UiEvent.MouseDown(MouseButton.Left, 40.0, 10.0))) // sort asc: A,B,C,D
@@ -675,7 +699,7 @@ func tableSortCacheHandlesRowCountChange(): Unit {
 
     // A shorter dataset through the same table id: End must land within the new bounds.
     let shorter = [["B"], ["A"]]
-    let table2 = Table("countcache", columns, shorter, selected)
+    let table2 = Table(columns, shorter, selected, key: "countcache")
     table2.layout(ctx, Rect(0.0, 0.0, 130.0, 200.0))
     @Expect(table2.handle(ctx, UiEvent.MouseDown(MouseButton.Left, 40.0, 10.0)))
     @Expect(table2.handle(ctx, UiEvent.KeyDown(Key.End, false)))
@@ -699,10 +723,10 @@ func tableOfSortsThroughTypedExtractors(): Unit {
     let ctx = controlTestContext()
     let selected = State<Int64>(-1)
     let servers = [TestServer("B", 10), TestServer("A", 9), TestServer("C", 100)]
-    let table = Table.of<TestServer>("of.table", servers, [
+    let table = Table.of<TestServer>(servers, [
         DataColumn<TestServer>("名称", 120.0) {s => s.name},
         DataColumn<TestServer>("负载", 80.0, numeric: true) {s => "${s.load}"}
-    ], selected)
+    ], selected, key: "of.table")
     table.layout(ctx, Rect(0.0, 0.0, 220.0, 200.0))
 
     // Sort by the numeric 负载 column (x in [120, 200)); Home selects the smallest load.
@@ -719,7 +743,7 @@ func tableOfSortsThroughTypedExtractors(): Unit {
 func listViewAcceptsOptionalExplicitId(): Unit {
     let ctx = controlTestContext()
     let sel = State<Int64>(-1)
-    let list = ListView(["a", "b", "c"], sel, id: "servers")
+    let list = ListView(["a", "b", "c"], sel, key: "servers")
     list.layout(ctx, Rect(0.0, 0.0, 120.0, 100.0))
     match (list.focusableId()) {
         case Some(fid) => @Expect(fid, "servers")
@@ -733,7 +757,7 @@ func listViewAcceptsOptionalExplicitId(): Unit {
 func stepperConstructorBoundsClampInitialValue(): Unit {
     let ctx = controlTestContext()
     let value = State<Int64>(200) // above the ctor upper bound
-    let stepper = Stepper("age", value, lower: 0, upper: 100, step: 5)
+    let stepper = Stepper(value, key: "age", lower: 0, upper: 100, step: 5)
     stepper.layout(ctx, Rect(0.0, 0.0, 120.0, 32.0))
     @Expect(value.value, Int64(100)) // clamped into [0, 100] by the constructor
 }

@@ -57,7 +57,7 @@ private func formSection(
             HStack {
                 Label("单次专注分钟数")
                 Spacer()
-                Stepper("form.min.${index}", minutes).range(15, 120).step(5)
+                Stepper(minutes, key: "form.min.${index}").range(15, 120).step(5)
             }.flexible(false)
             Switch("到时桌面通知", notify)
             FlowRow {
@@ -68,7 +68,7 @@ private func formSection(
             HStack {
                 Label("内容间距")
                 Spacer()
-                Dropdown("form.dens.${index}", ["紧凑", "舒适", "宽松"], density)
+                Dropdown(["紧凑", "舒适", "宽松"], density, key: "form.dens.${index}")
             }.flexible(false)
             Button("保存", {=> ()}).fillWidth()
         }.spacing(10.vp).flexible(false)

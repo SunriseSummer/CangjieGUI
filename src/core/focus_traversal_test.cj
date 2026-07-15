@@ -73,7 +73,7 @@ func explicitIdOverrideReplacesAutoIdInFocusRing(): Unit {
     let store = StateStore()
     let _ = buildRoot({
         => VStack {
-            Button("A", {=>}).id("alpha")
+            Button("A", {=>}).key("alpha")
             Button("B", {=>})
         }
     }, store)

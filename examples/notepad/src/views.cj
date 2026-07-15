@@ -22,7 +22,6 @@ func notepadView(model: NotepadModel, app: DesktopApp, documentPath: String): Un
             // editable 是构造参数（而非修饰符）：TextArea 在构造时即决定是否注册 Tab 焦点，
             // 因此只读编辑器不会进入焦点遍历序列。
             TextArea(
-                "notepad.body",
                 model.body,
                 scroll: Some(model.bodyScroll),
                 cursor: Some(model.bodyCursor),

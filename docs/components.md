@@ -12,9 +12,10 @@
   参数/修饰符都另有 `Float32` 重载，尺寸按 `vp` 解释、字号按 `fp` 解释，例如 `12.vp`、`14.fp`。
 - 状态类型：可交互控件的状态参数为 `Bindable<T>`（可传 `State<T>` 或 `Binding<T>`），只读展示控件
   为 `Observable<T>`。
-- 标识 `id`：控件的焦点、按压与局部状态以 `id` 为键。部分控件要求首参传入稳定唯一的 `id`；部分
-  以 `id!: ?String = None` 可选（缺省按构建顺序自动派生）；按钮类以链式 `.id(...)` 可选设定。仅当
-  身份需跨树形变化保持时才需显式给定。
+- 标识 `key`/`id`：控件的焦点、按压与局部状态以此为键，均为可选命名参数（缺省按构建顺序自动派生），
+  写在内容与状态参数之后；按钮与二态选择控件以链式 `.key(...)` 设定。惰性列表（`LazyColumn`/`LazyGrid`）的容器身份
+  参数名为 `id!`，其余控件为 `key!`。仅当身份需跨树形变化保持（控件在容器间移动，或跨结构保留光标/
+  滚动状态）时才需显式给定。
 
 ### 通用修饰符
 
@@ -124,10 +125,10 @@ Panel(padding!: LengthInsets = LengthInsets(12.vp), style!: ?SurfaceStyle = None
 纵向滚动容器，内容超高时可滚动。
 
 ```cangjie
-ScrollView(id: String) { ... }
+ScrollView(key!: ?String = None) { ... }
 ```
 
-- id：滚动区身份（用于保留滚动偏移）。
+- key!：滚动区身份，缺省按构建序派生，用于跨帧保留滚动偏移。
 
 修饰符：`scrollState(State<Float32>)`——由外部状态接管滚动偏移。
 
@@ -162,27 +163,29 @@ Flexible(weight!: Float32 = 1.0) { ... }
 定高行的纵向惰性列表：只物化视口附近的行，成本恒为一屏，适合超长列表。
 
 ```cangjie
-LazyColumn(id: String, count: Int64, itemHeight: Float32, spacing!: Float32 = 0.0,
-    scroll!: ?State<Float32> = None, key!: ?((Int64) -> String) = None) { i => ... }
+LazyColumn(count: Int64, itemHeight: Float32, spacing!: Float32 = 0.0,
+    scroll!: ?State<Float32> = None, key!: ?((Int64) -> String) = None,
+    id!: ?String = None) { i => ... }
 ```
 
-- id：列表身份。
 - count：行总数。
 - itemHeight：每行高度（vp）。
 - spacing!：行间距。
 - scroll!：外部滚动状态（缺省则内部按身份保留偏移）。
 - key!：由行索引生成稳定键，令行的局部状态随数据项迁移。
+- id!：列表身份（缺省按构建序派生）。
 - 尾随闭包：`i => 行内容`，按行索引构建。
 
 静态工厂（数据驱动，免去 `count` 与 `data[i]` 回查）：
 
 ```cangjie
-LazyColumn.of<T>(id: String, data: Array<T>, itemHeight: Float32, spacing!: Float32 = 0.0,
-    scroll!: ?State<Float32> = None, key!: ?((T) -> String) = None) { item => ... }
+LazyColumn.of<T>(data: Array<T>, itemHeight: Float32, spacing!: Float32 = 0.0,
+    scroll!: ?State<Float32> = None, key!: ?((T) -> String) = None,
+    id!: ?String = None) { item => ... }
 ```
 
 ```cangjie
-LazyColumn.of("users", users, 56.0, key: {u => "u${u.id}"}) { u => userRow(u) }
+LazyColumn.of(users, 56.0, key: {u => "u${u.id}"}, id: "users") { u => userRow(u) }
 ```
 
 ### LazyGrid
@@ -190,9 +193,9 @@ LazyColumn.of("users", users, 56.0, key: {u => "u${u.id}"}) { u => userRow(u) }
 数据驱动、按行窗口化的等宽网格（一行是一个 `Grid` 骑在 `LazyColumn` 上），单元格可为任意组件。
 
 ```cangjie
-LazyGrid<T>(id: String, data: Array<T>, columns: Int64, itemHeight: Float32,
+LazyGrid<T>(data: Array<T>, columns: Int64, itemHeight: Float32,
     spacing!: Float32 = 0.0, columnSpacing!: Float32 = 0.0,
-    scroll!: ?State<Float32> = None) { item => ... }
+    scroll!: ?State<Float32> = None, id!: ?String = None) { item => ... }
 ```
 
 - columns：列数；columnSpacing! 为列间距，spacing! 为行间距。
@@ -229,7 +232,7 @@ Keyed(key: String) { ... }
 ```cangjie
 Keyed("note.${note.id}") {
     let draft = rememberState<String>("draft") {note.body}
-    TextArea("note.body", draft)
+    TextArea(draft, key: "note.body")
 }
 ```
 
@@ -328,7 +331,7 @@ Button(title: String, onClick: () -> Unit, role!: ButtonRole = ButtonRole.Normal
 - role!：语义配色（`Normal`/`Primary`/`Danger`）。
 - style!：覆盖表面样式；fontSize! 文字字号。
 
-修饰符：`id(String)`、`role(ButtonRole)`、`style(SurfaceStyle)`、`fontSize(Length | Float32)`。
+修饰符：`key(String)`、`role(ButtonRole)`、`style(SurfaceStyle)`、`fontSize(Length | Float32)`。
 
 ```cangjie
 Button("保存", {=> model.save()}).role(ButtonRole.Primary)
@@ -345,7 +348,7 @@ IconButton(icon: IconName, label!: ?String = None, role!: ButtonRole = ButtonRol
 
 - icon：图标名；label! 可选文字；role!/style! 同 `Button`；onClick! 点击回调。
 
-修饰符：`id(String)`、`label(String)`、`role(ButtonRole)`、`style(SurfaceStyle)`。
+修饰符：`key(String)`、`label(String)`、`role(ButtonRole)`、`style(SurfaceStyle)`。
 
 ---
 
@@ -361,7 +364,7 @@ Switch(label: String, checked: Bindable<Bool>)
 
 - label：说明文字；checked 绑定的开关状态。
 
-修饰符：`id(String)`。
+修饰符：`key(String)`。
 
 ### Checkbox
 
@@ -371,7 +374,7 @@ Switch(label: String, checked: Bindable<Bool>)
 Checkbox(label: String, checked: Bindable<Bool>)
 ```
 
-修饰符：`id(String)`。
+修饰符：`key(String)`。
 
 ### RadioButton
 
@@ -383,7 +386,7 @@ RadioButton(label: String, selected: Bindable<Int64>, value: Int64)
 
 - label：说明文字；selected 共享选中值；value 本项代表的取值。
 
-修饰符：`id(String)`。
+修饰符：`key(String)`。
 
 ```cangjie
 RadioButton("从容", priority, 0)
@@ -396,30 +399,30 @@ RadioButton("冲刺", priority, 2)
 分段单选。选中指示器弹簧滑动到新段；`Tab` 聚焦后 Left/Right 切换（端点钳制）。
 
 ```cangjie
-SegmentedControl(items: Array<String>, selected: Bindable<Int64>, id!: ?String = None)
+SegmentedControl(items: Array<String>, selected: Bindable<Int64>, key!: ?String = None)
 ```
 
-- items：各段文字；selected 选中索引；id! 可选身份（缺省按构建序派生）。
+- items：各段文字；selected 选中索引；key! 可选身份（缺省按构建序派生）。
 
 ### Picker
 
 循环选择器。点击前/后半区或 Left/Right 循环切换；宽度按最长选项自适应，切换不抖动。
 
 ```cangjie
-Picker(id: String, items: Array<String>, selected: Bindable<Int64>)
+Picker(items: Array<String>, selected: Bindable<Int64>, key!: ?String = None)
 ```
 
-- id：身份；items 选项；selected 选中索引。
+- items：选项；selected 选中索引；key! 可选身份（缺省按构建序派生）。
 
 ### Dropdown
 
 下拉选择。点击/Enter 打开，列表浮于树上（下方放不下翻到上方）；选中/外点/Esc 关闭，上下键移动高亮；长列表在弹层内部滚动。
 
 ```cangjie
-Dropdown(id: String, items: Array<String>, selected: Bindable<Int64>)
+Dropdown(items: Array<String>, selected: Bindable<Int64>, key!: ?String = None)
 ```
 
-- id：身份；items 选项；selected 选中索引。
+- items：选项；selected 选中索引；key! 可选身份。
 
 ---
 
@@ -430,18 +433,18 @@ Dropdown(id: String, items: Array<String>, selected: Bindable<Int64>)
 滑杆。拖动或聚焦后 Left/Right 调值。
 
 ```cangjie
-Slider(id: String, value: Bindable<Float32>, lower!: Float32 = 0.0, upper!: Float32 = 1.0,
-    step!: Float32 = 0.0)
+Slider(value: Bindable<Float32>, key!: ?String = None, lower!: Float32 = 0.0,
+    upper!: Float32 = 1.0, step!: Float32 = 0.0)
 ```
 
-- id：身份；value 绑定值。
+- value：绑定值；key! 可选身份。
 - lower! / upper!：取值范围。
 - step!：步长；大于 0 时数值吸附到 `lower + k*step` 刻度（离散滑杆），默认 0 为连续。
 
 修饰符：`range(lower, upper)`、`step(Float32)`。
 
 ```cangjie
-Slider("volume", vol, lower: 0.0, upper: 1.0, step: 0.05)
+Slider(vol, key: "volume", lower: 0.0, upper: 1.0, step: 0.05)
 ```
 
 ### Stepper
@@ -449,11 +452,11 @@ Slider("volume", vol, lower: 0.0, upper: 1.0, step: 0.05)
 步进器。加减按钮调整整数值；宽度按数值内容自适应。
 
 ```cangjie
-Stepper(id: String, value: Bindable<Int64>, lower!: Int64 = Int64.Min,
+Stepper(value: Bindable<Int64>, key!: ?String = None, lower!: Int64 = Int64.Min,
     upper!: Int64 = Int64.Max, step!: Int64 = 1)
 ```
 
-- id：身份；value 绑定值。
+- value：绑定值；key! 可选身份。
 - lower! / upper!：范围（构造时即夹紧初值）。
 - step!：步长，须大于 0，否则抛 `IllegalArgumentException`。
 
@@ -483,11 +486,11 @@ ProgressBar(value: Observable<Float32>, lower!: Float32 = 0.0, upper!: Float32 =
 单行文本框。Shift 扩选、拖选、Ctrl+A/C/X/V、撤销/重做（Ctrl+Z/Y）；光标始终水平滚入可见。
 
 ```cangjie
-TextField(id: String, text: Bindable<String>, cursor!: ?State<Int64> = None,
+TextField(text: Bindable<String>, key!: ?String = None, cursor!: ?State<Int64> = None,
     anchor!: ?State<Int64> = None, editable!: Bool = true)
 ```
 
-- id：身份；text 绑定文本。
+- text：绑定文本；key! 可选身份。
 - cursor! / anchor!：可选的外部光标与选区锚点。
 - editable!：是否可编辑。
 
@@ -498,11 +501,11 @@ TextField(id: String, text: Bindable<String>, cursor!: ?State<Int64> = None,
 多行文本区。多行选区、Shift+↑↓ 跨行扩选、拖选、Ctrl+A/C/X/V、撤销/重做；编辑后光标行滚入视口。
 
 ```cangjie
-TextArea(id: String, text: Bindable<String>, scroll!: ?State<Float32> = None,
+TextArea(text: Bindable<String>, key!: ?String = None, scroll!: ?State<Float32> = None,
     cursor!: ?State<Int64> = None, anchor!: ?State<Int64> = None, editable!: Bool = true)
 ```
 
-- id：身份；text 绑定文本。
+- text：绑定文本；key! 可选身份。
 - scroll!：可选外部滚动状态；cursor! / anchor! 同上；editable! 是否可编辑。
 
 修饰符：`autofocus()`。方法：`undo()`、`redo()`。
@@ -512,10 +515,10 @@ TextArea(id: String, text: Bindable<String>, scroll!: ?State<Float32> = None,
 可编辑下拉：内嵌完整编辑的 `TextField` + 建议列表浮层。键入过滤（无匹配显示占位），点击/回车填入，自由文本亦保留；长建议列表在弹层内部滚动。
 
 ```cangjie
-ComboBox(id: String, text: Bindable<String>, options: Array<String>)
+ComboBox(text: Bindable<String>, options: Array<String>, key!: ?String = None)
 ```
 
-- id：身份；text 绑定文本（可自由输入）；options 建议项。
+- text：绑定文本（可自由输入）；options 建议项；key! 可选身份。
 
 ---
 
@@ -527,11 +530,11 @@ ComboBox(id: String, text: Bindable<String>, options: Array<String>)
 
 ```cangjie
 ListView(items: Array<String>, selected: Bindable<Int64>, scroll!: ?State<Float32> = None,
-    id!: ?String = None)
+    key!: ?String = None)
 ```
 
 - items：条目文字；selected 选中索引。
-- scroll!：可选外部滚动状态（缺省按身份保留偏移）；id! 可选身份。
+- scroll!：可选外部滚动状态（缺省按身份保留偏移）；key! 可选身份。
 
 修饰符：`scrollState(State<Float32>)`。
 
@@ -540,15 +543,16 @@ ListView(items: Array<String>, selected: Bindable<Int64>, scroll!: ?State<Float3
 多列数据表。固定表头、窗口化滚动；点击列头排序（再次反向，数值列按数值），行选择存原始行索引故排序后跟随；`Tab` + 方向键/Home/End 导航。
 
 ```cangjie
-Table(id: String, columns: Array<TableColumn>, rows: Array<Array<String>>, selected: Bindable<Int64>)
+Table(columns: Array<TableColumn>, rows: Array<Array<String>>, selected: Bindable<Int64>,
+    key!: ?String = None)
 ```
 
-- id：身份；columns 列定义；rows 按列索引的单元格字符串矩阵；selected 选中的原始行索引。
+- columns：列定义；rows 按列索引的单元格字符串矩阵；selected 选中的原始行索引；key! 可选身份。
 
 强类型工厂（以抽取器从行取值，免搭字符串矩阵）：
 
 ```cangjie
-Table.of<T>(id: String, data: Array<T>, columns: Array<DataColumn<T>>, selected: Bindable<Int64>)
+Table.of<T>(data: Array<T>, columns: Array<DataColumn<T>>, selected: Bindable<Int64>, key!: ?String = None)
 ```
 
 ### TableColumn
@@ -576,10 +580,10 @@ DataColumn<T>(title: String, width: Float32, numeric!: Bool = false,
 - 其余同 `TableColumn`；value! 为从行 `T` 取该列显示值的抽取器。
 
 ```cangjie
-Table.of("users", users, [
+Table.of(users, [
     DataColumn("姓名", 160.0) {u => u.name},
     DataColumn("年龄", 80.0, numeric: true) {u => "${u.age}"}
-], selectedRow)
+], selectedRow, key: "users")
 ```
 
 ### TabView
@@ -587,10 +591,10 @@ Table.of("users", users, [
 标签页容器。页面按标签顺序声明；活动标签指示器弹簧滑动；页签条为焦点停靠点，聚焦后 Left/Right 切换。
 
 ```cangjie
-TabView(labels: Array<String>, selected: Bindable<Int64>, id!: ?String = None) { pages }
+TabView(labels: Array<String>, selected: Bindable<Int64>, key!: ?String = None) { pages }
 ```
 
-- labels：各标签文字；selected 选中标签；id! 可选身份。
+- labels：各标签文字；selected 选中标签；key! 可选身份。
 - 尾随闭包：按顺序声明与标签一一对应的页面。
 
 ---

@@ -3,8 +3,8 @@ package cui.text
 import sdl.{FontSizes, Key, MouseButton, Point, Rect, Size, UiEvent}
 import sdl.input.{Clipboard, Keyboard}
 import cui.core.{Bindable, CUI_SMALL_H, CursorShape, ScrollBar, State, UiContext, Widget, claimHoverIfInside,
-    clampScrollOffset, drawSurface, drawVerticalScrollBar, emit, localState, registerFocusable, scrollLineIndex,
-    scrollLineRemainder, scrollOffsetAfterWheel}
+    clampScrollOffset, drawSurface, drawVerticalScrollBar, emit, localState, registerFocusable, resolveControlKey,
+    scrollLineIndex, scrollLineRemainder, scrollOffsetAfterWheel}
 
 // SDL reports letter keys as their uppercase ASCII code (see the Ctrl+letter shortcuts).
 private let AREA_LETTER_A: UInt8 = 65
@@ -50,22 +50,23 @@ public class TextArea <: Widget {
     private var frame = Rect.zero()
 
     public init(
-        id: String,
         text: Bindable<String>,
+        key!: ?String = None,
         scroll!: ?State<Float32> = None,
         cursor!: ?State<Int64> = None,
         anchor!: ?State<Int64> = None,
         editable!: Bool = true
     ) {
-        this.id = id
+        let ident = resolveControlKey(key, "TextArea")
+        this.id = ident
         this.text = text
         this.scrollStateValue = match (scroll) {
             case Some(value) => value
-            case None => localState<Float32>("TextArea:${id}:scroll") {0.0}
+            case None => localState<Float32>("TextArea:${ident}:scroll") {0.0}
         }
         this.cursorStateValue = match (cursor) {
             case Some(value) => value
-            case None => localState<Int64>("TextArea:${id}:cursor") {text.value.size}
+            case None => localState<Int64>("TextArea:${ident}:cursor") {text.value.size}
         }
         // The anchor starts collapsed on the caret so no phantom selection appears. A caller
         // that owns the cursor and moves it from outside (loading a file, a programmatic
@@ -74,16 +75,16 @@ public class TextArea <: Widget {
         let caretStart = cursorStateValue.value
         this.anchorStateValue = match (anchor) {
             case Some(value) => value
-            case None => localState<Int64>("TextArea:${id}:anchor") {caretStart}
+            case None => localState<Int64>("TextArea:${ident}:anchor") {caretStart}
         }
         this.isEditable = editable
-        this.scrollBar = ScrollBar("TextArea:${id}:thumb")
-        this.history = localState<UndoHistory>("TextArea:${id}:history") {UndoHistory()}.value
-        this.lineCache = localState<TextLineCache>("TextArea:${id}:lines") {TextLineCache()}.value
-        this.autofocusDone = localState<Bool>("TextArea:${id}:autofocused") {false}
+        this.scrollBar = ScrollBar("TextArea:${ident}:thumb")
+        this.history = localState<UndoHistory>("TextArea:${ident}:history") {UndoHistory()}.value
+        this.lineCache = localState<TextLineCache>("TextArea:${ident}:lines") {TextLineCache()}.value
+        this.autofocusDone = localState<Bool>("TextArea:${ident}:autofocused") {false}
         // A read-only text area is not an editing stop, so it stays out of Tab traversal.
         if (editable) {
-            registerFocusable(id)
+            registerFocusable(ident)
         }
         emit(this)
     }

@@ -106,6 +106,9 @@ internal func drawTextFieldCursor(ctx: UiContext, frame: Rect, id: String, text:
     if (!ctx.hasFocus(id)) {
         return
     }
+    // A focused field blinks its caret on the frame clock, so keep frames flowing even while the
+    // screen is otherwise idle; without this the dirty-frame loop (档 0) would freeze the blink.
+    ctx.requestFrame()
     let position = normalizedTextCursor(text, cursor)
     let prefixW = ctx.renderer.textWidth(text[0..position], pointSize: FontSizes.BODY)
     let x = frame.x + TEXT_FIELD_PAD_X - xShift + prefixW
@@ -175,6 +178,9 @@ internal func drawTextAreaCursor(
     if (!ctx.hasFocus(id)) {
         return
     }
+    // A focused area blinks its caret on the frame clock; keep frames flowing so the dirty-frame
+    // loop (档 0) does not freeze the blink even when nothing else changes.
+    ctx.requestFrame()
     let position = normalizedTextCursor(content.text, content.cursor)
     let line = textCursorLineIndex(content.text, position)
     let lineStart = lineStartBeforeOrAt(content.text, position)
