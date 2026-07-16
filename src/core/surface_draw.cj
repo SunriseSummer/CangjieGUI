@@ -11,7 +11,7 @@ import sdl.{Pen, Rect, SurfaceStyle, clampF32}
  * hard-edged bands at the clip boundary; pushClip intersects with the enclosing clip, so the
  * scroll axis stays exactly bounded by the ancestor that owns it.
  */
-let CUI_SHADOW_CLEARANCE: Float32 = 16.0
+protected let CUI_SHADOW_CLEARANCE: Float32 = 16.0
 
 /*
  * Paints a themed surface (shadow, border, rounded fill) for a widget. It lives in the

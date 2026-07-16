@@ -1,6 +1,30 @@
-package cui.core
+package cui.controls
 
-import sdl.{Key, MouseButton, Rect, Size, UiEvent}
+import sdl.{Key, MouseButton, Rect, Renderer, Size, UiEvent}
+import cui.core.{Axis, State, StateStore, Theme, UiContext, Widget, buildRoot, emit}
+
+private func splitTestContext(): UiContext {
+    UiContext(Renderer.headless(), Theme.light())
+}
+
+// Records the rect the split hands it, so layout math can be asserted directly.
+private class LayoutProbe <: Widget {
+    var rect = Rect.zero()
+
+    public func measure(_: UiContext, _: Size): Size {
+        Size.zero()
+    }
+
+    public func layout(_: UiContext, assigned: Rect): Unit {
+        rect = assigned
+    }
+
+    public func draw(_: UiContext): Unit {}
+
+    public func handle(_: UiContext, _: UiEvent): Bool {
+        false
+    }
+}
 
 // A leaf that reports a fixed focus id, so a container's focus-ring order can be inspected.
 private class FocusIdProbe <: Widget {
@@ -69,7 +93,7 @@ func splitRatioForExtentInvertsExtent(): Unit {
 
 @Test
 func splitViewLaysPanesAroundDivider(): Unit {
-    let ctx = testContext()
+    let ctx = splitTestContext()
     let left = LayoutProbe()
     let right = LayoutProbe()
     let split = SplitView(axis: Axis.Horizontal, initialRatio: 0.5, minFirst: 0.0, minSecond: 0.0,
@@ -87,7 +111,7 @@ func splitViewLaysPanesAroundDivider(): Unit {
 
 @Test
 func splitViewLaysPanesVertically(): Unit {
-    let ctx = testContext()
+    let ctx = splitTestContext()
     let top = LayoutProbe()
     let bottom = LayoutProbe()
     let split = SplitView(axis: Axis.Vertical, initialRatio: 0.25, minFirst: 0.0, minSecond: 0.0,
@@ -104,7 +128,7 @@ func splitViewLaysPanesVertically(): Unit {
 
 @Test
 func splitViewDragMovesDividerAndClampsToMinimums(): Unit {
-    let ctx = testContext()
+    let ctx = splitTestContext()
     let ratio = State<Float32>(0.5)
     let split = SplitView(axis: Axis.Horizontal, ratio: ratio, minFirst: 20.0, minSecond: 20.0,
         dividerThickness: 8.0, first: {=> emit(LayoutProbe())}) {=> emit(LayoutProbe())}
@@ -129,7 +153,7 @@ func splitViewDragMovesDividerAndClampsToMinimums(): Unit {
 
 @Test
 func splitViewIgnoresDragOutsideDivider(): Unit {
-    let ctx = testContext()
+    let ctx = splitTestContext()
     let ratio = State<Float32>(0.5)
     let split = SplitView(axis: Axis.Horizontal, ratio: ratio, minFirst: 0.0, minSecond: 0.0,
         dividerThickness: 8.0, first: {=> emit(LayoutProbe())}) {=> emit(LayoutProbe())}
@@ -144,7 +168,7 @@ func splitViewIgnoresDragOutsideDivider(): Unit {
 
 @Test
 func splitViewKeyboardNudgesFocusedDivider(): Unit {
-    let ctx = testContext()
+    let ctx = splitTestContext()
     let ratio = State<Float32>(0.5)
     let split = SplitView(axis: Axis.Horizontal, ratio: ratio, minFirst: 20.0, minSecond: 20.0,
         dividerThickness: 8.0, first: {=> emit(LayoutProbe())}) {=> emit(LayoutProbe())}
@@ -185,7 +209,7 @@ func splitViewPlacesDividerBetweenPanesInFocusOrder(): Unit {
 
 @Test
 func splitViewDragOffsetSurvivesPerFrameRebuild(): Unit {
-    let ctx = testContext()
+    let ctx = splitTestContext()
     let store = StateStore()
     let ratio = State<Float32>(0.5)
     // The real loop rebuilds the tree every frame, so the grab and the moves land on different

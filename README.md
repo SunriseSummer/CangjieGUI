@@ -14,19 +14,17 @@
 
 - 基于 SDL3 实现自渲染 GUI 引擎。通过 SDL3_ttf 渲染平台字体，完整支持 UTF-8 中文文本。
 - 基于仓颉尾随 lambda、extend、prop 等特性构建声明式 UI 编码范式。
-- 提供 `VStack`、`HStack`、`ZStack`、`Grid`、`FlowRow`、`ScrollView`、`Panel`、可拖动分栏 `SplitView`
-  与折叠面板 `Accordion` 等布局容器，以及数据驱动、只渲染视口附近的惰性虚拟化 `LazyColumn`（定高纵向）、
-  `LazyRow`（定宽横向）、`LazyList`（变高纵向）与 `LazyGrid`（网格）。
+- 提供 `VStack`、`HStack`、`ZStack`、`Grid`、`Panel`、`FlowRow`、`ScrollView`、`SplitView`、`Accordion` 等布局容器，
+  以及数据驱动、只渲染视口附近的懒加载容器 `LazyColumn`、`LazyRow`、`LazyList` 与 `LazyGrid`。
 - 提供按钮、文本框、开关、复选框、单选框、选择器、步进器、滑块、进度条、环形进度、评分、状态徽标、过滤标签、
   步骤条、分页导航、面包屑、列表、数据表格、树视图、日期选择器、时间选择器、拖动重排列表、分段控件、标签页、下拉和组合框等控件。
-- 提供下拉/右键菜单、应用菜单栏、日期选择器、提示、自动淡出的 Toast 通知与模态对话框等浮层，浮层按栈管理、可嵌套，对话框内可继续打开下拉、组合框与右键菜单。
+- 提供下拉/右键菜单、应用菜单栏、选择器、提示、通知与模态对话框等浮层，浮层按栈管理、可嵌套，对话框内可继续打开下拉、组合框与右键菜单。
 - 使用有顺序语义的链式修饰器配置尺寸、约束、内边距、表面、弹性、可见性和可用性，支持
   `.px`，`.vp`，`.fp` 尺寸单位表达。
 - 以 `Observable`/`Bindable` 实现状态管理：可写 `State<T>`、带缓存的派生只读 `DerivedState`
   （`derive`/`map`）、双向投影 `Binding`（`project`），控件按读写需要接受对应抽象。
 - 以 `Keyed`、`rememberState`、`ForEach` 明确复杂嵌套树与列表中的局部状态身份，控件交互身份按构建顺序自动唯一。
 - 支持主轴/交叉轴排列、权重布局、内容自适应、流式换行、裁剪滚动和可复用组件组合。
-- 文本超宽自动省略号，可选 `maxLines` 换行；`RichText` 提供内联多样式（着色文本段 + 内联图标）与自动换行的图文混排。
 - 使用 GPU 几何图元和超采样渲染圆角、描边、图标、阴影及抗锯齿图形。
 - 提供文件对话框、消息框、剪贴板、光标、显示器、文件系统、时间、系统信息等平台能力接口。
 - 已实现图元缓存、惰性渲染、脏帧检测/按需刷新等性能优化机制。
@@ -61,9 +59,7 @@ CangjieGUI/
 
 > [!WARNING]
 >
-> 部分 Linux 发行版上，系统 `libglib-2.0.so.0`（`SDL3_ttf` 的间接依赖）编译时链接了带
-> 版本符号的 PCRE2，而仓颉运行时中的 `libpcre2-8.so.0` 不带版本符号。链接器若优先找到
-> 运行时自带的 PCRE2，会出现大量 `undefined reference to ...@PCRE2_10.47` 链接错误。
+> 部分 Linux 发行版上，系统 `libglib-2.0.so.0`（`SDL3_ttf` 的间接依赖）编译时链接了带版本符号的 PCRE2，而仓颉运行时中的 `libpcre2-8.so.0` 不带版本符号。链接器若优先找到运行时自带的 PCRE2，会出现大量 `undefined reference to ...@PCRE2_10.47` 链接错误。
 >
 > 遇到这种情况，请在项目 `cjpm.toml` 中通过 `link-option` 显式指定系统 PCRE2：
 >

@@ -1,7 +1,7 @@
 package cui.controls
 
 import sdl.{Key, MouseButton, Rect, Renderer, Size, UiEvent}
-import cui.core.{Button, Modal, Spacer, State, StateStore, Theme, UiContext, Widget, buildRoot, emit}
+import cui.core.{Button, Spacer, State, StateStore, Theme, UiContext, Widget, buildRoot, emit}
 
 private func controlTestContext(): UiContext {
     UiContext(Renderer.headless(), Theme.light())

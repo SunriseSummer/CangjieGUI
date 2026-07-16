@@ -255,8 +255,9 @@ internal func lazyVisibleRange(
 // Materializes the visible items in `[first, last]` during the build pass, each scoped by
 // `scope:item:key(index)` so its local state follows it (across scrolls, and — with a data key —
 // across inserts/reorders); it is dropped when the item scrolls off, so hoist anything that must
-// persist. Shared by both axes: LazyColumn passes its rows, LazyRow its columns.
-internal func buildLazyChildren(
+// persist. Shared by both axes: LazyColumn passes its rows, LazyRow its columns — and by
+// ReorderableList in cui.controls, which virtualizes its rows the same way.
+protected func buildLazyChildren(
     scope: String,
     first: Int64,
     last: Int64,
@@ -276,7 +277,7 @@ internal func buildLazyChildren(
 
 // The effective item-key function: the caller's key, or the index as a string. The index default
 // reproduces the historical per-item scope key exactly, so index-keyed lists are byte-for-byte unchanged.
-internal func lazyKeyOrIndex(key: ?((Int64) -> String)): (Int64) -> String {
+protected func lazyKeyOrIndex(key: ?((Int64) -> String)): (Int64) -> String {
     match (key) {
         case Some(k) => k
         case None => {index => "${index}"}

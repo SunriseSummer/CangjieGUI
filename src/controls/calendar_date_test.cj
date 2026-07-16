@@ -1,4 +1,4 @@
-package cui.core
+package cui.controls
 
 @Test
 func calendarDateConstructionClampsToValidDate(): Unit {

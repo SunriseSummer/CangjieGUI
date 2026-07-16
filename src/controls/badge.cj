@@ -1,6 +1,7 @@
-package cui.core
+package cui.controls
 
 import sdl.{Color, FontSizes, Rect, Size, UiEvent}
+import cui.core.{UiContext, Widget, emit}
 
 private let BADGE_H: Float32 = 22.0
 private let BADGE_HPAD: Float32 = 9.0

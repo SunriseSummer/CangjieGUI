@@ -1,6 +1,14 @@
-package cui.core
+package cui.controls
 
-import sdl.{MouseButton, Rect, Size, UiEvent}
+import sdl.{MouseButton, Rect, Renderer, Size, UiEvent}
+import cui.core.{State, Theme, UiContext}
+
+private func stepTestContext(): UiContext {
+    let ctx = UiContext(Renderer.headless(), Theme.light())
+    ctx.viewportWidth = 800.0
+    ctx.viewportHeight = 600.0
+    ctx
+}
 
 // For a 440-wide layout with 4 steps: left = 44, right = 396, gap = 352/3 ≈ 117.33.
 // Node centres are 44, 161.33, 278.67, 396; the node row's centre-y is 4 + 14 = 18.
@@ -8,7 +16,7 @@ private let STEP_NODE_CY: Float32 = 18.0
 
 @Test
 func stepIndicatorMeasuresFixedHeight(): Unit {
-    let ctx = testContext()
+    let ctx = stepTestContext()
     // circle 28 + top pad 4 + label gap 8 + label 18 = 58.
     let size = StepIndicator(["A", "B"], 0).measure(ctx, Size(400.0, 100.0))
     @Expect(size.h, Float32(58.0))
@@ -17,7 +25,7 @@ func stepIndicatorMeasuresFixedHeight(): Unit {
 
 @Test
 func stepIndicatorClicksReachableSteps(): Unit {
-    let ctx = testContext()
+    let ctx = stepTestContext()
     let picked = State<Int64>(-1)
     let steps = StepIndicator(["账户", "资料", "偏好", "完成"], 2, onSelect: {i => picked.value = i})
     steps.layout(ctx, Rect(0.0, 0.0, 440.0, 60.0))
@@ -32,7 +40,7 @@ func stepIndicatorClicksReachableSteps(): Unit {
 
 @Test
 func stepIndicatorIgnoresFutureSteps(): Unit {
-    let ctx = testContext()
+    let ctx = stepTestContext()
     let picked = State<Int64>(-1)
     let steps = StepIndicator(["A", "B", "C", "D"], 1, onSelect: {i => picked.value = i})
     steps.layout(ctx, Rect(0.0, 0.0, 440.0, 60.0))
@@ -44,7 +52,7 @@ func stepIndicatorIgnoresFutureSteps(): Unit {
 
 @Test
 func stepIndicatorWithoutCallbackIsDisplayOnly(): Unit {
-    let ctx = testContext()
+    let ctx = stepTestContext()
     let steps = StepIndicator(["A", "B", "C"], 1)
     steps.layout(ctx, Rect(0.0, 0.0, 440.0, 60.0))
     // No onSelect: node presses are never consumed.
@@ -53,7 +61,7 @@ func stepIndicatorWithoutCallbackIsDisplayOnly(): Unit {
 
 @Test
 func stepIndicatorIgnoresPressesAwayFromNodes(): Unit {
-    let ctx = testContext()
+    let ctx = stepTestContext()
     let picked = State<Int64>(-1)
     let steps = StepIndicator(["A", "B", "C", "D"], 3, onSelect: {i => picked.value = i})
     steps.layout(ctx, Rect(0.0, 0.0, 440.0, 60.0))

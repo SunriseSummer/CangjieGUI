@@ -1,6 +1,7 @@
-package cui.core
+package cui.controls
 
 import sdl.{MouseButton, Rect, Renderer, Size, UiEvent}
+import cui.core.{State, Theme, UiContext}
 
 private func bcTestContext(): UiContext {
     let ctx = UiContext(Renderer.headless(), Theme.light())

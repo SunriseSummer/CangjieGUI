@@ -1,7 +1,8 @@
-package cui.core
+package cui.controls
 
 import std.collection.ArrayList
 import sdl.{Color, FontSizes, MouseButton, Pen, Rect, Size, UiEvent}
+import cui.core.{CursorShape, UiContext, Widget, resolveControlKey, emit}
 
 private let BC_H: Float32 = 28.0
 private let BC_HPAD: Float32 = 7.0

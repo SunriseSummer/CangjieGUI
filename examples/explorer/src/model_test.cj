@@ -21,6 +21,15 @@ func sortedChildrenDirsBeforeFiles(): Unit {
 }
 
 @Test
+func formatSizeUsesExplorerUnits(): Unit {
+    @Expect(formatSize(312), "312 B")
+    @Expect(formatSize(1024), "1 KB")
+    @Expect(formatSize(23_120), "23 KB") // 22.58 KB 向上取整
+    @Expect(formatSize(1_284_000), "1.2 MB") // MB 保留一位小数
+    @Expect(formatSize(734_000_000), "699.9 MB") // 二进制 MB（1 MB = 1048576 B），与资源管理器一致
+}
+
+@Test
 func pathSegmentsPrependRoot(): Unit {
     @Expect(pathSegments([]), ["根目录"])
     @Expect(pathSegments(["文档", "工作"]), ["根目录", "文档", "工作"])
@@ -39,13 +48,36 @@ func pathNavigationHelpers(): Unit {
 func modelDescendAndNavigate(): Unit {
     let model = ExplorerModel()
     @Expect(model.isRoot())
+    @Expect(!model.canGoUp())
     model.openFolder("文档")
     model.openFolder("工作")
     @Expect(model.path.value, ["文档", "工作"])
     @Expect(model.segments(), ["根目录", "文档", "工作"])
     @Expect(model.entries().size, 3)
-    model.navigateTo(1) // 回到文档
+    @Expect(model.canGoUp())
+    model.goUp() // 回到文档
     @Expect(model.path.value, ["文档"])
     model.navigateTo(0) // 回到根目录
     @Expect(model.isRoot())
+    model.goUp() // 根目录下为无操作
+    @Expect(model.isRoot())
+}
+
+@Test
+func selectionFollowsExplorerConventions(): Unit {
+    let model = ExplorerModel()
+    // 根目录：3 个文件夹 + 1 个文件。
+    @Expect(model.folderCount(), 3)
+    @Expect(model.fileCount(), 1)
+    model.selectFile("待办.txt")
+    let selected = model.selectedFile().getOrThrow()
+    @Expect(selected.name, "待办.txt")
+    @Expect(selected.sizeBytes, 312)
+    // 任何导航都清除选中。
+    model.openFolder("文档")
+    @Expect(model.selected.value, "")
+    @Expect(model.selectedFile().isNone())
+    // 选中项不在当前目录时同样视为未选中（防御：状态与目录内容永远一致）。
+    model.selectFile("不存在.txt")
+    @Expect(model.selectedFile().isNone())
 }

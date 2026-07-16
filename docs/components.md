@@ -667,18 +667,21 @@ CalendarDate(year: Int64, month: Int64, day: Int64)
 
 ### TimePicker
 
-时间选择器。闭合态显示所绑定的时间，点击/Enter/Space/Down 弹出时/分网格浮层（下方放不下翻到上方）；
-浮层含全部 24 小时与按 `minuteStep` 间隔的分钟，点小时或分钟即实时更新绑定值并保持浮层打开（选一个时间需时、分两步），
-故外点/Esc/Enter/Tab 关闭。
+时间选择器。闭合态显示所绑定的时间，点击/Enter/Space/Down 弹出浮层（下方放不下翻到上方）；浮层上半为 24 小时网格，
+一点选时；下半为逐分钟编辑区，粗细三档：水平滑杆粗调（按 `minuteStep` 吸附，轨道两端恒为 00 与 59）、−/+ 按钮
+逐分钟微调（在小时内环绕，59 → 00 不进位）、数值框快速键入（点框或直接敲数字：首位 6–9 立即生效，两位数补齐即生效，
+Backspace 清除待定位，Enter 提交、Esc 放弃）。选时或调分即实时更新绑定值并保持浮层打开（选一个时间需时、分两步），
+故外点（先提交待定输入）/Esc/Enter/Tab 关闭。
 
 ```cangjie
 TimePicker(selected: Bindable<TimeOfDay>, minuteStep!: Int64 = 5, hour12!: Bool = false, key!: ?String = None)
 ```
 
-- selected：绑定的时间（`TimeOfDay`）；minuteStep!：分钟网格间隔（默认 5）；hour12!：闭合态是否用 12 小时制显示；key! 可选身份。
+- selected：绑定的时间（`TimeOfDay`）；minuteStep!：滑杆粗调吸附间隔（默认 5，钳到 1–60）——步进、键入与方向键
+  始终逐分钟，任何分钟都可达；hour12!：闭合态是否用 12 小时制显示；key! 可选身份。
 
-浮层内键盘：上/下按一个 `minuteStep` 增减，左/右按整小时增减（均跨午夜环绕），Enter/Space/Esc/Tab 关闭。
-绑定值恒为合法 24 小时时间（见 `TimeOfDay`）。
+浮层内键盘：上/下逐分钟增减，左/右按整小时增减（均跨午夜环绕），数字键直接键入分钟，Enter/Space/Esc/Tab 关闭
+（有待定输入时 Enter/Space 先提交、Esc 先放弃，浮层保持打开）。绑定值恒为合法 24 小时时间（见 `TimeOfDay`）。
 
 ### TimeOfDay
 

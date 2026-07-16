@@ -1,6 +1,7 @@
-package cui.core
+package cui.controls
 
 import sdl.{FontSizes, Rect, SurfaceStyle}
+import cui.core.{CUI_SMALL_H, UiContext, drawSurface}
 
 // Padding strips above and below the rows inside a menu popup.
 private let MENU_ROW_PAD: Float32 = 5.0
@@ -49,18 +50,8 @@ public struct MenuItem {
     }
 }
 
-/** Whether `item` can be highlighted and run — the cross-package accessor for `MenuItem.isSelectable`. */
-protected func menuItemSelectable(item: MenuItem): Bool {
-    item.isSelectable()
-}
-
-/** Runs `item`'s action — the cross-package accessor for the internal action field. */
-protected func runMenuItem(item: MenuItem): Unit {
-    item.action()
-}
-
 /** The popup width that fits the widest label (plus any shortcut), floored at a minimum. */
-protected func menuPreferredWidth(ctx: UiContext, items: Array<MenuItem>): Float32 {
+internal func menuPreferredWidth(ctx: UiContext, items: Array<MenuItem>): Float32 {
     var width = MENU_MIN_WIDTH
     for (item in items) {
         if (item.isSeparator) {
@@ -76,7 +67,7 @@ protected func menuPreferredWidth(ctx: UiContext, items: Array<MenuItem>): Float
 }
 
 /** Total popup height for `items` at uniform row height plus the top and bottom pad strips. */
-protected func menuContentHeight(items: Array<MenuItem>): Float32 {
+internal func menuContentHeight(items: Array<MenuItem>): Float32 {
     Float32(items.size) * CUI_SMALL_H + MENU_ROW_PAD * 2.0
 }
 
@@ -84,7 +75,7 @@ protected func menuContentHeight(items: Array<MenuItem>): Float32 {
  * The row index at pointer `y` within `menu` (uniform CUI_SMALL_H rows), or -1 in the pad strips.
  * Callers check the item at that index for selectability before running or highlighting it.
  */
-protected func menuItemIndexAt(menu: Rect, y: Float32): Int64 {
+internal func menuItemIndexAt(menu: Rect, y: Float32): Int64 {
     if (y < menu.y + MENU_ROW_PAD || y >= menu.bottom() - MENU_ROW_PAD) {
         return -1
     }
@@ -96,7 +87,7 @@ protected func menuItemIndexAt(menu: Rect, y: Float32): Int64 {
  * and disabled rows. Stays at `from` when no selectable row lies that way, so navigation stops at the
  * ends instead of landing on a divider.
  */
-protected func menuNextSelectable(items: Array<MenuItem>, from: Int64, direction: Int64): Int64 {
+internal func menuNextSelectable(items: Array<MenuItem>, from: Int64, direction: Int64): Int64 {
     var i = from + direction
     while (i >= 0 && i < items.size) {
         if (items[i].isSelectable()) {
@@ -108,7 +99,7 @@ protected func menuNextSelectable(items: Array<MenuItem>, from: Int64, direction
 }
 
 /** The first selectable index, or 0 when the menu holds none (all separators/disabled). */
-protected func menuFirstSelectable(items: Array<MenuItem>): Int64 {
+internal func menuFirstSelectable(items: Array<MenuItem>): Int64 {
     for (i in 0..items.size) {
         if (items[i].isSelectable()) {
             return i
@@ -118,7 +109,7 @@ protected func menuFirstSelectable(items: Array<MenuItem>): Int64 {
 }
 
 /** Draws the menu surface and its rows: labels, right-aligned shortcuts, separators, dimmed disables. */
-protected func drawMenuPopup(ctx: UiContext, menu: Rect, items: Array<MenuItem>, highlight: Int64): Unit {
+internal func drawMenuPopup(ctx: UiContext, menu: Rect, items: Array<MenuItem>, highlight: Int64): Unit {
     drawSurface(ctx, menu, menuPopupSurface(ctx))
     ctx.renderer.pushClip(menu)
     var y = menu.y + MENU_ROW_PAD
@@ -162,7 +153,7 @@ private func drawMenuRow(ctx: UiContext, item: MenuItem, row: Rect, highlightInd
     }
 }
 
-protected func menuPopupSurface(ctx: UiContext): SurfaceStyle {
+internal func menuPopupSurface(ctx: UiContext): SurfaceStyle {
     SurfaceStyle(ctx.theme.panelRaised, border: ctx.theme.panelEdge, radius: ctx.theme.controlRadius,
         borderWidth: 1.0, shadow: ctx.theme.shadow, shadowOffsetY: 4.0)
 }

@@ -1,7 +1,7 @@
 package cui.controls
 
 import sdl.{Key, MouseButton, Rect, Renderer, UiEvent}
-import cui.core.{CalendarDate, State, Theme, UiContext}
+import cui.core.{State, Theme, UiContext}
 
 private func dpTestContext(): UiContext {
     let ctx = UiContext(Renderer.headless(), Theme.light())

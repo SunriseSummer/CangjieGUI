@@ -1,14 +1,16 @@
-package cui.core
+package cui.controls
 
 import sdl.{FontSizes, Key, MouseButton, Pen, Rect, Size, UiEvent}
+import cui.core.{Bindable, CursorShape, UiContext, Widget, resolveControlKey, claimHoverIfInside, emit,
+    registerFocusable}
 
 private let CHIP_H: Float32 = 28.0
 private let CHIP_HPAD: Float32 = 12.0
 
 /*
  * A selectable filter tag — a rounded pill bound to a `Bindable<Bool>`. Clicking (or Space/Enter while
- * focused) toggles it; selected it fills with the accent, unselected it is an outlined field. Use a row
- * of them as toggle filters.
+ * focused) toggles it; selected it fills with the accent, unselected it is an outlined field. A row of
+ * chips forms a set of toggle filters.
  */
 public class Chip <: Widget {
     private let text: String

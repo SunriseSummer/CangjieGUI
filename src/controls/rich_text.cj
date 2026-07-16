@@ -1,7 +1,8 @@
-package cui.core
+package cui.controls
 
 import std.collection.ArrayList
 import sdl.{Color, FontSizes, IconName, Rect, Size, UiEvent, drawIcon}
+import cui.core.{CUI_SMALL_H, Length, LengthUnit, UiContext, Widget, emit}
 
 // Gap after an inline icon before the next span.
 private let RICH_SPAN_GAP: Float32 = 3.0

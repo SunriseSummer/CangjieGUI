@@ -6,7 +6,7 @@
  */
 package cui_chat
 
-import std.collection.ArrayList
+import std.collection.{ArrayList, HashSet}
 import cui.State
 
 class ChatModel {
@@ -23,6 +23,15 @@ class ChatModel {
         this.nextId = Int64(seeded.size) + 1
     }
 
+    /** 群成员数（按出现过的发送者去重），抬头副标题用。 */
+    func memberCount(): Int64 {
+        let names = HashSet<String>()
+        for (message in messages.value) {
+            names.add(message.sender)
+        }
+        names.size
+    }
+
     /** 发送草稿：非空则追加一条“我”的消息，清空输入并滚到底部。 */
     func send(): Unit {
         let text = draft.value.trimAscii()
@@ -34,7 +43,18 @@ class ChatModel {
         for (message in arr) {
             appended.add(message)
         }
-        appended.add(Message(nextId, "我", text, true))
+        // 演示数据无真实时钟：新消息记在最后一条的下一分钟，间隔不足不会触发时间分隔条。
+        let minute = if (arr.size > 0) {
+            arr[arr.size - 1].minuteOfDay + 1
+        } else {
+            9 * 60
+        }
+        let prevMinute = if (arr.size > 0) {
+            arr[arr.size - 1].minuteOfDay
+        } else {
+            -TIME_SEP_GAP_MIN
+        }
+        appended.add(Message(nextId, MY_SENDER, text, true, minute, needsTimeSeparator(prevMinute, minute)))
         nextId += 1
         messages.value = appended.toArray()
         draft.value = ""

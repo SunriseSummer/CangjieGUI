@@ -2,9 +2,8 @@ package cui.controls
 
 import std.collection.ArrayList
 import sdl.{FontSizes, Key, MouseButton, Rect, Size, UiEvent, clampF32}
-import cui.core.{CursorShape, MenuItem, Overlay, State, UiContext, Widget, claimHoverIfInside, drawFocusRing,
-    drawMenuPopup, emit, focusableControlIdentity, localState, menuContentHeight, menuFirstSelectable,
-    menuItemIndexAt, menuItemSelectable, menuNextSelectable, menuPreferredWidth, requireControlId, runMenuItem}
+import cui.core.{CursorShape, Overlay, State, UiContext, Widget, claimHoverIfInside, drawFocusRing,
+    emit, focusableControlIdentity, localState, requireControlId}
 
 private let MENU_BAR_HEIGHT: Float32 = 34.0
 private let MENU_BAR_INSET: Float32 = 4.0
@@ -175,7 +174,7 @@ public class MenuBar <: Widget {
                     // shape through the menu (the move still falls through for the bar's own hover).
                     ctx.claimHover(overlayOwner, CursorShape.Default)
                     let index = menuItemIndexAt(popup, y)
-                    if (index >= 0 && index < currentItems().size && menuItemSelectable(currentItems()[index])) {
+                    if (index >= 0 && index < currentItems().size && currentItems()[index].isSelectable()) {
                         highlight.value = index
                     }
                 } else {
@@ -219,8 +218,8 @@ public class MenuBar <: Widget {
     private func runItem(ctx: UiContext, index: Int64): Unit {
         let items = currentItems()
         close(ctx)
-        if (index >= 0 && index < items.size && menuItemSelectable(items[index])) {
-            runMenuItem(items[index])
+        if (index >= 0 && index < items.size && items[index].isSelectable()) {
+            items[index].action()
         }
     }
 

@@ -1,6 +1,11 @@
-package cui.core
+package cui.controls
 
-import sdl.{Color, FrameInfo, IconName, Rect, Size, UiEvent}
+import sdl.{Color, FrameInfo, IconName, Rect, Renderer, Size, UiEvent}
+import cui.core.{Theme, UiContext}
+
+private func richTextTestContext(): UiContext {
+    UiContext(Renderer.headless(), Theme.light())
+}
 
 // A deterministic measure independent of the font backend: every rune is 10 logical pixels wide.
 private let TEN_PX_PER_RUNE: (String) -> Float32 = {text => Float32(text.toRuneArray().size) * 10.0}
@@ -72,7 +77,7 @@ func richTextEmptyYieldsNoItems(): Unit {
 
 @Test
 func richTextWidgetMeasuresAndDrawsWithoutError(): Unit {
-    let ctx = testContext()
+    let ctx = richTextTestContext()
     let rich = RichText([
         RichSpan.icon(IconName.Save),
         RichSpan.text(" 已保存 "),

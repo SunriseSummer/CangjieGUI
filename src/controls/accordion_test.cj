@@ -1,7 +1,42 @@
-package cui.core
+package cui.controls
 
 import std.collection.HashSet
-import sdl.{Key, MouseButton, Rect, Size, UiEvent}
+import sdl.{Key, MouseButton, Rect, Renderer, Size, UiEvent}
+import cui.core.{Spacer, State, Theme, UiContext, Widget, emit}
+
+private func accordionTestContext(): UiContext {
+    UiContext(Renderer.headless(), Theme.light())
+}
+
+// A reference-type counter so a build closure can tally invocations (captured vars are read-only).
+private class LazyBuildCounter {
+    var count: Int64 = 0
+
+    func bump(): Unit {
+        count += 1
+    }
+}
+
+// A layout probe with a fixed desired size, standing in for real section content.
+private class SizedLayoutProbe <: Widget {
+    let desired: Size
+
+    init(desired: Size) {
+        this.desired = desired
+    }
+
+    public func measure(_: UiContext, available: Size): Size {
+        Size(min(desired.w, available.w), min(desired.h, available.h))
+    }
+
+    public func layout(_: UiContext, _: Rect): Unit {}
+
+    public func draw(_: UiContext): Unit {}
+
+    public func handle(_: UiContext, _: UiEvent): Bool {
+        false
+    }
+}
 
 private func intSet(values: Array<Int64>): HashSet<Int64> {
     let set = HashSet<Int64>()
@@ -51,7 +86,7 @@ func accordionBuildsOnlyOpenBodies(): Unit {
 
 @Test
 func accordionMeasureSumsHeadersAndOpenBodies(): Unit {
-    let ctx = testContext()
+    let ctx = accordionTestContext()
     let acc = Accordion([
         AccordionSection("A") {=> emit(SizedLayoutProbe(Size(100.0, 50.0)))},
         AccordionSection("B") {=> emit(Spacer())}
@@ -62,7 +97,7 @@ func accordionMeasureSumsHeadersAndOpenBodies(): Unit {
 
 @Test
 func accordionClickHeaderTogglesSection(): Unit {
-    let ctx = testContext()
+    let ctx = accordionTestContext()
     let expanded = State<HashSet<Int64>>(intSet([]))
     let acc = Accordion([
         AccordionSection("A") {=> emit(Spacer())},
@@ -80,7 +115,7 @@ func accordionClickHeaderTogglesSection(): Unit {
 
 @Test
 func accordionSingleModeClosesOthersOnOpen(): Unit {
-    let ctx = testContext()
+    let ctx = accordionTestContext()
     let expanded = State<HashSet<Int64>>(intSet([0]))
     let acc = Accordion([
         AccordionSection("A") {=> emit(SizedLayoutProbe(Size(100.0, 50.0)))},
@@ -97,7 +132,7 @@ func accordionSingleModeClosesOthersOnOpen(): Unit {
 
 @Test
 func accordionKeyboardTogglesFocusedHeader(): Unit {
-    let ctx = testContext()
+    let ctx = accordionTestContext()
     let expanded = State<HashSet<Int64>>(intSet([]))
     let acc = Accordion([
         AccordionSection("A") {=> emit(Spacer())},

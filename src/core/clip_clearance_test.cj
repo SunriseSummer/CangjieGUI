@@ -74,20 +74,3 @@ func lazyRowClipLeavesShadowClearanceAcrossOnly(): Unit {
     @Expect(clip.x, Float32(0.0))
     @Expect(clip.right() <= 300.0)
 }
-
-@Test
-func reorderableRowClipLeavesShadowClearance(): Unit {
-    let ctx = testContext()
-    let probe = ClipProbe()
-    let list = ReorderableList(1, 50.0, {_, _ =>}, id: "clip.reorder") {
-        _ => emit(probe)
-    }
-    list.layout(ctx, Rect(0.0, 0.0, 400.0, 200.0))
-    list.draw(ctx)
-    let clip = probe.seen.getOrThrow()
-    // The slot clip is widened on every side (no enclosing scroll axis of its own).
-    @Expect(clip.x < 0.0)
-    @Expect(clip.y < 0.0)
-    @Expect(clip.right() > 400.0)
-    @Expect(clip.bottom() > 50.0)
-}

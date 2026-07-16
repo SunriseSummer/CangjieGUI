@@ -1,9 +1,17 @@
-package cui.core
+package cui.controls
 
-import sdl.{MouseButton, Rect, UiEvent}
+import sdl.{MouseButton, Rect, Renderer, UiEvent}
+import cui.core.{State, Theme, UiContext}
 
 // Row centre-y for a 34px-tall control laid at y=0.
 private let PAGE_CY: Float32 = 17.0
+
+private func paginationTestContext(): UiContext {
+    let ctx = UiContext(Renderer.headless(), Theme.light())
+    ctx.viewportWidth = 800.0
+    ctx.viewportHeight = 600.0
+    ctx
+}
 
 @Test
 func paginationItemsWindowsWithEllipsis(): Unit {
@@ -23,7 +31,7 @@ func clampPageClampsIntoRange(): Unit {
 
 @Test
 func paginationPageClickJumps(): Unit {
-    let ctx = testContext()
+    let ctx = paginationTestContext()
     let page = State<Int64>(5)
     let pag = Pagination(20, page, window: 1) // items [0, -1, 4, 5, 6, -1, 19]
     pag.layout(ctx, Rect(0.0, 0.0, 400.0, 34.0))
@@ -34,7 +42,7 @@ func paginationPageClickJumps(): Unit {
 
 @Test
 func paginationPrevNextStepByOne(): Unit {
-    let ctx = testContext()
+    let ctx = paginationTestContext()
     let back = State<Int64>(5)
     let pagBack = Pagination(20, back)
     pagBack.layout(ctx, Rect(0.0, 0.0, 400.0, 34.0))
@@ -51,7 +59,7 @@ func paginationPrevNextStepByOne(): Unit {
 
 @Test
 func paginationArrowsClampAtEnds(): Unit {
-    let ctx = testContext()
+    let ctx = paginationTestContext()
     let first = State<Int64>(0)
     let pagFirst = Pagination(20, first)
     pagFirst.layout(ctx, Rect(0.0, 0.0, 400.0, 34.0))
@@ -62,7 +70,7 @@ func paginationArrowsClampAtEnds(): Unit {
 
 @Test
 func paginationEllipsisIsNotClickable(): Unit {
-    let ctx = testContext()
+    let ctx = paginationTestContext()
     let page = State<Int64>(10)
     let pag = Pagination(20, page) // items [0, -1, 9, 10, 11, -1, 19]; item 1 is the ellipsis at x 76..110
     pag.layout(ctx, Rect(0.0, 0.0, 400.0, 34.0))

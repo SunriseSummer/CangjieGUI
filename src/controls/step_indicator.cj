@@ -1,6 +1,7 @@
-package cui.core
+package cui.controls
 
 import sdl.{Color, FontSizes, MouseButton, Pen, Rect, Size, UiEvent}
+import cui.core.{CursorShape, UiContext, Widget, resolveControlKey, emit}
 
 private let STEP_CIRCLE_R: Float32 = 14.0
 private let STEP_EDGE_PAD: Float32 = 44.0
@@ -13,7 +14,7 @@ private let STEP_TOP_PAD: Float32 = 4.0
  * row of numbered nodes joined by a connector, with everything before `current` marked done (filled and
  * checked), `current` highlighted, and later steps dimmed. Each step's label sits beneath its node.
  *
- * It is display-first: drive `current` from the flow's own Back/Next controls. Pass `onSelect` to make
+ * It is display-first: the flow's own Back/Next controls drive `current`. An `onSelect` callback makes
  * the already-reached steps (index ≤ current) clickable, so the user can jump back to a completed step.
  */
 public class StepIndicator <: Widget {

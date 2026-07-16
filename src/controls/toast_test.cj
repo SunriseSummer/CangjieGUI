@@ -1,6 +1,14 @@
-package cui.core
+package cui.controls
 
-import sdl.{FrameInfo, Size, UiEvent}
+import sdl.{FrameInfo, Renderer, Size, UiEvent}
+import cui.core.{Theme, UiContext}
+
+private func toastTestContext(): UiContext {
+    let ctx = UiContext(Renderer.headless(), Theme.light())
+    ctx.viewportWidth = 800.0
+    ctx.viewportHeight = 600.0
+    ctx
+}
 
 @Test
 func toasterShowAddsAndTickExpires(): Unit {
@@ -40,7 +48,7 @@ func toasterSnapshotKeepsPostOrder(): Unit {
 
 @Test
 func toastLayerTicksToasterAndRequestsFramesWhileActive(): Unit {
-    let ctx = testContext()
+    let ctx = toastTestContext()
     let toaster = Toaster()
     toaster.show("x", durationMs: 1000)
     let layer = ToastLayer(toaster)
@@ -59,7 +67,7 @@ func toastLayerTicksToasterAndRequestsFramesWhileActive(): Unit {
 
 @Test
 func toastLayerTakesNoLayoutSpace(): Unit {
-    let ctx = testContext()
+    let ctx = toastTestContext()
     let layer = ToastLayer(Toaster())
     @Expect(!layer.participatesInLayout())
     @Expect(layer.measure(ctx, Size(300.0, 200.0)).h, Float32(0.0))

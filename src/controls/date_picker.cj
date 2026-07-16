@@ -1,7 +1,7 @@
 package cui.controls
 
 import sdl.{FontSizes, IconName, Key, MouseButton, Pen, Rect, Size, SurfaceStyle, UiEvent, clampF32, drawIcon}
-import cui.core.{Bindable, CalendarDate, CUI_CONTROL_H, CursorShape, Overlay, State, UiContext, Widget,
+import cui.core.{Bindable, CUI_CONTROL_H, CursorShape, Overlay, State, UiContext, Widget,
     resolveControlKey, claimHoverIfInside, drawSurface, emit, localState, registerFocusable}
 
 private let DP_FIELD_W: Float32 = 176.0
