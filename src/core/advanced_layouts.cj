@@ -355,7 +355,10 @@ public class ScrollView <: Widget {
     }
 
     public func draw(ctx: UiContext): Unit {
-        ctx.renderer.pushClip(frame)
+        // Clip exactly on the scroll axis, but give the cross axis shadow clearance: a card at the
+        // viewport edge keeps its rounded soft halo instead of having it sliced off vertically.
+        ctx.renderer.pushClip(Rect(frame.x - CUI_SHADOW_CLEARANCE, frame.y, frame.w + 2.0 * CUI_SHADOW_CLEARANCE,
+            frame.h))
         child.draw(ctx)
         ctx.renderer.popClip()
         drawVerticalScrollBar(ctx, frame, scrollOffset.value, contentHeight, frame.h, active: scrollBar.dragging(ctx))

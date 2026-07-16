@@ -272,7 +272,10 @@ public class ReorderableList <: Widget {
                 radius: ctx.theme.controlRadius, borderWidth: 1.0, shadow: ctx.theme.shadow, shadowOffsetY: 5.0))
         }
         drawHandle(ctx, Rect(frame.x, top, REORDER_HANDLE_W, rowHeight), lifted)
-        ctx.renderer.pushClip(rowRect)
+        // The slot clip is widened by the shadow clearance so a card row's soft halo wraps its
+        // rounded corners instead of being sliced off at the slot boundary; row content itself is
+        // slot-sized, so only the halo occupies the margin.
+        ctx.renderer.pushClip(rowRect.inset(-CUI_SHADOW_CLEARANCE))
         rows[i].draw(ctx)
         ctx.renderer.popClip()
     }

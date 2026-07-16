@@ -135,13 +135,16 @@ public class LazyColumn <: Widget {
     public func draw(ctx: UiContext): Unit {
         let content = lazyContentHeight(count, itemHeight, spacing)
         let stride = itemHeight + spacing
-        ctx.renderer.pushClip(frame)
+        // Exact on the scroll axis, shadow clearance on the cross axis (see CUI_SHADOW_CLEARANCE).
+        ctx.renderer.pushClip(Rect(frame.x - CUI_SHADOW_CLEARANCE, frame.y, frame.w + 2.0 * CUI_SHADOW_CLEARANCE,
+            frame.h))
         for (pair in visibleItems) {
             let (index, widget) = pair
-            // Clip each row to its own bounds (intersected with the viewport) so a row whose content
-            // exceeds itemHeight is truncated rather than bleeding over its neighbour.
+            // Clip each row to its own bounds plus shadow clearance (intersected with the viewport):
+            // grossly oversized content is still truncated near its slot, while a card row's soft
+            // halo wraps its corners instead of being cut into hard-edged bands at the slot line.
             let rowRect = Rect(frame.x, frame.y - frameScroll + Float32(index) * stride, frame.w, itemHeight)
-            ctx.renderer.pushClip(rowRect)
+            ctx.renderer.pushClip(rowRect.inset(-CUI_SHADOW_CLEARANCE))
             widget.draw(ctx)
             ctx.renderer.popClip()
         }

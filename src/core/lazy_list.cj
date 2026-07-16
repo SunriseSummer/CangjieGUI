@@ -115,11 +115,15 @@ public class LazyList <: Widget {
 
     public func draw(ctx: UiContext): Unit {
         let content = rowTops[count]
-        ctx.renderer.pushClip(frame)
+        // Exact on the scroll axis, shadow clearance on the cross axis (see CUI_SHADOW_CLEARANCE).
+        ctx.renderer.pushClip(Rect(frame.x - CUI_SHADOW_CLEARANCE, frame.y, frame.w + 2.0 * CUI_SHADOW_CLEARANCE,
+            frame.h))
         for (pair in visibleItems) {
             let (index, widget) = pair
+            // Row clip widened by the shadow clearance so a card row's halo stays rounded; gross
+            // overflow beyond the clearance is still truncated (intersected with the viewport).
             let rowRect = Rect(frame.x, frame.y - frameScroll + rowTops[index], frame.w, max(0.0, heightOf(index)))
-            ctx.renderer.pushClip(rowRect)
+            ctx.renderer.pushClip(rowRect.inset(-CUI_SHADOW_CLEARANCE))
             widget.draw(ctx)
             ctx.renderer.popClip()
         }
