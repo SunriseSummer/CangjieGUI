@@ -2,7 +2,9 @@ package cui.core
 
 import sdl.{Rect, Size, UiEvent}
 
-private let LAYOUT_UNBOUNDED: Float32 = 999936.0
+// Effectively-infinite extent offered to a child during measure; shared by the scrolling and
+// collapsible containers (Accordion) that size a child to its natural content.
+let LAYOUT_UNBOUNDED: Float32 = 999936.0
 
 /** Layers children back-to-front and aligns each child inside the same frame. */
 public class ZStack <: Widget {

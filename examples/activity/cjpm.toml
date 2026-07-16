@@ -1,0 +1,9 @@
+[package]
+cjc-version = "1.0.5"
+name = "cui_activity"
+version = "0.1.0"
+output-type = "executable"
+description = "CUI RichText file-activity feed example."
+
+[dependencies]
+cui = { path = "../.." }

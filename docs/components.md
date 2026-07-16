@@ -134,7 +134,62 @@ ScrollView(key!: ?String = None) { ... }
 
 用法：溢出时在右侧预留滚动条轨道（不遮挡内容），滑块可拖动、轨道可翻页、支持滚轮。
 
-底层另有 `ScrollBar(dragId: String)` 辅助类（`press`/`drag`/`dragging` 方法），供自定义可滚动控件复用滚动条的命中与拖动逻辑；它不是可直接置入树的组件。
+底层另有 `ScrollBar(dragId: String)` 辅助类（`press`/`drag`/`dragging` 方法），供自定义可滚动控件复用滚动条的命中与拖动逻辑；其横向对应物为 `HScrollBar(dragId: String)`（同一组方法，作用于横轴，`LazyRow` 的底部滚动条即由它驱动）。二者都不是可直接置入树的组件。
+
+### SplitView
+
+分栏容器：以可拖动的分隔条在两个窗格间分配空间，横向（并排，竖直分隔条）或纵向（上下，水平分隔条）。
+可嵌套以构成多区布局（如导航｜编辑｜信息）。
+
+```cangjie
+SplitView(axis!: Axis = Axis.Horizontal, ratio!: ?Bindable<Float32> = None, initialRatio!: Float32 = 0.5,
+    minFirst!: Float32 = 96.0, minSecond!: Float32 = 96.0, dividerThickness!: Float32 = 8.0,
+    key!: ?String = None, first!: () -> Unit, second!: () -> Unit)
+```
+
+- axis!：分栏方向。`Horizontal` 左右分栏、拖动分隔条左右调整；`Vertical` 上下分栏、上下调整。
+- ratio!：第一窗格占内容（除去分隔条厚度）的比例（0~1）；缺省由视图身份内部保留（`initialRatio` 为初值），
+  传入 `Bindable<Float32>` 则由外部持有以便持久化或联动。
+- minFirst! / minSecond!：两窗格各自的最小逻辑像素；拖动到此即止。容器太小容纳不下两个最小值时，
+  自动退化为按比例分配，任一窗格都不会塌缩为零。
+- dividerThickness!：分隔条厚度（逻辑像素）。
+- key!：视图身份，缺省按构建序派生。
+- first! / second!：两个窗格各为独立的构建块，块内可声明任意多个组件（自动纵向堆叠），无需再包容器。
+
+分隔条是位于两窗格之间的键盘焦点停靠点：聚焦后沿分栏轴的方向键微调（横向 Left/Right、纵向 Up/Down），
+悬停或拖动时请求对应的横向/纵向调整光标。
+
+```cangjie
+SplitView(axis: Axis.Horizontal, ratio: model.sidebarRatio, minFirst: 170.0, minSecond: 360.0,
+    first: {=> navigator() }) {=> editor() }
+```
+
+### Accordion
+
+折叠面板：若干可展开/收起的分区，各有可点击的标题（带展开箭头）与展开时显示的内容体。适合设置分组、
+FAQ、属性检查器。`single` 为真时展开一个分区自动收起其它（手风琴），否则各分区独立开合。
+
+```cangjie
+Accordion(sections: Array<AccordionSection>, single!: Bool = false,
+    expanded!: ?State<HashSet<Int64>> = None, initiallyExpanded!: Array<Int64> = [], key!: ?String = None)
+```
+
+- sections：各分区（标题 + 内容体构建块）。
+- single!：是否单开（手风琴模式）。
+- expanded!：可选外部展开集（一组已展开分区下标）；缺省由视图身份内部保留。
+- initiallyExpanded!：初始展开的分区下标（仅内部保留时作初值）。
+- key!：可选身份，缺省按构建序派生。
+
+每个分区标题是键盘焦点停靠点：聚焦后 Enter/Space 展开收起，`Tab` 遍历标题与展开体内的控件。仅展开的
+分区体会被构建，故收起分区的局部状态在重新展开时重置。
+
+### AccordionSection
+
+`Accordion` 的一个分区：标题与其展开时构建的内容体（尾随闭包）。
+
+```cangjie
+AccordionSection("外观") {=> appearanceBody() }
+```
 
 ### Spacer
 
@@ -188,6 +243,54 @@ LazyColumn.of<T>(data: Array<T>, itemHeight: Float32, spacing!: Float32 = 0.0,
 LazyColumn.of(users, 56.0, key: {u => "u${u.id}"}, id: "users") { u => userRow(u) }
 ```
 
+### LazyRow
+
+定宽列的横向惰性列表：`LazyColumn` 的横向对应物，只物化视口附近的列，成本恒为一屏，适合超长横向条
+（日期带、封面墙、时间轴）。鼠标滚轮横向滚动，内容溢出时底部出现滚动条。
+
+```cangjie
+LazyRow(count: Int64, itemWidth: Float32, spacing!: Float32 = 0.0,
+    scroll!: ?State<Float32> = None, key!: ?((Int64) -> String) = None,
+    id!: ?String = None) { i => ... }
+```
+
+- count：列总数；itemWidth：每列宽度（vp）；spacing!：列间距。
+- scroll! / key! / id!：同 `LazyColumn`（滚动状态、稳定列键、列表身份）。
+- 尾随闭包：`i => 列内容`，按列索引构建。
+
+静态工厂（数据驱动）：
+
+```cangjie
+LazyRow.of<T>(data: Array<T>, itemWidth: Float32, spacing!: Float32 = 0.0,
+    scroll!: ?State<Float32> = None, key!: ?((T) -> String) = None,
+    id!: ?String = None) { item => ... }
+```
+
+### LazyList
+
+变高行的纵向惰性列表：`LazyColumn` 的变高对应物，每行高度由 `heightOf(index)` 给出，适合行高随内容变化
+的场景（聊天气泡、评论、图文卡片）。行偏移是高度的累加和、可见窗口由二分定位，故只构建可见行，偏移计算
+是一次对高度值的轻量遍历。
+
+```cangjie
+LazyList(count: Int64, heightOf: (Int64) -> Float32, spacing!: Float32 = 0.0,
+    scroll!: ?State<Float32> = None, key!: ?((Int64) -> String) = None,
+    id!: ?String = None) { i => ... }
+```
+
+- count：行总数；heightOf：由行索引取该行高度，须 O(1)（取存好的或估算的高度，勿当场量文本），
+  且要与该行实际绘制高度吻合，否则会重叠或留隙。
+- spacing! / scroll! / key! / id!：同 `LazyColumn`。
+- 尾随闭包：`i => 行内容`，按行索引构建。
+
+静态工厂（数据驱动，高度由每项抽取）：
+
+```cangjie
+LazyList.of<T>(data: Array<T>, heightOf: (T) -> Float32, spacing!: Float32 = 0.0,
+    scroll!: ?State<Float32> = None, key!: ?((T) -> String) = None,
+    id!: ?String = None) { item => ... }
+```
+
 ### LazyGrid
 
 数据驱动、按行窗口化的等宽网格（一行是一个 `Grid` 骑在 `LazyColumn` 上），单元格可为任意组件。
@@ -200,6 +303,28 @@ LazyGrid<T>(data: Array<T>, columns: Int64, itemHeight: Float32,
 
 - columns：列数；columnSpacing! 为列间距，spacing! 为行间距。
 - 尾随闭包：`item => 单元格内容`。
+
+### ReorderableList
+
+可拖动重排的定高列表：每行左侧有拖动手柄，按住手柄上下拖动即改变顺序——拖动时其它行让开、被拖行悬浮，
+松手回调 `onMove(from, to)` 由调用方对自己的数据施加移动，下一帧显示新序。行是普通组件，手柄以外的按压
+落到行内容（其自身的控件照常工作），行身份随 `key` 迁移。适合完整可见的中小列表。
+
+```cangjie
+ReorderableList(count: Int64, rowHeight: Float32, onMove: (Int64, Int64) -> Unit,
+    spacing!: Float32 = 6.0, key!: ?((Int64) -> String) = None, id!: ?String = None) { i => ... }
+```
+
+- count：行数；rowHeight：定高（vp）；onMove：`(from, to)` 提交回调，调用方据此重排数据。
+- spacing! / key! / id!：行间距、稳定行键、列表身份。
+- 尾随闭包：`i => 行内容`。
+
+静态工厂（数据驱动，`onMove` 收到数组下标）：
+
+```cangjie
+ReorderableList.of<T>(data: Array<T>, rowHeight: Float32, onMove: (Int64, Int64) -> Unit,
+    spacing!: Float32 = 6.0, key!: ?((T) -> String) = None, id!: ?String = None) { item => ... }
+```
 
 ### ForEach
 
@@ -257,6 +382,30 @@ Label(text: String, muted!: Bool = false, align!: TextAlign = TextAlign.Leading,
 
 修饰符：`muted()`、`muted(Bool)`、`textAlign(TextAlign)`、`foregroundColor(Color)`、`fontSize(Length | Float32)`、`maxLines(Int64)`（须大于 0）、`wrap()`。
 
+### RichText
+
+内联样式文本：由若干 `RichSpan`（着色文本段与内联图标）拼成一行，超宽自动换行到多行。文本段共享同一
+字号、以颜色区分（渲染层无粗斜体、无逐段基线度量），图标随文流动。是 `Label`（单一样式）的多样式、
+图文混排对应物。
+
+```cangjie
+RichText(spans: Array<RichSpan>, fontSize!: Length = Length(FontSizes.BODY, LengthUnit.Fp))
+```
+
+- spans：样式段数组；fontSize! 所有文本段共享的字号。
+
+修饰符：`fontSize(Length | Float32)`。单行时按内容收缩（便于行内嵌入），换行后填满宽度。
+
+### RichSpan
+
+`RichText` 的一段：着色文本或内联图标。由工厂构造。
+
+```cangjie
+RichSpan.text(text: String, color!: ?Color = None) // 默认或指定颜色的文本段
+RichSpan.muted(text: String)                        // 次要（弱化）文字色
+RichSpan.icon(icon: IconName, color!: ?Color = None) // 内联图标，按行高取尺寸
+```
+
 ### Icon
 
 矢量图标，来自内置 `IconName` 图标集。
@@ -282,6 +431,70 @@ Divider(axis!: Axis = Axis.Horizontal, color!: ?Color = None)
 - color!：线色。
 
 修饰符：`axis(Axis)`、`foregroundColor(Color)`；`color(Color)` 为已弃用别名。
+
+### StepIndicator
+
+横向步骤条：多步流程（结账、引导、向导）的进度指示。一排编号节点由连接线相连，`current` 之前的步为已完成
+（实心并打勾）、`current` 高亮、之后的步置灰；每步标签在节点下方。以展示为主——`current` 由流程自身的
+上一步/下一步驱动；传 `onSelect` 可让已到达的步骤（下标 ≤ current）可点击，以跳回某个已完成的步骤。
+
+```cangjie
+StepIndicator(steps: Array<String>, current: Int64, onSelect!: ?(Int64) -> Unit = None, key!: ?String = None)
+```
+
+- steps：各步标签；current：当前步下标（0 起）。
+- onSelect!：可选，点击某步回调（仅对下标 ≤ current 的已达步骤触发）；可点节点悬停显示交互光标。
+- key!：可选身份（用于悬停光标协议；缺省按构建顺序自动派生）。
+
+### Pagination
+
+分页导航：为长列表、表格、搜索结果等分页内容提供页码切换。一排页码按钮夹在上一页/下一页箭头之间，始终显示
+首页与末页、当前页附近 `window` 个页码，中间的空缺以省略号折叠。点页码跳到该页，箭头步进一页并在两端自动禁用。
+`current` 是 0 起的当前页，双向绑定、显示为 1 起。总页数变化（如过滤后）时，把绑定的页码重置为 0 即可回到首页。
+
+```cangjie
+Pagination(pageCount: Int64, current: Bindable<Int64>, window!: Int64 = 1, key!: ?String = None)
+```
+
+- pageCount：总页数（至少 1）；current：当前页（0 起），双向绑定。
+- window!：当前页两侧各显示的页码数（默认 1，即当前页 ± 1）。
+- key!：可选身份（用于悬停光标协议；缺省按构建顺序自动派生）。可点的页码与未禁用的箭头悬停显示交互光标。
+
+### Breadcrumb
+
+面包屑路径导航：一排以 chevron 分隔的层级段（如 首页 › 文档 › 项目）。末段是当前位置，强调显示、不可点；
+其前各段是链接，点击回调 `onSelect(下标)`。设了 `maxItems` 且路径更长时，中间折叠为省略号，保留首段与末尾若干段。
+不传 `onSelect` 即为纯展示。
+
+```cangjie
+Breadcrumb(segments: Array<String>, onSelect!: ?(Int64) -> Unit = None, maxItems!: Int64 = 0, key!: ?String = None)
+```
+
+- segments：各层级名（末项为当前位置）；onSelect!：点击某段回调（仅对非末段的链接触发）。
+- maxItems!：最多显示的实际段数（0 = 全显示）；超出时中间折叠为省略号。
+
+### Badge
+
+状态徽标：圆角药丸形，柔和底色 + 同色文字，纯展示。用于状态、分类、计数、标签等。颜色由 `kind` 决定：
+`Neutral`（中性，随主题 mutedText）、`Accent`（主题强调）、`Danger`（随主题 danger）、`Info`/`Success`/`Warning`
+（固定语义蓝/绿/黄）。徽标按文字宽度自适应。
+
+```cangjie
+Badge(text: String, kind!: BadgeKind = BadgeKind.Neutral)
+```
+
+- text：徽标文字；kind!：语义色，`BadgeKind` 取 `Neutral`/`Accent`/`Info`/`Success`/`Warning`/`Danger`。
+
+### Chip
+
+可选过滤标签：圆角药丸，绑定 `Bindable<Bool>`。点击（或聚焦后 Space/Enter）切换选中；选中时以强调色填充，
+未选中为描边字段。常成排用作切换式过滤器。
+
+```cangjie
+Chip(text: String, selected: Bindable<Bool>, key!: ?String = None)
+```
+
+- text：标签文字；selected：绑定的选中态（双向）；key! 可选身份。
 
 ### ImageView
 
@@ -424,6 +637,63 @@ Dropdown(items: Array<String>, selected: Bindable<Int64>, key!: ?String = None)
 
 - items：选项；selected 选中索引；key! 可选身份。
 
+### DatePicker
+
+日期选择器。闭合态显示所绑定的日期，点击/Enter/Space/Down 弹出月历浮层（下方放不下翻到上方）；
+点选某日即选中并关闭，表头箭头翻月，外点/Esc 关闭。
+
+```cangjie
+DatePicker(selected: Bindable<CalendarDate>, key!: ?String = None)
+```
+
+- selected：绑定的日期（`CalendarDate`）；key! 可选身份（缺省按构建序派生）。
+
+浮层内键盘：方向键移动高亮日（越月自动翻页），Home/End 上/下翻月，Enter/Space 确认高亮日，Esc 关闭。
+绑定值恒为合法日期（见 `CalendarDate`）。
+
+### CalendarDate
+
+一个只含年、月、日的日历日（无时间、无时区），是 `DatePicker` 绑定的值类型。构造即归一：月钳到
+1–12、日钳到当月天数，故不会产生 2 月 30 日之类的非法日期。日历运算（闰年、月长、星期、加日/加月）
+直接按公历计算、纯函数且确定，仅 `today()` 读系统时钟。
+
+```cangjie
+CalendarDate(year: Int64, month: Int64, day: Int64)
+```
+
+方法：`today()`（静态，取今日）、`daysInMonth()`、`weekdayIndex()`（0=周日..6=周六）、
+`firstWeekdayIndex()`、`withDay(d)`、`addingMonths(delta)`（加月并钳日）、`addingDays(delta)`（精确加日、跨月跨年）、
+`iso()`（`YYYY-MM-DD`）、`compareTo(other)`（返回两日相差天数）、`==`/`!=`。
+
+### TimePicker
+
+时间选择器。闭合态显示所绑定的时间，点击/Enter/Space/Down 弹出时/分网格浮层（下方放不下翻到上方）；
+浮层含全部 24 小时与按 `minuteStep` 间隔的分钟，点小时或分钟即实时更新绑定值并保持浮层打开（选一个时间需时、分两步），
+故外点/Esc/Enter/Tab 关闭。
+
+```cangjie
+TimePicker(selected: Bindable<TimeOfDay>, minuteStep!: Int64 = 5, hour12!: Bool = false, key!: ?String = None)
+```
+
+- selected：绑定的时间（`TimeOfDay`）；minuteStep!：分钟网格间隔（默认 5）；hour12!：闭合态是否用 12 小时制显示；key! 可选身份。
+
+浮层内键盘：上/下按一个 `minuteStep` 增减，左/右按整小时增减（均跨午夜环绕），Enter/Space/Esc/Tab 关闭。
+绑定值恒为合法 24 小时时间（见 `TimeOfDay`）。
+
+### TimeOfDay
+
+一个只含时（0–23）、分（0–59）的时刻（无日期、无时区），是 `TimePicker` 绑定的值类型。构造即归一：
+自午夜起的总分钟对一天取模落到 0–1439，故跨午夜的运算干净环绕，不会产生 24:00 或 10:75 之类的非法时刻。
+运算为纯整数分钟数、与平台时钟无关，仅 `now()` 读系统时钟。
+
+```cangjie
+TimeOfDay(hour: Int64, minute: Int64)
+```
+
+方法：`now()`（静态，取当前时刻）、`totalMinutes()`（自午夜起分钟数）、`withHour(h)`、`withMinute(m)`、
+`addingMinutes(delta)`/`addingHours(delta)`（跨午夜环绕）、`format()`（24 小时 `HH:MM`）、
+`format12()`（12 小时含 AM/PM）、`compareTo(other)`（返回相差分钟）、`==`/`!=`。
+
 ---
 
 ## 七、数值控件
@@ -473,6 +743,29 @@ ProgressBar(value: Observable<Float32>, lower!: Float32 = 0.0, upper!: Float32 =
 - value：进度来源；lower! / upper! 取值范围。
 
 修饰符：`range(lower, upper)`。
+
+### ProgressRing
+
+环形进度（只读展示）：一圈轨道 + 从顶部顺时针扫到 `value`（0…1 分数，越界钳回）的弧，环心可显示百分比。
+弧是圆角折线，任意尺寸都平滑，是线性 `ProgressBar` 的圆形对应物。
+
+```cangjie
+ProgressRing(value: Float32, diameter!: Float32 = 72.0, thickness!: Float32 = 8.0, showLabel!: Bool = true)
+```
+
+- value：完成度分数（0…1，自动钳定）；diameter!：环直径；thickness!：环粗；showLabel!：是否显示环心百分比。
+
+### Rating
+
+评分控件。一排圆点，填充到当前分、其后置空，绑定 0…count 的整数分（默认 5 点）。默认可交互：点某点评到该位，
+再点当前分清除为 0，悬停预览填充；聚焦后方向键增减（左/下减、右/上加），Home 清零、End 满分。传 `readonly`
+则为纯展示，不取焦点、不响应输入。
+
+```cangjie
+Rating(value: Bindable<Int64>, count!: Int64 = 5, readonly!: Bool = false, key!: ?String = None)
+```
+
+- value：绑定的分值（0…count）；count!：点数（默认 5）；readonly!：是否只读展示；key! 可选身份。
 
 ---
 
@@ -538,6 +831,38 @@ ListView(items: Array<String>, selected: Bindable<Int64>, scroll!: ?State<Float3
 
 修饰符：`scrollState(State<Float32>)`。
 
+### TreeView
+
+层级列表，带展开/折叠——文件浏览器、大纲、导航树。以 `TreeNode` 根节点描述层级，视图把当前展开的节点
+扁平成行并窗口化（只绘制视口附近行，大树成本恒为一屏）。
+
+```cangjie
+TreeView(roots: Array<TreeNode>, selected: Bindable<String>, scroll!: ?State<Float32> = None,
+    expanded!: ?State<HashSet<String>> = None, initiallyExpanded!: Array<String> = [], key!: ?String = None)
+```
+
+- roots：树的根节点数组。
+- selected：选中的节点 id（用稳定 id 而非行索引——展开/折叠会移动其后所有行）；空串表示未选中。
+- scroll!：可选外部滚动状态（缺省按身份保留偏移）。
+- expanded!：可选外部展开集（一组已展开的节点 id）；缺省由视图身份内部保留。
+- initiallyExpanded!：初始展开的节点 id（仅在内部保留展开集时作为初值）。
+- key!：可选身份，缺省按构建序派生。
+
+键盘（聚焦后）：↑↓ 在可见行间移动、Home/End 到两端、→ 展开折叠节点并步入、← 折叠展开节点并步出到父级、
+空格/Enter 切换当前节点。点击行选中、点击箭头切换展开。
+
+### TreeNode
+
+`TreeView` 的节点：稳定 `id`、显示 `label`、可选前导 `icon` 与 `children`。id 须全树唯一（视图以其为键管理展开与选择）。
+
+```cangjie
+TreeNode(id: String, label: String, children!: Array<TreeNode> = [], icon!: ?IconName = None)
+```
+
+```cangjie
+TreeView(roots, selected, initiallyExpanded: ["src", "src/core"])
+```
+
 ### Table
 
 多列数据表。固定表头、窗口化滚动；点击列头排序（再次反向，数值列按数值），行选择存原始行索引故排序后跟随；`Tab` + 方向键/Home/End 导航。
@@ -601,7 +926,7 @@ TabView(labels: Array<String>, selected: Bindable<Int64>, key!: ?String = None) 
 
 ## 十、浮层
 
-`Dropdown`/`ComboBox` 弹出列表、`ContextMenu` 菜单、`Modal` 对话框均由浮层栈承载，可嵌套（对话框内可再开下拉）。
+`Dropdown`/`ComboBox` 弹出列表、`DatePicker` 月历、`ContextMenu`/`MenuBar` 菜单、`Modal` 对话框均由浮层栈承载，可嵌套（对话框内可再开下拉）。
 
 ### Tooltip
 
@@ -613,25 +938,71 @@ Tooltip(text!: String) { ... }
 
 - text!：提示文字；尾随闭包为被包裹的内容。
 
-### ContextMenu
+### Toaster 与 ToastLayer
 
-右键菜单。为子内容附加右键菜单，指针处弹出，选中运行动作并关闭、外点/Esc 取消、方向键与悬停移动高亮。
+瞬态通知（Toast）。`Toaster` 是应用级控制器，从任意处 `show` 一条通知；在树中放一个 `ToastLayer(toaster)`
+负责在右下角自底向上堆叠渲染、计时、滑入与淡出。`ToastLayer` 不占布局空间、不吞事件，并在有通知时驱动
+帧刷新（时间动画所需），故置于根 `ZStack` 末层即浮于内容之上。
 
 ```cangjie
-ContextMenu(items!: Array<MenuItem>) { ... }
+let toaster = Toaster()
+toaster.show("已保存", kind: ToastKind.Success, durationMs: 3200)
+
+ZStack {
+    appContent()
+    ToastLayer(toaster)
+}
+```
+
+- `Toaster.show(message, kind!: ToastKind = Info, durationMs!: UInt64 = 3200)`：弹一条通知。
+- `ToastKind`：`Info`/`Success`/`Warning`/`Error`，决定左侧强调条颜色。
+- `ToastLayer(toaster)`：渲染与计时；每帧按 `FrameInfo.deltaMs` 老化通知、到期移除。
+
+### ContextMenu
+
+右键菜单。为子内容附加右键菜单，指针处弹出，选中运行动作并关闭、外点/Esc 取消、方向键与悬停移动高亮
+（跳过分隔线与禁用项）。菜单项可带快捷键提示、禁用或为分隔线。
+
+```cangjie
+ContextMenu(items!: Array<MenuItem>, key!: ?String = None) { ... }
 ```
 
 - items!：菜单项；尾随闭包为附加菜单的内容。
+- key!：可选身份。缺省按构建顺序派生；当兄弟结构会动态增减时传入固定 key，保证打开状态与弹出位置不串位。
+
+### MenuBar
+
+应用菜单栏。横向排列若干顶层标题，点击展开其下拉菜单（浮于树上）；菜单打开时指针滑过其他标题即切换，
+选中项运行动作并关闭、外点/Esc 关闭。是键盘焦点停靠点：聚焦后 Left/Right 移动标题、Enter/Space/Down
+打开；打开后 Up/Down 移动高亮（跳过分隔线与禁用项）、Left/Right 切换菜单、Enter/Space 执行。
+
+```cangjie
+MenuBar(menus: Array<Menu>, key!: ?String = None)
+```
+
+- menus：顶层菜单数组；key! 可选身份（缺省按构建序派生）。
+
+### Menu
+
+`MenuBar` 的一个顶层菜单：标题与其下拉的菜单项。
+
+```cangjie
+Menu(title: String, items: Array<MenuItem>)
+```
 
 ### MenuItem
 
-`ContextMenu` 的菜单项。
+`ContextMenu` 与 `MenuBar` 共用的菜单项：文字、选中动作，可选右对齐快捷键提示与禁用标志；
+`MenuItem.separator()` 构造一条不可选中的分隔线。
 
 ```cangjie
-MenuItem(label: String, action: () -> Unit)
+MenuItem(label: String, action: () -> Unit, shortcut!: String = "", enabled!: Bool = true)
+MenuItem.separator()
 ```
 
 - label：条目文字；action 选中时执行。
+- shortcut!：右对齐的快捷键提示文字（仅展示，不绑定实际按键）。
+- enabled!：为 `false` 时置灰、不可高亮、不执行（可随状态动态传入）。
 
 ### Modal
 
@@ -646,7 +1017,7 @@ Modal(presented: Bindable<Bool>, onDismiss!: ?() -> Unit = None) { ... }
 
 ---
 
-## 十一、事件与帧包装器
+## 十一、事件、帧与动画
 
 ### EventHandler
 
@@ -667,3 +1038,19 @@ FrameHandler(onFrame!: (FrameInfo) -> Unit) { ... }
 ```
 
 - onFrame!：每帧回调；尾随闭包为被包裹内容。
+
+### Spring
+
+弹簧动画原语（非组件，控件过渡的底层驱动）。持有一个朝目标收敛的浮点值，按临界阻尼弹簧步进，
+开关、勾选、单选、进度、分段等控件的过渡都由它实现；自定义控件可复用同一原语。
+
+```cangjie
+Spring(value: Float32, stiffness!: Float32 = 210.0, damping!: Float32 = 24.0)
+```
+
+- value：初始值；stiffness! / damping!：弹簧刚度与阻尼（默认为控件过渡调校的临界阻尼组合）。
+
+方法：`animate(ctx, target!)` 为绘制期一步到位的常用形式——重定目标、按本帧时长步进，未收敛时自动
+`ctx.requestFrame()` 保证脏帧循环不冻结动画，返回新值；`animate(target!, deltaMs!)` 为无 ctx 的手动步进；
+`target(value)` 重定目标、`reset(value)` 立即就位、`tick(deltaMs)` 仅步进、`settled()` 是否已收敛；
+`value` 属性读取当前值。

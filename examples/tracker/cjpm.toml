@@ -1,0 +1,9 @@
+[package]
+cjc-version = "1.0.5"
+name = "cui_tracker"
+version = "0.1.0"
+output-type = "executable"
+description = "CUI Badge/Chip issue-tracker example."
+
+[dependencies]
+cui = { path = "../.." }

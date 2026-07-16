@@ -30,6 +30,8 @@ public class DesktopApp {
     private var baseCursor: ?Cursor = None
     private var pointerCursor: ?Cursor = None
     private var textCursor: ?Cursor = None
+    private var resizeHCursor: ?Cursor = None
+    private var resizeVCursor: ?Cursor = None
     private var appliedShape: ?CursorShape = None
     // The caret rectangle last forwarded to the OS for IME anchoring (logical pixels).
     private var appliedInputAnchor: ?Rect = None
@@ -345,6 +347,8 @@ public class DesktopApp {
             case CursorShape.Default => ensureCursor(SystemCursor.Default)
             case CursorShape.Interactive => ensurePointerCursor()
             case CursorShape.Text => ensureTextCursor()
+            case CursorShape.ResizeH => ensureResizeHCursor()
+            case CursorShape.ResizeV => ensureResizeVCursor()
         }
     }
 
@@ -372,6 +376,24 @@ public class DesktopApp {
             case None =>
                 textCursor = createCursor(SystemCursor.Text)
                 textCursor
+        }
+    }
+
+    private func ensureResizeHCursor(): ?Cursor {
+        match (resizeHCursor) {
+            case Some(cursor) => Some(cursor)
+            case None =>
+                resizeHCursor = createCursor(SystemCursor.EwResize)
+                resizeHCursor
+        }
+    }
+
+    private func ensureResizeVCursor(): ?Cursor {
+        match (resizeVCursor) {
+            case Some(cursor) => Some(cursor)
+            case None =>
+                resizeVCursor = createCursor(SystemCursor.NsResize)
+                resizeVCursor
         }
     }
 

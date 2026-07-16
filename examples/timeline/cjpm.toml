@@ -1,0 +1,9 @@
+[package]
+cjc-version = "1.0.5"
+name = "cui_timeline"
+version = "0.1.0"
+output-type = "executable"
+description = "CUI LazyRow horizontal date-strip example."
+
+[dependencies]
+cui = { path = "../.." }

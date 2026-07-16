@@ -13,6 +13,7 @@ public enum IconName {
     | Trash
     | Brush
     | Calendar
+    | Clock
     | Process
     | Calculator
     | ChevronLeft
@@ -38,6 +39,7 @@ public func drawIcon(r: Renderer, icon: IconName, rect: Rect, color: Color, weig
         case IconName.Trash => drawTrashIcon(r, rect, pen)
         case IconName.Brush => drawBrushIcon(r, rect, pen)
         case IconName.Calendar => drawCalendarIcon(r, rect, pen)
+        case IconName.Clock => drawClockIcon(r, rect, pen)
         case IconName.Process => drawProcessIcon(r, rect, pen)
         case IconName.Calculator => drawCalculatorIcon(r, rect, pen)
         case IconName.ChevronLeft => drawChevronIcon(r, rect, pen, 15.0, 9.0)
@@ -123,6 +125,13 @@ private func drawCalendarIcon(r: Renderer, rect: Rect, pen: Pen): Unit {
     r.strokeLine(x(rect, 16.0), y(rect, 3.0), x(rect, 16.0), y(rect, 7.0), pen)
     r.fillCircle(x(rect, 9.0), y(rect, 15.0), s(rect, 1.3), pen.color)
     r.fillCircle(x(rect, 14.0), y(rect, 15.0), s(rect, 1.3), pen.color)
+}
+
+// A round clock face with a long minute hand pointing up and a short hour hand pointing right (~3 o'clock).
+private func drawClockIcon(r: Renderer, rect: Rect, pen: Pen): Unit {
+    r.strokeCircle(x(rect, 12.0), y(rect, 12.0), s(rect, 8.5), pen, segments: 32)
+    r.strokeLine(x(rect, 12.0), y(rect, 12.0), x(rect, 12.0), y(rect, 7.0), pen)
+    r.strokeLine(x(rect, 12.0), y(rect, 12.0), x(rect, 15.5), y(rect, 13.5), pen)
 }
 
 private func drawProcessIcon(r: Renderer, rect: Rect, pen: Pen): Unit {

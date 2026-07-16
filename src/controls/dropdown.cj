@@ -140,8 +140,12 @@ public class Dropdown <: Widget {
                 }
                 close(ctx) // select-and-close, or dismiss on an outside click
                 true
-            case UiEvent.MouseMove(_, y) =>
-                // While the thumb is grabbed the move scrolls the list; hover falls through.
+            case UiEvent.MouseMove(x, y) =>
+                // While the thumb is grabbed the move scrolls the list; hover falls through, though the
+                // popup still claims the default cursor so a control beneath cannot set its shape through it.
+                if (popup.contains(x, y)) {
+                    ctx.claimHover(overlayOwner, CursorShape.Default)
+                }
                 popupBar.drag(ctx, listRect(popup), popupScroll, contentHeight(), listHeight(popup), y)
             case UiEvent.MouseWheel(_, wheelY, x, y) =>
                 if (popup.contains(x, y)) {

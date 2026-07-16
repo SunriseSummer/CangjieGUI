@@ -1,0 +1,9 @@
+[package]
+cjc-version = "1.0.5"
+name = "cui_editor"
+version = "0.1.0"
+output-type = "executable"
+description = "CUI MenuBar text-editor example."
+
+[dependencies]
+cui = { path = "../.." }

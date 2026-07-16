@@ -1,0 +1,9 @@
+[package]
+cjc-version = "1.0.5"
+name = "cui_notify"
+version = "0.1.0"
+output-type = "executable"
+description = "CUI Toast notification example."
+
+[dependencies]
+cui = { path = "../.." }

@@ -4,11 +4,11 @@ import std.collection.ArrayList
 import sdl.{Rect, Size, UiEvent}
 
 // Extra rows built above and below the viewport so a one-frame scroll never reveals a blank edge.
-private let LAZY_OVERSCAN: Int64 = 2
+let LAZY_OVERSCAN: Int64 = 2
 
 // The viewport height assumed on the very first frame, before layout has measured the real one — a
 // full-ish screen, so the first frame is populated rather than blank. Layout corrects it at once.
-private let LAZY_DEFAULT_VIEWPORT: Float32 = 720.0
+let LAZY_DEFAULT_VIEWPORT: Float32 = 720.0
 
 /**
  * A vertically scrolling list that materializes only the rows near the viewport. Rows have a fixed
@@ -28,7 +28,6 @@ private let LAZY_DEFAULT_VIEWPORT: Float32 = 720.0
  * the overscan rows keep the edges filled across that one-frame settle.
  */
 public class LazyColumn <: Widget {
-    private let id: String
     private let count: Int64
     private let itemHeight: Float32
     private let spacing: Float32
@@ -58,7 +57,6 @@ public class LazyColumn <: Widget {
         item!: (Int64) -> Unit
     ) {
         let ident = resolveControlKey(id, "LazyColumn")
-        this.id = ident
         this.count = max(0, count)
         this.itemHeight = max(1.0, itemHeight)
         this.spacing = max(0.0, spacing)
@@ -72,8 +70,9 @@ public class LazyColumn <: Widget {
         this.scrollBar = ScrollBar("LazyColumn:${ident}:thumb")
         let content = lazyContentHeight(this.count, this.itemHeight, this.spacing)
         this.frameScroll = clampScrollOffset(this.scrollStateValue.value, content, this.viewportHeightState.value)
-        this.visibleItems = buildVisibleItems(this.id, this.count, this.itemHeight, this.spacing, this.frameScroll,
-            this.viewportHeightState.value, rowKeyOrIndex(key), item)
+        let (first, last) = lazyVisibleRange(this.frameScroll, this.viewportHeightState.value, this.itemHeight,
+            this.spacing, this.count, LAZY_OVERSCAN)
+        this.visibleItems = buildLazyChildren("LazyColumn:${ident}", first, last, lazyKeyOrIndex(key), item)
         emit(this)
     }
 
@@ -250,34 +249,31 @@ internal func lazyVisibleRange(
     (first, last)
 }
 
-// Materializes the visible rows during the build pass, each scoped by `key(rowIndex)` so its local
-// state follows it (across scrolls, and — with a data key — across inserts/reorders); it is dropped
-// when the row scrolls off, so hoist anything that must persist.
-private func buildVisibleItems(
-    id: String,
-    count: Int64,
-    itemHeight: Float32,
-    spacing: Float32,
-    scroll: Float32,
-    viewportH: Float32,
+// Materializes the visible items in `[first, last]` during the build pass, each scoped by
+// `scope:item:key(index)` so its local state follows it (across scrolls, and — with a data key —
+// across inserts/reorders); it is dropped when the item scrolls off, so hoist anything that must
+// persist. Shared by both axes: LazyColumn passes its rows, LazyRow its columns.
+internal func buildLazyChildren(
+    scope: String,
+    first: Int64,
+    last: Int64,
     key: (Int64) -> String,
     item: (Int64) -> Unit
 ): Array<(Int64, Widget)> {
-    let (first, last) = lazyVisibleRange(scroll, viewportH, itemHeight, spacing, count, LAZY_OVERSCAN)
     let built = ArrayList<(Int64, Widget)>()
     var index = first
     while (index <= last) {
-        let rowIndex = index
-        let widget = buildKeyedChild("LazyColumn:${id}:item:${key(rowIndex)}") {=> item(rowIndex)}
-        built.add((rowIndex, widget))
+        let itemIndex = index
+        let widget = buildKeyedChild("${scope}:item:${key(itemIndex)}") {=> item(itemIndex)}
+        built.add((itemIndex, widget))
         index += 1
     }
     built.toArray()
 }
 
-// The effective row-key function: the caller's key, or the row index as a string. The index default
-// reproduces the historical per-row scope key exactly, so index-keyed lists are byte-for-byte unchanged.
-private func rowKeyOrIndex(key: ?((Int64) -> String)): (Int64) -> String {
+// The effective item-key function: the caller's key, or the index as a string. The index default
+// reproduces the historical per-item scope key exactly, so index-keyed lists are byte-for-byte unchanged.
+internal func lazyKeyOrIndex(key: ?((Int64) -> String)): (Int64) -> String {
     match (key) {
         case Some(k) => k
         case None => {index => "${index}"}

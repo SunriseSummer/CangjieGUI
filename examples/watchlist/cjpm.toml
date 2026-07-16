@@ -1,0 +1,9 @@
+[package]
+cjc-version = "1.0.5"
+name = "cui_watchlist"
+version = "0.1.0"
+output-type = "executable"
+description = "CUI Rating movie-watchlist example."
+
+[dependencies]
+cui = { path = "../.." }

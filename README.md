@@ -8,49 +8,25 @@
 - `sdl`：SDL/SDL_ttf 的仓颉安全封装，可脱离 CUI 单独用于游戏和图形软件等。
 - `cui`：在 `sdl` 基础上实现的自渲染、声明式 GUI 框架。
 
-<table>
-    <tr>
-        <td>
-            <img src="https://github.com/user-attachments/assets/fa41c938-ffde-42d8-afb2-7c1df05211cb" />
-        </td>
-        <td>
-            <img src="https://github.com/user-attachments/assets/41f355cd-25db-49b1-b9af-1bc1b01e9711" />
-        </td>
-    </tr>
-    <tr>
-        <td>
-            <img src="https://github.com/user-attachments/assets/387f5237-09b4-4797-a9f4-47bda49c4f0e" />
-        </td>
-        <td>
-            <img src="https://github.com/user-attachments/assets/0e26d146-675e-498b-beee-68ebcb2418b3" />
-        </td>
-    </tr>
-    <tr>
-        <td>
-            <img src="https://github.com/user-attachments/assets/e9f40aa5-8478-416f-baaa-9f1ce5d7356f" />
-        </td>
-        <td>
-            <img src="https://github.com/user-attachments/assets/f1624385-ae74-4c29-8a89-70bb56a1f63f" />
-        </td>
-    </tr>
-</table>
+<img src="./images/gallery.jpg" />
 
 ## 核心能力
 
 - 基于 SDL3 实现自渲染 GUI 引擎。通过 SDL3_ttf 渲染平台字体，完整支持 UTF-8 中文文本。
 - 基于仓颉尾随 lambda、extend、prop 等特性构建声明式 UI 编码范式。
-- 提供 `VStack`、`HStack`、`ZStack`、`Grid`、`FlowRow`、`ScrollView` 与 `Panel` 等布局容器，
-  以及数据驱动、只渲染视口附近行的惰性虚拟化 `LazyColumn`/`LazyGrid`。
-- 提供按钮、文本框、开关、复选框、单选框、选择器、步进器、滑块、进度条、列表、数据表格、分段控件、
-  标签页、下拉和组合框等控件。
-- 提供下拉/右键菜单、提示与模态对话框等浮层，浮层按栈管理、可嵌套，对话框内可继续打开下拉、组合框与右键菜单。
+- 提供 `VStack`、`HStack`、`ZStack`、`Grid`、`FlowRow`、`ScrollView`、`Panel`、可拖动分栏 `SplitView`
+  与折叠面板 `Accordion` 等布局容器，以及数据驱动、只渲染视口附近的惰性虚拟化 `LazyColumn`（定高纵向）、
+  `LazyRow`（定宽横向）、`LazyList`（变高纵向）与 `LazyGrid`（网格）。
+- 提供按钮、文本框、开关、复选框、单选框、选择器、步进器、滑块、进度条、环形进度、评分、状态徽标、过滤标签、
+  步骤条、分页导航、面包屑、列表、数据表格、树视图、日期选择器、时间选择器、拖动重排列表、分段控件、标签页、下拉和组合框等控件。
+- 提供下拉/右键菜单、应用菜单栏、日期选择器、提示、自动淡出的 Toast 通知与模态对话框等浮层，浮层按栈管理、可嵌套，对话框内可继续打开下拉、组合框与右键菜单。
 - 使用有顺序语义的链式修饰器配置尺寸、约束、内边距、表面、弹性、可见性和可用性，支持
   `.px`，`.vp`，`.fp` 尺寸单位表达。
 - 以 `Observable`/`Bindable` 实现状态管理：可写 `State<T>`、带缓存的派生只读 `DerivedState`
   （`derive`/`map`）、双向投影 `Binding`（`project`），控件按读写需要接受对应抽象。
 - 以 `Keyed`、`rememberState`、`ForEach` 明确复杂嵌套树与列表中的局部状态身份，控件交互身份按构建顺序自动唯一。
 - 支持主轴/交叉轴排列、权重布局、内容自适应、流式换行、裁剪滚动和可复用组件组合。
-- 文本超宽自动省略号，可选 `maxLines` 换行。
+- 文本超宽自动省略号，可选 `maxLines` 换行；`RichText` 提供内联多样式（着色文本段 + 内联图标）与自动换行的图文混排。
 - 使用 GPU 几何图元和超采样渲染圆角、描边、图标、阴影及抗锯齿图形。
 - 提供文件对话框、消息框、剪贴板、光标、显示器、文件系统、时间、系统信息等平台能力接口。
 - 已实现图元缓存、惰性渲染、脏帧检测/按需刷新等性能优化机制。
@@ -143,7 +119,7 @@ cjpm run
 
 ## 示例应用
 
-`examples/` 中包含 11 个可独立构建运行的演示应用：
+`examples/` 中包含 22 个可独立构建运行的演示应用：
 
 | 示例 | 主要内容 |
 |---|---|
@@ -158,6 +134,23 @@ cjpm run
 | `paint` | 自定义 Widget、画布绘制、事件边界处理、滑块和系统光标 |
 | `planner` | 局部状态、进度条、组合框、文本换行、滚动与桌面控件 |
 | `process_manager` | 后台任务、互斥邮箱、异常兜底、进程数据表格与系统信息 |
+| `workbench` | 嵌套 `SplitView` 三区分栏（导航｜编辑｜信息）、可拖动/键盘微调分隔条、`derive` 派生大纲与统计 |
+| `file_explorer` | `TreeView` 目录树（展开/折叠、层级图标、键盘导航）与 `SplitView` 组合的左树右详情资源管理器 |
+| `booking` | `DatePicker` 月历选择器（弹出、点选/键盘、越月翻页）与 `CalendarDate` 日期运算驱动的酒店预订结算表单 |
+| `editor` | `MenuBar` 应用菜单栏（多菜单、快捷键提示、分隔线、动态启用/禁用、悬停切换与键盘导航）驱动的文本编辑器 |
+| `timeline` | `LazyRow` 横向虚拟化日期带（400 天只渲染视口附近、横向滚动、点选）与 `CalendarDate` 运算的时间轴 |
+| `chat` | `LazyList` 变高虚拟列表（长短不一的气泡按预估高度定位、只渲染视口附近、发送滚到底部）的聊天界面 |
+| `activity` | `RichText` 富文本活动流（彩色图标 + 彩色操作者/文件 + 弱化时间、长路径自动换行）与动作筛选 |
+| `settings` | `Accordion` 折叠面板设置屏：外观/通知/隐私/关于分区（含真实控件）、单开模式、派生摘要 |
+| `tasklist` | `ReorderableList` 拖动重排任务优先级（手柄拖动、行悬浮/让位、内容复选框照常）与派生完成计数 |
+| `notify` | `Toaster`/`ToastLayer` 瞬态通知：四类通知右下角堆叠、滑入淡出、自动消失（时间动画驱动帧刷新） |
+| `wizard` | `StepIndicator` 四步账户设置向导：步骤条进度/跳回、分步表单、必填校验与上一步/下一步导航 |
+| `catalog` | `Pagination` 商品目录分页浏览：140 件商品每页 8 件、首末页+省略号页导航、分类过滤切换回首页 |
+| `scheduler` | `TimePicker` 会议排期：时/分网格选时、实时算时长、与 `DatePicker` 并排的日程表单与排序列表 |
+| `watchlist` | `Rating` 观影清单评分：逐部电影可交互圆点评分（点选/清除/键盘）、镜头绑定、实时已评数与平均分 |
+| `explorer` | `Breadcrumb` 文件浏览器：面包屑路径导航（点段跳回、超长折叠省略号）、模拟目录树、点文件夹进入 |
+| `tracker` | `Badge`/`Chip` 问题追踪：语义色状态/优先级徽标、成排过滤标签切换显示、镜头绑定与派生列表 |
+| `goals` | `ProgressRing` 每日目标：四指标环形进度 + 总完成度环、点 +/- 调整、完成度实时派生 |
 
 ## 许可证
 
