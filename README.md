@@ -13,7 +13,7 @@
 
 ## 开发环境
 
-- Cangjie SDK `1.0.5`
+- Cangjie SDK 1.0.5
 - Windows/Mac/Linux
 - 参阅 [`CangjieSDL`](https://github.com/SunriseSummer/CangjieSDL) 项目文档，根据目标平台规格配置 SDL 和 SDL_ttf 动态库
 
