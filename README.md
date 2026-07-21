@@ -1,6 +1,6 @@
 # CUI/苍翠：仓颉桌面 GUI 框架
 
-基于[仓颉 SDL 图形库](https://github.com/SunriseSummer/CangjieSDL) ，实现了一个跨平台/自渲染/声明式的桌面 GUI 框架，提供声明式界面构建、状态管理、常用布局容器、常用控件、文本渲染、矢量绘制以及系统能力集成等。
+用[仓颉编程语言](https://cangjie-lang.cn/)实现的跨平台/自渲染/声明式的桌面 GUI 框架，提供声明式界面构建、状态管理、常用组件、文本渲染、矢量绘制以及系统能力集成等。底层依赖[仓颉 SDL 图形库](https://github.com/SunriseSummer/CangjieSDL)。
 
 <img src="./examples/.images/cangcui.png" />
 <img src="./images/gallery.jpg" />
@@ -16,12 +16,6 @@
 - Cangjie SDK 1.0.5
 - Windows/Mac/Linux
 - 参阅 [`CangjieSDL`](https://github.com/SunriseSummer/CangjieSDL) 项目文档，根据目标平台规格配置 SDL 和 SDL_ttf 动态库
-
-配置好环境后，可执行单元测试，确认开发环境和项目可正常使用：
-
-```shell
-cjpm test
-```
 
 > [!IMPORTANT]
 >
