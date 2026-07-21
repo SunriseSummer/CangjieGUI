@@ -17,7 +17,7 @@
 - Windows/Mac/Linux
 - 参阅 [`CangjieSDL`](https://github.com/SunriseSummer/CangjieSDL) 项目文档，根据目标平台规格配置 SDL 和 SDL_ttf 动态库
 
-配置好环境后，执行单元测试，确认开发环境和项目可正常使用：
+配置好环境后，可执行单元测试，确认开发环境和项目可正常使用：
 
 ```shell
 cjpm test
