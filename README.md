@@ -10,7 +10,6 @@
 - [示例应用](examples/)
 - [入门指南](docs/guide/index.md)
 - [API 文档](docs/api/index.md)
-- [现代 GUI 核心范式洞察辨析：函数式/对象式，立即模式/保留模式](docs/modern-GUI-insights-and-analysis.md)
 
 ## 开发环境
 
@@ -82,6 +81,8 @@ main() {
   高度 `Shadow.elevation` 一起构成一致的设计系统。
 - 提供文件对话框、消息框、剪贴板、光标、显示器、文件系统、时间、系统信息等平台能力接口。
 - 已实现图元缓存、惰性渲染、脏帧检测/按需刷新等性能优化机制。
+
+扩展阅读：[现代 GUI 核心范式洞察辨析：函数式/对象式，立即模式/保留模式](docs/modern-GUI-insights-and-analysis.md)
 
 ## 许可证
 
