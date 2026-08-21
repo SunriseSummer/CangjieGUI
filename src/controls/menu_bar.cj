@@ -152,38 +152,56 @@ public class MenuBar <: Widget {
         let popup = currentPopup(ctx)
         match (event) {
             case UiEvent.MouseDown(MouseButton.Left, x, y) =>
-                if (popup.contains(x, y)) {
-                    runItem(ctx, menuItemIndexAt(popup, y))
-                } else {
-                    let index = titleIndexAt(titles, x, y)
-                    if (index < 0) {
-                        close(ctx) // click outside both the bar and the menu dismisses
-                    } else if (index == openIndex.value) {
-                        close(ctx) // clicking the open title toggles it shut
-                    } else {
-                        openMenu(index) // clicking another title switches to it
-                    }
-                }
+                pressOverlay(ctx, popup, titles, x, y)
                 true
             case UiEvent.MouseDown(_, _, _) =>
                 close(ctx)
                 true
             case UiEvent.MouseMove(x, y) =>
-                if (popup.contains(x, y)) {
-                    // Claim the default cursor over the popup so a control beneath it cannot set its
-                    // shape through the menu (the move still falls through for the bar's own hover).
-                    ctx.claimHover(overlayOwner, CursorShape.Default)
-                    let index = menuItemIndexAt(popup, y)
-                    if (index >= 0 && index < currentItems().size && currentItems()[index].isSelectable()) {
-                        highlight.value = index
-                    }
-                } else {
-                    let index = titleIndexAt(titles, x, y)
-                    if (index >= 0 && index != openIndex.value) {
-                        openMenu(index) // hover-switch between menus while open
-                    }
-                }
+                moveOverlay(ctx, popup, titles, x, y)
                 false
+            case _ => keyOverlay(ctx, event)
+        }
+    }
+
+    // A primary press: an item runs, the open title toggles shut, another title switches
+    // menus, anywhere else dismisses.
+    private func pressOverlay(ctx: UiContext, popup: Rect, titles: Array<Rect>, x: Float32, y: Float32): Unit {
+        if (popup.contains(x, y)) {
+            runItem(ctx, menuItemIndexAt(popup, y))
+            return
+        }
+        let index = titleIndexAt(titles, x, y)
+        if (index < 0) {
+            close(ctx) // click outside both the bar and the menu dismisses
+        } else if (index == openIndex.value) {
+            close(ctx) // clicking the open title toggles it shut
+        } else {
+            openMenu(index) // clicking another title switches to it
+        }
+    }
+
+    // Pointer motion: highlight-follows-hover inside the menu, hover-switch between titles.
+    private func moveOverlay(ctx: UiContext, popup: Rect, titles: Array<Rect>, x: Float32, y: Float32): Unit {
+        if (popup.contains(x, y)) {
+            // Claim the default cursor over the popup so a control beneath it cannot set its
+            // shape through the menu (the move still falls through for the bar's own hover).
+            ctx.claimHover(overlayOwner, CursorShape.Default)
+            let index = menuItemIndexAt(popup, y)
+            if (index >= 0 && index < currentItems().size && currentItems()[index].isSelectable()) {
+                highlight.value = index
+            }
+            return
+        }
+        let index = titleIndexAt(titles, x, y)
+        if (index >= 0 && index != openIndex.value) {
+            openMenu(index) // hover-switch between menus while open
+        }
+    }
+
+    // The open-menu keyboard table: Escape closes, Enter/Space run, arrows navigate, Tab commits.
+    private func keyOverlay(ctx: UiContext, event: UiEvent): Bool {
+        match (event) {
             case UiEvent.KeyDown(Key.Escape, _) =>
                 close(ctx)
                 true

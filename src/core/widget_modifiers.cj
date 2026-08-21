@@ -102,7 +102,7 @@ class ModifiedWidget <: Widget {
         }
     }
 
-    public func draw(ctx: UiContext): Unit {
+    public func draw(ctx: UiContext): Unit { // cjcheck-ignore: long-function # one match with one short arm per modifier kind; the length is the enum's width, not nested logic
         match (modifier) {
             case WidgetModifier.Surface(style) =>
                 drawSurface(ctx, frame, style)
@@ -143,22 +143,10 @@ class ModifiedWidget <: Widget {
             // stroke is centred on the edge (inset by half its width) and rounded to the radius.
             case WidgetModifier.Border(color, width, radius) =>
                 child.draw(ctx)
-                if (width > 0.0 && Int64(color.a) > 0) {
-                    let r = max(0.0, ctx.resolve(radius))
-                    ctx
-                        .renderer
-                        .strokeRoundedRect(frame.inset(width / 2.0), max(0.0, r - width / 2.0),
-                            Pen(width: width, color: color))
-                }
+                drawBorderStroke(ctx, color, width, radius, dash: 0.0, gap: 0.0)
             case WidgetModifier.DashedBorder(color, width, radius, dash, gap) =>
                 child.draw(ctx)
-                if (width > 0.0 && Int64(color.a) > 0) {
-                    let r = max(0.0, ctx.resolve(radius))
-                    ctx
-                        .renderer
-                        .strokeRoundedRectDashed(frame.inset(width / 2.0), max(0.0, r - width / 2.0),
-                            Pen(width: width, color: color), dash: dash, gap: gap)
-                }
+                drawBorderStroke(ctx, color, width, radius, dash: dash, gap: gap)
             case WidgetModifier.Visible(isVisible) =>
                 if (isVisible) {
                     child.draw(ctx)
@@ -169,6 +157,22 @@ class ModifiedWidget <: Widget {
                     ctx.renderer.fill(frame, ctx.theme.bg.withAlpha(96))
                 }
             case _ => child.draw(ctx)
+        }
+    }
+
+    // Strokes the border arm shared by Border and DashedBorder: centred on the edge (inset by
+    // half the width), rounded to the resolved radius; a zero dash means a solid stroke.
+    private func drawBorderStroke(ctx: UiContext, color: Color, width: Float32, radius: Length,
+        dash!: Float32, gap!: Float32): Unit {
+        if (width <= 0.0 || Int64(color.a) == 0) {
+            return
+        }
+        let r = max(0.0, max(0.0, ctx.resolve(radius)) - width / 2.0)
+        let pen = Pen(width: width, color: color)
+        if (dash > 0.0) {
+            ctx.renderer.strokeRoundedRectDashed(frame.inset(width / 2.0), r, pen, dash: dash, gap: gap)
+        } else {
+            ctx.renderer.strokeRoundedRect(frame.inset(width / 2.0), r, pen)
         }
     }
 

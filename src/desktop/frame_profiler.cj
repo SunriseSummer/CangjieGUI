@@ -30,13 +30,13 @@ class FrameProfiler {
 
     // Adds one frame's phase durations (nanoseconds) and prints a rolling average every `interval`.
     func record(
-        build: UInt64,
-        layout: UInt64,
-        event: UInt64,
-        begin: UInt64,
-        tree: UInt64,
-        resolve: UInt64,
-        present: UInt64
+        build!: UInt64,
+        layout!: UInt64,
+        event!: UInt64,
+        begin!: UInt64,
+        tree!: UInt64,
+        resolve!: UInt64,
+        present!: UInt64
     ): Unit {
         buildNs += build
         layoutNs += layout

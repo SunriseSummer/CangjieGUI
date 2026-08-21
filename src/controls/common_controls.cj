@@ -1,7 +1,7 @@
 package cui.controls
 
 import sdl.{FontSizes, Key, MouseButton, Pen, Rect, Size, UiEvent}
-import cui.core.{Bindable, CUI_CONTROL_H, CursorShape, Spring, UiContext, Widget, requireControlId, claimHoverIfInside, drawFocusRing,
+import cui.core.{handleButtonProtocol, clampItemIndex, Bindable, CUI_CONTROL_H, CursorShape, Spring, UiContext, Widget, requireControlId, claimHoverIfInside, drawFocusRing,
     drawSurface, emit, focusableControlIdentity, localState, reregisterFocusable, registerFocusable, resolveControlKey}
 
 private let SWITCH_TRACK_W: Float32 = 40.0
@@ -75,7 +75,7 @@ public class Switch <: Widget {
     }
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
-        toggleInteraction(ctx, event, frame, controlId, {=> checked.value = !checked.value})
+        handleButtonProtocol(ctx, event, frame, controlId, {=> checked.value = !checked.value})
     }
 
     public func focusableId(): ?String {
@@ -148,7 +148,7 @@ public class RadioButton <: Widget {
     }
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
-        toggleInteraction(ctx, event, frame, controlId, {=> selected.value = optionValue})
+        handleButtonProtocol(ctx, event, frame, controlId, {=> selected.value = optionValue})
     }
 
     public func focusableId(): ?String {
@@ -191,7 +191,7 @@ public class Picker <: Widget {
     }
 
     public func draw(ctx: UiContext): Unit {
-        drawSurface(ctx, frame, ctx.theme.fieldSurface(ctx.showFocusRing(id)))
+        drawSurface(ctx, frame, ctx.theme.fieldSurface(active: ctx.showFocusRing(id)))
         let label = if (items.isEmpty()) {
             "—"
         } else {
@@ -247,7 +247,7 @@ public class Picker <: Widget {
     }
 
     private func currentIndex(): Int64 {
-        clampControlIndex(selected.value, items.size)
+        clampItemIndex(selected.value, items.size)
     }
 
     private func leftButton(): Rect {
@@ -326,7 +326,7 @@ public class Stepper <: Widget {
     }
 
     public func draw(ctx: UiContext): Unit {
-        drawSurface(ctx, frame, ctx.theme.fieldSurface(ctx.showFocusRing(id)))
+        drawSurface(ctx, frame, ctx.theme.fieldSurface(active: ctx.showFocusRing(id)))
         ctx.renderer.textCenter("−", decrementButton(), ctx.theme.text, pointSize: FontSizes.TITLE)
         ctx.renderer.textCenter("${value.value}", valueFrame(), ctx.theme.text, pointSize: FontSizes.CONTROL)
         ctx.renderer.textCenter("+", incrementButton(), ctx.theme.text, pointSize: FontSizes.TITLE)
@@ -413,54 +413,8 @@ public class Stepper <: Widget {
     }
 }
 
-private func toggleInteraction(
-    ctx: UiContext,
-    event: UiEvent,
-    frame: Rect,
-    id: String,
-    activate: () -> Unit
-): Bool {
-    claimHoverIfInside(ctx, event, frame, id, CursorShape.Interactive)
-    match (event) {
-        case UiEvent.MouseDown(MouseButton.Left, x, y) =>
-            if (frame.contains(x, y)) {
-                ctx.focus(id)
-                ctx.press(id)
-                return true
-            }
-        case UiEvent.MouseUp(MouseButton.Left, x, y) =>
-            if (ctx.isPressed(id)) {
-                if (frame.contains(x, y)) {
-                    activate()
-                }
-                return true
-            }
-        case UiEvent.KeyDown(Key.Enter, _) =>
-            if (ctx.hasFocus(id)) {
-                activate()
-                return true
-            }
-        case UiEvent.KeyDown(Key.Space, _) =>
-            if (ctx.hasFocus(id)) {
-                activate()
-                return true
-            }
-        case _ => ()
-    }
-    false
-}
 
 /** Throws `IllegalArgumentException` when a focusable control receives an empty ID. */
 private func validateControlId(id: String, kind: String): Unit {
     requireControlId(id, kind)
-}
-
-private func clampControlIndex(index: Int64, count: Int64): Int64 {
-    if (count <= 0 || index < 0) {
-        0
-    } else if (index >= count) {
-        count - 1
-    } else {
-        index
-    }
 }

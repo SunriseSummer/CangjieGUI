@@ -1,7 +1,7 @@
 package cui.controls
 
 import sdl.{Color, FontSizes, Key, MouseButton, Pen, Rect, Size, UiEvent}
-import cui.core.{Bindable, CUI_SMALL_H, ScrollBar, State, UiContext, Widget, resolveControlKey, clampScrollOffset, maxScrollOffset, drawSurface,
+import cui.core.{clampItemIndex, Bindable, CUI_SMALL_H, ScrollBar, State, UiContext, Widget, resolveControlKey, clampScrollOffset, maxScrollOffset, drawSurface,
     drawVerticalScrollBar, emit, localState, registerFocusable, scrollLineIndex, scrollLineRemainder,
     scrollOffsetAfterWheel}
 
@@ -163,7 +163,7 @@ public class Table <: Widget {
 
     public func draw(ctx: UiContext): Unit {
         let order = displayOrder()
-        drawSurface(ctx, frame, ctx.theme.fieldSurface(ctx.showFocusRing(id)))
+        drawSurface(ctx, frame, ctx.theme.fieldSurface(active: ctx.showFocusRing(id)))
         let body = bodyRect()
         scrollOffset.value = clampScrollOffset(scrollOffset.value, contentHeight(), body.h)
         // Reveal the selection when it changed since last frame — including an app setting it
@@ -371,7 +371,7 @@ public class Table <: Widget {
             return false
         }
         let order = displayOrder()
-        selectDisplay(order, clampPosition(displayPositionOf(order, selected.value) + delta, order.size))
+        selectDisplay(order, clampItemIndex(displayPositionOf(order, selected.value) + delta, order.size))
         true
     }
 
@@ -380,7 +380,7 @@ public class Table <: Widget {
             return false
         }
         let order = displayOrder()
-        selectDisplay(order, clampPosition(pos, order.size))
+        selectDisplay(order, clampItemIndex(pos, order.size))
         true
     }
 
@@ -408,7 +408,7 @@ public class Table <: Widget {
     }
 
     // The display position of a selected row, or -1 when nothing valid is selected — so the next
-    // Down lands on the first row (clampPosition(-1 + 1) == 0) rather than skipping it.
+    // Down lands on the first row (clampItemIndex(-1 + 1) == 0) rather than skipping it.
     private func displayPositionOf(order: Array<Int64>, rowIndex: Int64): Int64 {
         var i = 0
         while (i < order.size) {
@@ -490,17 +490,5 @@ public class Table <: Widget {
         } else {
             comparison > 0
         }
-    }
-}
-
-private func clampPosition(pos: Int64, count: Int64): Int64 {
-    if (count <= 0) {
-        0
-    } else if (pos < 0) {
-        0
-    } else if (pos >= count) {
-        count - 1
-    } else {
-        pos
     }
 }

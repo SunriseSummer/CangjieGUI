@@ -10,7 +10,7 @@ import std.collection.{ArrayList, HashMap, HashSet}
  * last snapshot (it only ever advances), so a real change is never missed, only occasionally
  * over-counted into a harmless extra render.
  */
-var stateWriteGeneration: UInt64 = 0
+var stateWriteGeneration: UInt64 = 0 // cjcheck-ignore: global-var # monotonic dirty-frame counter; benign race documented above
 
 class StateListener<T> {
     let callback: (T, T) -> Unit
@@ -76,6 +76,7 @@ public interface Bindable<T> <: Observable<T> {
     /** Reads or replaces the current value. */
     mut prop value: T
 
+    /** Reads the current value; equivalent to `value`, for call-style access. */
     func get(): T {
         value
     }
@@ -226,7 +227,7 @@ public class StateStore {
             }
             case None =>
                 let state = State<T>(initial())
-                let _ = entries.add(path, state)
+                let _ = entries.add(path, state) // cjcheck-ignore: ignore-result # key was just checked absent; no displaced value exists
                 addedDuringBuild.add(path)
                 state
         }
@@ -255,7 +256,7 @@ public class StateStore {
             }
         }
         for (key in obsolete) {
-            let _ = entries.remove(key)
+            let _ = entries.remove(key) // cjcheck-ignore: ignore-result # key comes from iterating entries; removal cannot miss
         }
         scopes.clear()
     }
@@ -263,7 +264,7 @@ public class StateStore {
     /** Rolls back state created by a build that threw partway through. */
     func cancelBuild(): Unit {
         for (key in addedDuringBuild) {
-            let _ = entries.remove(key)
+            let _ = entries.remove(key) // cjcheck-ignore: ignore-result # rollback removes keys recorded at insertion; removal cannot miss
         }
         addedDuringBuild.clear()
         scopes.clear()
@@ -293,7 +294,7 @@ public class StateStore {
             case Some(count) => count
             case None => 0
         }
-        let _ = controlIdCounts.add(path, seen + 1)
+        let _ = controlIdCounts.add(path, seen + 1) // cjcheck-ignore: ignore-result # displaced count is `seen`, already read above
         if (seen == 0) {
             path
         } else {

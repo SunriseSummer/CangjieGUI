@@ -109,11 +109,11 @@ private func solveBezierParam(x: Float32, ax: Float32, bx: Float32, cx: Float32)
     var i = 0
     while (i < 8) {
         let error = sampleBezier(u, ax, bx, cx) - x
-        if (magnitude(error) < 0.0005) {
+        if (absF32(error) < 0.0005) {
             return u
         }
         let slope = sampleBezierDerivative(u, ax, bx, cx)
-        if (magnitude(slope) < 0.000001) {
+        if (absF32(slope) < 0.000001) {
             break
         }
         u -= error / slope
@@ -125,7 +125,7 @@ private func solveBezierParam(x: Float32, ax: Float32, bx: Float32, cx: Float32)
     var t = x
     while (lo < hi) {
         let value = sampleBezier(t, ax, bx, cx)
-        if (magnitude(value - x) < 0.0005) {
+        if (absF32(value - x) < 0.0005) {
             return t
         }
         if (x > value) {
@@ -142,7 +142,8 @@ private func solveBezierParam(x: Float32, ax: Float32, bx: Float32, cx: Float32)
     t
 }
 
-private func magnitude(value: Float32): Float32 {
+// The absolute value of a Float32; shared by the animation primitives (no std dependency).
+internal func absF32(value: Float32): Float32 {
     if (value < 0.0) {
         -value
     } else {

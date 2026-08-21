@@ -231,7 +231,7 @@ public class Label <: Widget {
     // Exact float comparison is deliberate in both caches: the keys are reused values,
     // not computed approximations, so equality means "same inputs as last time".
     private func singleLineWidth(ctx: UiContext, ps: Float32): Float32 {
-        if (cachedTextWidthPointSize != ps) {
+        if (cachedTextWidthPointSize != ps) { // cjcheck-ignore: float-equal # cache-key identity; miss only costs a re-measure
             cachedTextWidth = ctx.renderer.textWidth(text, pointSize: ps, style: textStyle, font: fontFace)
             cachedTextWidthPointSize = ps
         }
@@ -240,7 +240,7 @@ public class Label <: Widget {
 
     private func linesFor(ctx: UiContext, width: Float32, ps: Float32): Array<String> {
         match (cachedLines) {
-            case Some(lines) where cachedLinesWidth == width && cachedLinesPointSize == ps => lines
+            case Some(lines) where cachedLinesWidth == width && cachedLinesPointSize == ps => lines // cjcheck-ignore: float-equal # cache-key identity; miss only costs a re-wrap
             case _ =>
                 let lines = wrapText(ctx, text, width, ps, lineLimit, style: textStyle, font: fontFace)
                 var widest: Float32 = 0.0

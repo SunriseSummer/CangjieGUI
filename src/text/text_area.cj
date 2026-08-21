@@ -105,18 +105,12 @@ public class TextArea <: Widget {
 
     /** Reverts the last edit group; also bound to Ctrl+Z. */
     public func undo(): Unit {
-        match (history.undo(snapshot())) {
-            case Some(state) => applySnapshot(state)
-            case None => ()
-        }
+        applyHistoryStep(history.undo(snapshot())) {state => applySnapshot(state)}
     }
 
     /** Reapplies the last undone edit; also bound to Ctrl+Y / Ctrl+Shift+Z. */
     public func redo(): Unit {
-        match (history.redo(snapshot())) {
-            case Some(state) => applySnapshot(state)
-            case None => ()
-        }
+        applyHistoryStep(history.redo(snapshot())) {state => applySnapshot(state)}
     }
 
     public func measure(_: UiContext, available: Size): Size {
@@ -144,11 +138,11 @@ public class TextArea <: Widget {
             scrollStateValue.value = clampedScroll
         }
         let content = TextAreaContent(text.value, cursorStateValue.value, scrollStateValue.value)
-        drawTextAreaBox(ctx, frame, id, content, docLines, edit.selectionStart(), edit.selectionEnd(),
-            ctx.hasFocus(id), scrollBar.dragging(ctx))
+        drawTextAreaBox(ctx, frame, id, content, docLines,
+            selection: (edit.selectionStart(), edit.selectionEnd()), barActive: scrollBar.dragging(ctx))
     }
 
-    public func handle(ctx: UiContext, event: UiEvent): Bool {
+    public func handle(ctx: UiContext, event: UiEvent): Bool { // cjcheck-ignore: long-function # flat single-match event table; each arm is one editing interaction in the desktop convention order
         // A read-only area is not an editing target, so it does not request the text cursor.
         if (isEditable) {
             claimHoverIfInside(ctx, event, frame, id, CursorShape.Text)
@@ -317,15 +311,15 @@ public class TextArea <: Widget {
             edit.selectAll()
             return true
         } else if (code == AREA_LETTER_C) {
-            let _ = copySelection(edit)
+            let _ = copyEditSelection(edit) // cjcheck-ignore: ignore-result # a failed platform copy has no in-UI recovery; the shortcut is still consumed
             return true
         } else if (code == AREA_LETTER_X) {
             if (isEditable) {
-                return recordedEdit(ctx, {=> if (copySelection(edit)) {
-                    let _ = edit.deleteSelection()
+                return recordedEdit(ctx, {=> if (copyEditSelection(edit)) {
+                    let _ = edit.deleteSelection() // cjcheck-ignore: ignore-result # cut always has a selection here; copySelection just confirmed it
                 }})
             }
-            let _ = copySelection(edit) // read-only: cut degrades to copy
+            let _ = copyEditSelection(edit) // cjcheck-ignore: ignore-result # read-only cut degrades to copy; a failed platform copy has no in-UI recovery
             return true
         } else if (code == AREA_LETTER_V) {
             if (isEditable) {
@@ -350,29 +344,18 @@ public class TextArea <: Widget {
         false
     }
 
-    // Clipboard access can fail without a desktop session; treat it as best-effort.
-    private func copySelection(edit: TextEditState): Bool {
-        if (!edit.hasSelection()) {
-            return false
-        }
-        try {
-            Clipboard.setText(edit.selectedText())
-            true
-        } catch (_: Exception) {
-            false
-        }
-    }
-
     private func pasteClipboard(edit: TextEditState): Unit {
-        try {
-            let clip = Clipboard.getText()
-            if (clip.size > 0) {
-                // Line breaks are kept (this is the multi-line control), but Windows CRLF is
-                // normalised: a raw \r at each line end breaks End/Backspace and measurement.
-                edit.insert(clip.replace("\r\n", "\n").replace("\r", "\n"))
-            }
+        // Clipboard access can fail at the platform boundary; a failed read degrades the
+        // paste to a no-op instead of aborting the recorded edit with an exception.
+        let clip = try {
+            Clipboard.getText()
         } catch (_: Exception) {
-            ()
+            ""
+        }
+        if (clip.size > 0) {
+            // Line breaks are kept (this is the multi-line control), but Windows CRLF is
+            // normalised: a raw \r at each line end breaks End/Backspace and measurement.
+            edit.insert(clip.replace("\r\n", "\n").replace("\r", "\n"))
         }
     }
 }
@@ -383,15 +366,15 @@ private func drawTextAreaBox(
     id: String,
     content: TextAreaContent,
     lines: Array<String>,
-    selStart: Int64,
-    selEnd: Int64,
-    focused: Bool,
-    barActive: Bool
+    selection!: (Int64, Int64),
+    barActive!: Bool
 ): Unit {
     drawTextBoxChrome(ctx, frame, id)
     let viewport = textViewport(frame)
     ctx.renderer.pushClip(viewport)
-    if (focused) {
+    // The selection paints only while focused, matching the field's focus-scoped highlight.
+    if (ctx.hasFocus(id)) {
+        let (selStart, selEnd) = selection
         drawTextAreaSelection(ctx, viewport, content, selStart, selEnd)
     }
     drawLines(ctx, viewport, lines, content.scroll)
@@ -401,7 +384,7 @@ private func drawTextAreaBox(
 }
 
 internal func drawTextBoxChrome(ctx: UiContext, frame: Rect, id: String): Unit {
-    drawSurface(ctx, frame, ctx.theme.fieldSurface(ctx.showFocusRing(id)))
+    drawSurface(ctx, frame, ctx.theme.fieldSurface(active: ctx.showFocusRing(id)))
 }
 
 private func drawLines(ctx: UiContext, rect: Rect, lines: Array<String>, scroll: Float32): Unit {

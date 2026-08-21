@@ -1,6 +1,5 @@
 package cui.core
 
-import std.collection.ArrayList
 import sdl.{Rect, Size, UiEvent}
 
 /**
@@ -95,7 +94,7 @@ public class LazyList <: Widget {
 
     public func layout(ctx: UiContext, rect: Rect): Unit {
         frame = rect
-        let _ = viewportHeightState.setIfChanged(rect.h)
+        let _ = viewportHeightState.setIfChanged(rect.h) // cjcheck-ignore: ignore-result # write-on-change only; whether it changed is irrelevant here
         let content = rowTops[count]
         let clamped = clampScrollOffset(scrollStateValue.value, content, rect.h)
         if (clamped != scrollStateValue.value) {
@@ -138,7 +137,7 @@ public class LazyList <: Widget {
             case UiEvent.Frame(_) =>
                 for (pair in visibleItems) {
                     let (_, widget) = pair
-                    let _ = widget.handle(ctx, event)
+                    broadcastEvent(widget, ctx, event)
                 }
                 return false
             case UiEvent.MouseWheel(_, wheelY, pointerX, pointerY) =>
@@ -183,14 +182,7 @@ public class LazyList <: Widget {
     }
 
     public func focusableIds(): Array<String> {
-        let ids = ArrayList<String>()
-        for (pair in visibleItems) {
-            let (_, widget) = pair
-            for (fid in widget.focusableIds()) {
-                ids.add(fid)
-            }
-        }
-        ids.toArray()
+        collectLazyFocusableIds(visibleItems)
     }
 }
 

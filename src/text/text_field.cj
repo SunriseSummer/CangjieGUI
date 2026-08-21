@@ -78,18 +78,12 @@ public class TextField <: Widget {
 
     /** Reverts the last edit group; also bound to Ctrl+Z. */
     public func undo(): Unit {
-        match (history.undo(snapshot())) {
-            case Some(state) => applySnapshot(state)
-            case None => ()
-        }
+        applyHistoryStep(history.undo(snapshot())) {state => applySnapshot(state)}
     }
 
     /** Reapplies the last undone edit; also bound to Ctrl+Y / Ctrl+Shift+Z. */
     public func redo(): Unit {
-        match (history.redo(snapshot())) {
-            case Some(state) => applySnapshot(state)
-            case None => ()
-        }
+        applyHistoryStep(history.redo(snapshot())) {state => applySnapshot(state)}
     }
 
     public func measure(_: UiContext, available: Size): Size {
@@ -244,11 +238,11 @@ public class TextField <: Widget {
             edit.selectAll()
             return true
         } else if (code == LETTER_C) {
-            copySelection(edit)
+            let _ = copyEditSelection(edit) // cjcheck-ignore: ignore-result # a failed platform copy has no in-UI recovery; the shortcut is still consumed
             return true
         } else if (code == LETTER_X) {
-            return recordedEdit(ctx, {=> if (copySelection(edit)) {
-                let _ = edit.deleteSelection()
+            return recordedEdit(ctx, {=> if (copyEditSelection(edit)) {
+                let _ = edit.deleteSelection() // cjcheck-ignore: ignore-result # cut always has a selection here; copySelection just confirmed it
             }})
         } else if (code == LETTER_V) {
             return recordedEdit(ctx, {=> pasteClipboard(edit)})
@@ -266,28 +260,16 @@ public class TextField <: Widget {
         false
     }
 
-    // Clipboard access can fail where there is no desktop session; treat it as best-effort
-    // so a copy or paste never crashes the field.
-    private func copySelection(edit: TextEditState): Bool {
-        if (!edit.hasSelection()) {
-            return false
-        }
-        try {
-            Clipboard.setText(edit.selectedText())
-            true
-        } catch (_: Exception) {
-            false
-        }
-    }
-
     private func pasteClipboard(edit: TextEditState): Unit {
-        try {
-            let clip = Clipboard.getText()
-            if (clip.size > 0) {
-                edit.insert(flattenLines(clip)) // a single-line field keeps its value on one row
-            }
+        // Clipboard access can fail at the platform boundary; a failed read degrades the
+        // paste to a no-op instead of aborting the recorded edit with an exception.
+        let clip = try {
+            Clipboard.getText()
         } catch (_: Exception) {
-            ()
+            ""
+        }
+        if (clip.size > 0) {
+            edit.insert(flattenLines(clip)) // a single-line field keeps its value on one row
         }
     }
 }

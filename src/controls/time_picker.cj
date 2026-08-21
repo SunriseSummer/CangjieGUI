@@ -84,7 +84,7 @@ public class TimePicker <: Widget {
     }
 
     public func draw(ctx: UiContext): Unit {
-        drawSurface(ctx, frame, ctx.theme.fieldSurface(ctx.showFocusRing(id) || open.value))
+        drawSurface(ctx, frame, ctx.theme.fieldSurface(active: ctx.showFocusRing(id) || open.value))
         let labelArea = Rect(frame.x + 10.0, frame.y, max(0.0, frame.w - 36.0), frame.h)
         ctx.renderer.pushClip(labelArea)
         let textY = frame.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
@@ -140,45 +140,7 @@ public class TimePicker <: Widget {
 
     private func handleOverlay(ctx: UiContext, event: UiEvent, popup: Rect): Bool {
         match (event) {
-            case UiEvent.MouseDown(MouseButton.Left, x, y) =>
-                if (popup.contains(x, y)) {
-                    // A press anywhere but the value box commits the pending typed minute first,
-                    // like focus leaving a field.
-                    if (!valueRect(popup).contains(x, y)) {
-                        commitEdit()
-                    }
-                    let h = hourAt(popup, x, y)
-                    if (h >= 0) {
-                        selected.value = selected.get().withHour(h)
-                        return true
-                    }
-                    if (minusRect(popup).contains(x, y)) {
-                        stepMinute(-1)
-                        return true
-                    }
-                    if (plusRect(popup).contains(x, y)) {
-                        stepMinute(1)
-                        return true
-                    }
-                    if (valueRect(popup).contains(x, y)) {
-                        // A re-click while already editing keeps the pending digit (it is visible
-                        // in the box); only a fresh click opens an empty edit.
-                        if (!editing.value) {
-                            editing.value = true
-                            editBuffer.value = ""
-                        }
-                        return true
-                    }
-                    if (sliderRect(popup).contains(x, y)) {
-                        ctx.beginDrag(sliderId)
-                        applySlider(popup, x)
-                        return true
-                    }
-                    return true // a click on the pop-up chrome: consume but keep it open
-                }
-                commitEdit() // dismiss on a click outside, keeping what was typed (like blur)
-                close(ctx)
-                true
+            case UiEvent.MouseDown(MouseButton.Left, x, y) => pressOverlay(ctx, popup, x, y)
             case UiEvent.MouseMove(x, y) =>
                 if (ctx.isDragging(sliderId) && ctx.leftMouseDown) {
                     // A live slider drag follows the pointer even past the pop-up edge.
@@ -203,6 +165,57 @@ public class TimePicker <: Widget {
                     return true
                 }
                 false
+            case _ => keyOverlay(ctx, event)
+        }
+    }
+
+    // A primary press routed by pop-up region: hour cell, minute -/+, the editable value box,
+    // the slider, pop-up chrome (consumed), or outside (commit and dismiss).
+    private func pressOverlay(ctx: UiContext, popup: Rect, x: Float32, y: Float32): Bool {
+        if (popup.contains(x, y)) {
+            // A press anywhere but the value box commits the pending typed minute first,
+            // like focus leaving a field.
+            if (!valueRect(popup).contains(x, y)) {
+                commitEdit()
+            }
+            let h = hourAt(popup, x, y)
+            if (h >= 0) {
+                selected.value = selected.get().withHour(h)
+                return true
+            }
+            if (minusRect(popup).contains(x, y)) {
+                stepMinute(-1)
+                return true
+            }
+            if (plusRect(popup).contains(x, y)) {
+                stepMinute(1)
+                return true
+            }
+            if (valueRect(popup).contains(x, y)) {
+                // A re-click while already editing keeps the pending digit (it is visible
+                // in the box); only a fresh click opens an empty edit.
+                if (!editing.value) {
+                    editing.value = true
+                    editBuffer.value = ""
+                }
+                return true
+            }
+            if (sliderRect(popup).contains(x, y)) {
+                ctx.beginDrag(sliderId)
+                applySlider(popup, x)
+                return true
+            }
+            return true // a click on the pop-up chrome: consume but keep it open
+        }
+        commitEdit() // dismiss on a click outside, keeping what was typed (like blur)
+        close(ctx)
+        true
+    }
+
+    // The pop-up keyboard table: digits type the minute; Escape/Enter/Space resolve the pending
+    // edit before closing; arrows nudge; Tab commits, closes, and lets focus move on.
+    private func keyOverlay(ctx: UiContext, event: UiEvent): Bool {
+        match (event) {
             case UiEvent.KeyDown(Key.Digit(code), _) =>
                 typeDigit(Int64(code) - 48)
                 true
@@ -212,29 +225,12 @@ public class TimePicker <: Widget {
                     return true
                 }
                 false
-            case UiEvent.KeyDown(Key.Escape, _) =>
-                if (editing.value) {
-                    cancelEdit() // first Escape abandons the typed digit, keeping the pop-up open
-                } else {
-                    close(ctx)
-                }
-                true
-            case UiEvent.KeyDown(Key.Enter, _) =>
-                if (editing.value) {
-                    commitEdit() // first Enter lands the typed minute, a second closes
-                } else {
-                    close(ctx)
-                }
-                true
-            // Space commits like Enter; consumed so it cannot fall through to the field's own Space
-            // arm (which would count as a no-op re-open rather than a dismissal).
-            case UiEvent.KeyDown(Key.Space, _) =>
-                if (editing.value) {
-                    commitEdit()
-                } else {
-                    close(ctx)
-                }
-                true
+            // First Escape abandons the typed digit keeping the pop-up open; Enter/Space land it.
+            // A second press of any of the three closes. Space is consumed so it cannot fall
+            // through to the field's own Space arm (a no-op re-open rather than a dismissal).
+            case UiEvent.KeyDown(Key.Escape, _) => resolveEditThen(ctx, commit: false)
+            case UiEvent.KeyDown(Key.Enter, _) => resolveEditThen(ctx, commit: true)
+            case UiEvent.KeyDown(Key.Space, _) => resolveEditThen(ctx, commit: true)
             case UiEvent.KeyDown(Key.Up, _) =>
                 commitEdit()
                 nudge(1)
@@ -257,6 +253,20 @@ public class TimePicker <: Widget {
                 false
             case _ => false
         }
+    }
+
+    // Resolves a pending typed minute (commit or cancel); with nothing pending, closes.
+    private func resolveEditThen(ctx: UiContext, commit!: Bool): Bool {
+        if (editing.value) {
+            if (commit) {
+                commitEdit()
+            } else {
+                cancelEdit()
+            }
+        } else {
+            close(ctx)
+        }
+        true
     }
 
     private func nudge(deltaMinutes: Int64): Unit {
@@ -431,7 +441,7 @@ public class TimePicker <: Widget {
     // minute in the middle. While a digit is being typed the whole group shows the active field
     // border, and an empty buffer ghosts the current minute so the box never reads blank.
     private func drawMinuteStepper(ctx: UiContext, popup: Rect, minute: Int64): Unit {
-        drawSurface(ctx, stepperRect(popup), ctx.theme.fieldSurface(editing.value))
+        drawSurface(ctx, stepperRect(popup), ctx.theme.fieldSurface(active: editing.value))
         drawStepButton(ctx, minusRect(popup), "−")
         drawStepButton(ctx, plusRect(popup), "+")
         let box = valueRect(popup)
@@ -489,13 +499,7 @@ private func popupHeight(): Float32 {
 
 // Clamp the minute spacing into a sensible 1–60 range.
 internal func clampMinuteStep(step: Int64): Int64 {
-    if (step < 1) {
-        1
-    } else if (step > 60) {
-        60
-    } else {
-        step
-    }
+    max(1, min(60, step))
 }
 
 /*
@@ -539,12 +543,4 @@ internal func parseBufferedMinute(buffer: String): Int64 {
         value = value * 10 + (Int64(UInt32(r)) - 48)
     }
     value
-}
-
-private func padTwo(value: Int64): String {
-    if (value >= 0 && value < 10) {
-        "0${value}"
-    } else {
-        "${value}"
-    }
 }

@@ -1,9 +1,10 @@
 package cui.text
 
 import std.collection.ArrayList
-import sdl.{Color, FontSizes, Key, MouseButton, Pen, Rect, Size, SurfaceStyle, UiEvent}
-import cui.core.{Bindable, CUI_CONTROL_H, CUI_SMALL_H, Overlay, ScrollBar, State, UiContext, Widget, resolveControlKey, buildChild,
-    clampScrollOffset, drawSurface, drawVerticalScrollBar, emit, localState, scrollBarGutter, scrollOffsetAfterWheel}
+import sdl.{Color, FontSizes, Key, MouseButton, Rect, Size, SurfaceStyle, UiEvent}
+import cui.core.{drawFieldChevron, Bindable, CUI_CONTROL_H, CUI_SMALL_H, Overlay, ScrollBar, State, UiContext, Widget, resolveControlKey, buildChild,
+    clampItemIndex, clampScrollOffset, drawSurface, drawVerticalScrollBar, emit, localState, scrollBarGutter,
+    scrollOffsetAfterWheel}
 
 private let COMBO_POPUP_PAD: Float32 = 5.0
 private let COMBO_GAP: Float32 = 4.0
@@ -71,7 +72,7 @@ public class ComboBox <: Widget {
 
     public func draw(ctx: UiContext): Unit {
         field.draw(ctx)
-        drawChevron(ctx)
+        drawFieldChevron(ctx, frame)
         if (open.value) {
             let popup = popupRect(ctx, filteredOptions())
             ctx.setOverlay(Overlay(handleEvent: {c, e => handleOverlay(c, e, popup)},
@@ -174,7 +175,7 @@ public class ComboBox <: Widget {
                 true
             case UiEvent.KeyDown(Key.Enter, _) =>
                 // Clamp: typing may have shrunk the list below the highlighted index.
-                commit(ctx, filtered, clampComboIndex(highlight.value, filtered.size))
+                commit(ctx, filtered, clampItemIndex(highlight.value, filtered.size))
                 true
             case UiEvent.KeyDown(Key.Down, _) =>
                 moveHighlight(1, filtered, popup)
@@ -190,7 +191,7 @@ public class ComboBox <: Widget {
     }
 
     private func moveHighlight(delta: Int64, filtered: Array<String>, popup: Rect): Unit {
-        highlight.value = clampComboIndex(highlight.value + delta, filtered.size)
+        highlight.value = clampItemIndex(highlight.value + delta, filtered.size)
         revealRow(highlight.value, filtered, popup)
     }
 
@@ -275,7 +276,7 @@ public class ComboBox <: Widget {
 
     private func drawPopup(ctx: UiContext, popup: Rect): Unit {
         let filtered = filteredOptions()
-        let active = clampComboIndex(highlight.value, filtered.size)
+        let active = clampItemIndex(highlight.value, filtered.size)
         drawSurface(ctx, popup, popupSurface(ctx))
         let contentH = contentHeight(filtered)
         let listH = listHeight(popup)
@@ -319,14 +320,6 @@ public class ComboBox <: Widget {
         drawVerticalScrollBar(ctx, list, offset, contentH, listH, active: popupBar.dragging(ctx))
     }
 
-    private func drawChevron(ctx: UiContext): Unit {
-        let cx = frame.right() - 18.0
-        let cy = frame.centerY()
-        let pen = Pen(width: 1.6, color: ctx.theme.mutedText)
-        ctx.renderer.strokeLine(cx - 4.0, cy - 2.0, cx, cy + 2.5, pen)
-        ctx.renderer.strokeLine(cx, cy + 2.5, cx + 4.0, cy - 2.0, pen)
-    }
-
     private func drawRowLabel(ctx: UiContext, label: String, row: Rect, color: Color): Unit {
         let textY = row.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
         ctx.renderer.text(label, row.x + 8.0, textY, color, pointSize: FontSizes.CONTROL)
@@ -335,17 +328,5 @@ public class ComboBox <: Widget {
     private func popupSurface(ctx: UiContext): SurfaceStyle {
         SurfaceStyle(ctx.theme.panelRaised, border: ctx.theme.panelEdge, radius: ctx.theme.controlRadius,
             borderWidth: 1.0, shadow: ctx.theme.shadow, shadowOffsetY: 4.0)
-    }
-}
-
-private func clampComboIndex(index: Int64, count: Int64): Int64 {
-    if (count <= 0) {
-        0
-    } else if (index < 0) {
-        0
-    } else if (index >= count) {
-        count - 1
-    } else {
-        index
     }
 }

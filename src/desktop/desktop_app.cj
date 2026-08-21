@@ -2,7 +2,7 @@ package cui.desktop
 
 import std.collection.ArrayList
 import std.env.getCommandLine
-import sdl.{FrameInfo, Key, MouseButton, Rect, SdlWindow, UiEvent, WindowSpec}
+import sdl.{FrameInfo, Key, MouseButton, Rect, SdlWindow, UiEvent, WindowSpec, SdlException}
 import sdl.input.{Cursor, Keyboard, SystemCursor}
 import sdl.dialogs.FileDialogOptions
 import sdl.dialogs.FileDialogRequest
@@ -11,7 +11,8 @@ import sdl.system.AppMetadata
 import sdl.system.ApplicationMetadata
 import sdl.system.SdlHintSetting
 import sdl.system.SdlHints
-import cui.core.{CursorShape, StateStore, Theme, UiContext, Widget, buildRoot, currentStateGeneration, drawTooltip}
+import cui.core.{CursorShape, StateStore, Theme, UiContext, Widget, broadcastEvent, buildRoot, currentStateGeneration,
+    drawTooltip}
 
 // Long enough for the first paint to settle and for background work started at launch
 // (dialog-free examples fetch data on worker threads) to land in the frame.
@@ -66,6 +67,7 @@ public class DesktopApp {
         }
     }
 
+    /** Registers a resource to be closed on shutdown, in reverse registration order. */
     public func manage(resource: Resource): Unit {
         resources.add(resource)
     }
@@ -100,19 +102,27 @@ public class DesktopApp {
         stateStore.clear()
     }
 
+    /** Opens the native open-file dialog; poll the returned request each frame for the result. */
     public func openFileDialog(options!: FileDialogOptions = FileDialogOptions()): FileDialogRequest {
         FileDialogs.openFile(options: options, window: Some(window))
     }
 
+    /** Opens the native save-file dialog; poll the returned request each frame for the result. */
     public func saveFileDialog(options!: FileDialogOptions = FileDialogOptions()): FileDialogRequest {
         FileDialogs.saveFile(options: options, window: Some(window))
     }
 
+    /** Opens the native pick-folder dialog; poll the returned request each frame for the result. */
     public func openFolderDialog(options!: FileDialogOptions = FileDialogOptions()): FileDialogRequest {
         FileDialogs.openFolder(options: options, window: Some(window))
     }
 
-    public func run(body: () -> Unit): Unit {
+    /*
+     * Runs the frame loop until close: each rendered frame rebuilds the widget tree from `body`,
+     * lays it out, dispatches input, and draws. Blocks until the window closes; managed resources
+     * and the window are released deterministically even when a widget throws out of the loop.
+     */
+    public func run(body: () -> Unit): Unit { // cjcheck-ignore: long-function # the frame loop reads as one linear pipeline (poll, build, layout, dispatch, draw); splitting hides the frame order
         // The finally block keeps shutdown deterministic even when a widget throws out of
         // the frame loop: managed resources close in reverse order, then the window.
         try {
@@ -165,8 +175,9 @@ public class DesktopApp {
                     renderedWidth = viewportW
                     renderedHeight = viewportH
                     match (profiler) {
-                        case Some(p) => p.record(tLayout - tBuild, tEvents - tLayout, tDraw - tEvents, beginNs, treeNs,
-                            resolveNs, presentNs)
+                        case Some(p) => p.record(build: tLayout - tBuild, layout: tEvents - tLayout,
+                            event: tDraw - tEvents, begin: beginNs, tree: treeNs, resolve: resolveNs,
+                            present: presentNs)
                         case None => ()
                     }
                 } else {
@@ -217,9 +228,10 @@ public class DesktopApp {
     private func routeEvent(widget: Widget, event: UiEvent): Unit {
         match (event) {
             case UiEvent.Quit => ctx.requestClose()
-            case UiEvent.WindowResized(w, h) =>
-                window.width = Int32(Float32(w) / window.scale)
-                window.height = Int32(Float32(h) / window.scale)
+            case UiEvent.WindowResized(_, _) =>
+                // Re-read the size from SDL so the cached logical size follows the resize; the
+                // event payload is ignored in favour of the authoritative queried value.
+                let _ = window.refreshSize() // cjcheck-ignore: ignore-result # the refreshed size is read via window.width/height next frame
             case UiEvent.MouseMove(_, _) =>
                 // Resolve which control the pointer is over, then reflect its requested
                 // shape in the system cursor. Bracketing keeps hover single-winner.
@@ -308,8 +320,10 @@ public class DesktopApp {
                     appliedInputAnchor = Some(anchor)
                     try {
                         window.setTextInputArea(anchor)
-                    } catch (_: Exception) {
-                        ()
+                    } catch (_: SdlException) {
+                        // A refused anchor must not stay cached as applied, or a transient
+                        // platform failure would silence IME anchoring for the whole session.
+                        appliedInputAnchor = None
                     }
                 }
             case None => ()
@@ -327,8 +341,10 @@ public class DesktopApp {
         }
     }
 
+    // Root dispatch: there is no widget behind the tree root, so the consumed flag has no
+    // further recipient and the broadcast form documents that intentionally dropped result.
     private func dispatchEvent(widget: Widget, event: UiEvent): Unit {
-        let _ = widget.handle(ctx, event)
+        broadcastEvent(widget, ctx, event)
     }
 
     // Applies the hovered control's requested shape, skipping the SDL call when it is
@@ -344,8 +360,10 @@ public class DesktopApp {
         match (cursorForShape(shape)) {
             case Some(cursor) => try {
                 cursor.setActive()
-            } catch (_: Exception) {
-                ()
+            } catch (_: SdlException) {
+                // A refused shape must not stay cached as applied, or the same shape could
+                // never be retried; the platform simply keeps the current cursor this frame.
+                appliedShape = None
             }
             case None => ()
         }

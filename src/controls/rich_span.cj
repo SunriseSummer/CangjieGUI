@@ -36,12 +36,12 @@ public struct RichSpan {
     private init(
         kind: RichSpanKind,
         color: ?Color,
-        isMuted: Bool,
         style: FontStyle,
         fontFace: ?String,
         size: ?Length,
         tapAction: ?() -> Unit,
-        highlightColor: ?Color
+        highlightColor: ?Color,
+        isMuted!: Bool
     ) {
         this.kind = kind
         this.color = color
@@ -55,52 +55,52 @@ public struct RichSpan {
 
     /** A run of text in the default text colour, or an explicit `color`. */
     public static func text(text: String, color!: ?Color = None): RichSpan {
-        RichSpan(RichSpanKind.SpanText(text), color, false, FontStyle.regular, None, None, None, None)
+        RichSpan(RichSpanKind.SpanText(text), color, FontStyle.regular, None, None, None, None, isMuted: false)
     }
 
     /** A run of text in the theme's secondary (muted) text colour. */
     public static func muted(text: String): RichSpan {
-        RichSpan(RichSpanKind.SpanText(text), None, true, FontStyle.regular, None, None, None, None)
+        RichSpan(RichSpanKind.SpanText(text), None, FontStyle.regular, None, None, None, None, isMuted: true)
     }
 
     /** An inline icon, sized to the line and optionally coloured. */
     public static func icon(icon: IconName, color!: ?Color = None): RichSpan {
-        RichSpan(RichSpanKind.SpanIcon(icon), color, false, FontStyle.regular, None, None, None, None)
+        RichSpan(RichSpanKind.SpanIcon(icon), color, FontStyle.regular, None, None, None, None, isMuted: false)
     }
 
     /** This span drawn bold (or with bold set to `value`). */
     public func bold(value!: Bool = true): RichSpan {
-        RichSpan(kind, color, isMuted, style.withBold(value: value), fontFace, size, tapAction, highlightColor)
+        RichSpan(kind, color, style.withBold(value: value), fontFace, size, tapAction, highlightColor, isMuted: isMuted)
     }
 
     /** This span drawn italic (or with italic set to `value`). */
     public func italic(value!: Bool = true): RichSpan {
-        RichSpan(kind, color, isMuted, style.withItalic(value: value), fontFace, size, tapAction, highlightColor)
+        RichSpan(kind, color, style.withItalic(value: value), fontFace, size, tapAction, highlightColor, isMuted: isMuted)
     }
 
     /** This span underlined (or with the underline set to `value`). */
     public func underline(value!: Bool = true): RichSpan {
-        RichSpan(kind, color, isMuted, style.withUnderline(value: value), fontFace, size, tapAction, highlightColor)
+        RichSpan(kind, color, style.withUnderline(value: value), fontFace, size, tapAction, highlightColor, isMuted: isMuted)
     }
 
     /** This span struck through (or with the strikethrough set to `value`). */
     public func strikethrough(value!: Bool = true): RichSpan {
-        RichSpan(kind, color, isMuted, style.withStrikethrough(value: value), fontFace, size, tapAction, highlightColor)
+        RichSpan(kind, color, style.withStrikethrough(value: value), fontFace, size, tapAction, highlightColor, isMuted: isMuted)
     }
 
     /** This span with its whole text style replaced. */
     public func fontStyle(value: FontStyle): RichSpan {
-        RichSpan(kind, color, isMuted, value, fontFace, size, tapAction, highlightColor)
+        RichSpan(kind, color, value, fontFace, size, tapAction, highlightColor, isMuted: isMuted)
     }
 
     /** This span drawn in a registered application font (see `Fonts.register`). */
     public func fontFamily(name: String): RichSpan {
-        RichSpan(kind, color, isMuted, style, Some(name), size, tapAction, highlightColor)
+        RichSpan(kind, color, style, Some(name), size, tapAction, highlightColor, isMuted: isMuted)
     }
 
     /** This span drawn at its own point size, overriding the `RichText`'s base size. */
     public func fontSize(value: Length): RichSpan {
-        RichSpan(kind, color, isMuted, style, fontFace, Some(value), tapAction, highlightColor)
+        RichSpan(kind, color, style, fontFace, Some(value), tapAction, highlightColor, isMuted: isMuted)
     }
 
     /** This span drawn at its own point size in font pixels. */
@@ -110,7 +110,7 @@ public struct RichSpan {
 
     /** Makes this span a clickable link: clicking it runs `action`, and the pointer turns interactive. */
     public func onTap(action: () -> Unit): RichSpan {
-        RichSpan(kind, color, isMuted, style, fontFace, size, action, highlightColor)
+        RichSpan(kind, color, style, fontFace, size, action, highlightColor, isMuted: isMuted)
     }
 
     /**
@@ -121,6 +121,6 @@ public struct RichSpan {
      * should read as one continuous mark belongs in a single span.
      */
     public func highlight(background: Color): RichSpan {
-        RichSpan(kind, color, isMuted, style, fontFace, size, tapAction, Some(background))
+        RichSpan(kind, color, style, fontFace, size, tapAction, Some(background), isMuted: isMuted)
     }
 }

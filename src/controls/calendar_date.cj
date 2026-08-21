@@ -24,7 +24,7 @@ public struct CalendarDate <: Equatable<CalendarDate> {
         this.day = clampInt(day, 1, daysInGregorianMonth(year, m))
     }
 
-    /** Today's date from the system clock. Throws `CuiException` if the clock cannot be read. */
+    /** Today's date from the system clock. Throws `SdlException` if the clock cannot be read. */
     public static func today(): CalendarDate {
         let now = Time.currentDateTime()
         CalendarDate(Int64(now.year), Int64(now.month), Int64(now.day))
@@ -66,7 +66,7 @@ public struct CalendarDate <: Equatable<CalendarDate> {
 
     /** ISO-8601 `YYYY-MM-DD`, zero-padded. */
     public func iso(): String {
-        "${pad4(year)}-${pad2(month)}-${pad2(day)}"
+        "${pad4(year)}-${padTwo(month)}-${padTwo(day)}"
     }
 
     /** Negative when this date precedes `other`, zero when equal, positive when it follows. */
@@ -177,14 +177,6 @@ private func fromEpochDay(epochDay: Int64): CalendarDate {
 // non-negative modulo.
 private func weekdayFromEpochDay(epochDay: Int64): Int64 {
     ((epochDay + 4) % 7 + 7) % 7
-}
-
-private func pad2(value: Int64): String {
-    if (value >= 0 && value < 10) {
-        "0${value}"
-    } else {
-        "${value}"
-    }
 }
 
 private func pad4(value: Int64): String {

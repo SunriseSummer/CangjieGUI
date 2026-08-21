@@ -2,7 +2,7 @@ package cui.controls
 
 import std.collection.ArrayList
 import std.math.{cos, sin}
-import sdl.{FontSizes, Pen, Point, Rect, Size, UiEvent}
+import sdl.{FontSizes, Pen, Point, Rect, Size, UiEvent, clampF32}
 import cui.core.{UiContext, Widget, emit}
 
 private let RING_PI: Float64 = 3.141592653589793
@@ -78,14 +78,9 @@ public class ProgressRing <: Widget {
     }
 }
 
+// A progress value pinned into the displayable [0, 1] range.
 internal func clampFraction(value: Float32): Float32 {
-    if (value < 0.0) {
-        0.0
-    } else if (value > 1.0) {
-        1.0
-    } else {
-        value
-    }
+    clampF32(value, 0.0, 1.0)
 }
 
 /*

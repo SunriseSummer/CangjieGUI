@@ -16,9 +16,13 @@ protected let CUI_GAP: Float32 = 8.0
  * wrap the widget in a `ModifiedWidget` and return the wrapper for chaining.
  */
 public interface Widget {
+    /** Returns the preferred size within `available` space; must not exceed it unless unavoidable. */
     func measure(ctx: UiContext, available: Size): Size
+    /** Assigns the widget's on-screen frame; children are positioned inside `rect` here. */
     func layout(ctx: UiContext, rect: Rect): Unit
+    /** Paints the widget into its laid-out frame using the context's renderer. */
     func draw(ctx: UiContext): Unit
+    /** Processes one input event; returning true consumes it and stops dispatch behind this widget. */
     func handle(ctx: UiContext, event: UiEvent): Bool
 
     /**
@@ -30,6 +34,7 @@ public interface Widget {
         false
     }
 
+    /** The relative share of leftover space a flexible widget receives (see `isFlexible`). */
     func flexWeight(): Float32 {
         1.0
     }
@@ -246,6 +251,7 @@ public interface Widget {
         shadow(layers, radius: vpLength(radius))
     }
 
+    /** Strokes a 1-pixel square-cornered border on top of this widget. */
     func border(color: Color): Widget {
         applyModifier(this, WidgetModifier.Border(color, 1.0, vpLength(0.0)))
     }
@@ -321,17 +327,31 @@ public interface Widget {
     }
 }
 
+/*
+ * Delivers `event` to `widget` as a broadcast: the consumed flag is deliberately dropped.
+ * Frame ticks (and other broadcast phases) must reach every child so animations and
+ * per-frame hooks keep running — no child may stop the fan-out by "consuming" the tick,
+ * so the return value carries no information for the caller. Containers dispatching
+ * consumable input should call `handle` directly and honour its result instead.
+ */
+public func broadcastEvent(widget: Widget, ctx: UiContext, event: UiEvent): Unit {
+    let _ = widget.handle(ctx, event) // cjcheck-ignore: ignore-result # broadcast semantics: consumed flag is meaningless for fan-out (see function comment)
+}
+
+/** A layout direction: stacks lay out along one axis; stretch rules are asked per axis. */
 public enum Axis {
     | Horizontal
     | Vertical
 }
 
+/** A button's visual intent, mapped by the theme to a fill/border set (see `buttonSurface`). */
 public enum ButtonRole {
     | Normal
     | Primary
     | Danger
 }
 
+/** Horizontal text alignment within a label's frame, in reading direction. */
 public enum TextAlign {
     | Leading
     | Center
@@ -367,4 +387,19 @@ public enum Alignment {
     | BottomLeading
     | Bottom
     | BottomTrailing
+}
+
+/*
+ * Clamps a list index into [0, count-1]; an empty list clamps to 0 so callers can keep a
+ * single "current item" slot without special-casing emptiness. Shared by every control
+ * that keeps a selected/highlighted position over a possibly shrinking item list.
+ */
+protected func clampItemIndex(index: Int64, count: Int64): Int64 {
+    if (count <= 0 || index < 0) {
+        0
+    } else if (index >= count) {
+        count - 1
+    } else {
+        index
+    }
 }

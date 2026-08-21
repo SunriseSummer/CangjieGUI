@@ -83,6 +83,7 @@ public class UiContext {
     private var lastPressY: Float32 = 0.0
     private var hasLastPress = false
 
+    /** Asks the desktop loop to exit after the current frame (window close, app quit action). */
     public func requestClose(): Unit {
         shouldClose = true
     }
@@ -155,6 +156,7 @@ public class UiContext {
         focusRingVisible = true // Tab traversal is keyboard, so the ring shows
     }
 
+    /** Whether `id` currently owns keyboard focus. */
     public func hasFocus(id: String): Bool {
         focusId == id
     }
@@ -168,8 +170,10 @@ public class UiContext {
         focusId == id && focusRingVisible
     }
 
-    // `viaKeyboard` marks focus the user reached by keyboard (Tab, autofocus) versus a pointer
-    // press; it drives whether a ring shows, not focus itself.
+    /*
+     * Gives keyboard focus to `id`. `viaKeyboard` marks focus the user reached by keyboard
+     * (Tab, autofocus) versus a pointer press; it drives whether a ring shows, not focus itself.
+     */
     public func focus(id: String, viaKeyboard!: Bool = false): Unit {
         focusId = id
         focusClaimedInPress = true
@@ -410,10 +414,12 @@ public class UiContext {
         dragGrabOffset
     }
 
+    /** Whether `id` owns the active pointer drag started by `beginDrag`. */
     public func isDragging(id: String): Bool {
         dragId == id
     }
 
+    /** Ends the active drag, releasing the drag owner and its grab offset. */
     public func clearDrag(): Unit {
         dragId = ""
         dragGrabOffset = 0.0

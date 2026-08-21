@@ -15,6 +15,7 @@ public enum LengthUnit {
     | Vp
     | Fp
 
+    /** The unit's suffix as written in source: "px", "vp" or "fp". */
     public func symbol(): String {
         match (this) {
             case Px => "px"
@@ -38,6 +39,7 @@ public struct Length <: ToString {
         this.unit = unit
     }
 
+    /** A zero length; the unit (vp) is irrelevant since zero resolves to zero at any scale. */
     public static func zero(): Length {
         Length(0.0, LengthUnit.Vp)
     }
@@ -72,18 +74,21 @@ public interface LengthUnits {
 }
 
 extend Int64 <: LengthUnits {
+    /** This value in physical device pixels (see `LengthUnits.px`). */
     public prop px: Length {
         get() {
             Length(Float32(this), LengthUnit.Px)
         }
     }
 
+    /** This value in virtual (density-independent) pixels (see `LengthUnits.vp`). */
     public prop vp: Length {
         get() {
             Length(Float32(this), LengthUnit.Vp)
         }
     }
 
+    /** This value in font pixels, following the user font scale (see `LengthUnits.fp`). */
     public prop fp: Length {
         get() {
             Length(Float32(this), LengthUnit.Fp)
@@ -92,18 +97,21 @@ extend Int64 <: LengthUnits {
 }
 
 extend Float64 <: LengthUnits {
+    /** This value in physical device pixels (see `LengthUnits.px`). */
     public prop px: Length {
         get() {
             Length(Float32(this), LengthUnit.Px)
         }
     }
 
+    /** This value in virtual (density-independent) pixels (see `LengthUnits.vp`). */
     public prop vp: Length {
         get() {
             Length(Float32(this), LengthUnit.Vp)
         }
     }
 
+    /** This value in font pixels, following the user font scale (see `LengthUnits.fp`). */
     public prop fp: Length {
         get() {
             Length(Float32(this), LengthUnit.Fp)
@@ -139,6 +147,7 @@ public struct LengthInsets {
         this.left = left
     }
 
+    /** Insets of zero on all four edges. */
     public static func zero(): LengthInsets {
         LengthInsets(Length.zero())
     }

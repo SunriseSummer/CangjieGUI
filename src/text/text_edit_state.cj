@@ -1,5 +1,6 @@
 package cui.text
 
+import sdl.input.Clipboard
 import cui.core.{Bindable, State}
 
 /**
@@ -32,12 +33,13 @@ public class TextEditState {
         this.anchor = State<Int64>(value.size)
     }
 
+    /** Clamps caret and anchor onto valid rune boundaries after an external text write. */
     public func normalizeCursor(): Unit {
         // Runs every frame (draw calls it): skip the write when already normalized so callers
         // that own and observe the cursor/anchor are not notified — and revisions not bumped —
         // for a no-op. Behaviour is unchanged; only redundant notifications are avoided.
-        let _ = cursor.setIfChanged(normalizedTextCursor(text.value, cursor.value))
-        let _ = anchor.setIfChanged(normalizedTextCursor(text.value, anchor.value))
+        let _ = cursor.setIfChanged(normalizedTextCursor(text.value, cursor.value)) // cjcheck-ignore: ignore-result # write-on-change only; whether it changed is irrelevant here
+        let _ = anchor.setIfChanged(normalizedTextCursor(text.value, anchor.value)) // cjcheck-ignore: ignore-result # write-on-change only; whether it changed is irrelevant here
     }
 
     /** Whether a non-empty range is selected. */
@@ -129,14 +131,16 @@ public class TextEditState {
         true
     }
 
+    /** Replaces the selection (or inserts at the caret) with `value`, collapsing the caret after it. */
     public func insert(value: String): Unit {
-        let _ = deleteSelection()
+        let _ = deleteSelection() // cjcheck-ignore: ignore-result # insert replaces any selection; "nothing was selected" needs no branch
         let position = normalizedTextCursor(text.value, cursor.value)
         text.value = text.value[0..position] + value + text.value[position..text.value.size]
         cursor.value = position + value.size
         anchor.value = cursor.value
     }
 
+    /** Deletes the selection, or the rune before the caret when nothing is selected. */
     public func backspace(): Unit {
         if (deleteSelection()) {
             return
@@ -151,6 +155,7 @@ public class TextEditState {
         anchor.value = start
     }
 
+    /** Deletes the selection, or the rune after the caret when nothing is selected. */
     public func deleteForward(): Unit {
         if (deleteSelection()) {
             return
@@ -169,6 +174,7 @@ public class TextEditState {
     // one boundary in the travel direction. The `extend*` variants keep the anchor so a
     // held Shift grows or shrinks the selection.
 
+    /** Moves the caret one boundary left, collapsing a selection to its start. */
     public func moveLeft(): Unit {
         if (hasSelection()) {
             cursor.value = selectionStart()
@@ -178,6 +184,7 @@ public class TextEditState {
         anchor.value = cursor.value
     }
 
+    /** Moves the caret one boundary right, collapsing a selection to its end. */
     public func moveRight(): Unit {
         if (hasSelection()) {
             cursor.value = selectionEnd()
@@ -187,55 +194,67 @@ public class TextEditState {
         anchor.value = cursor.value
     }
 
+    /** Extends the selection one boundary left, keeping the anchor (Shift+Left). */
     public func extendLeft(): Unit {
         cursor.value = previousTextBoundary(text.value, cursor.value)
     }
 
+    /** Extends the selection one boundary right, keeping the anchor (Shift+Right). */
     public func extendRight(): Unit {
         cursor.value = nextTextBoundary(text.value, cursor.value)
     }
 
+    /** Moves the caret to the start of the document, collapsing any selection. */
     public func moveToStart(): Unit {
         cursor.value = 0
         anchor.value = 0
     }
 
+    /** Moves the caret to the end of the document, collapsing any selection. */
     public func moveToEnd(): Unit {
         cursor.value = text.value.size
         anchor.value = cursor.value
     }
 
+    /** Extends the selection to the start of the document, keeping the anchor. */
     public func extendToStart(): Unit {
         cursor.value = 0
     }
 
+    /** Extends the selection to the end of the document, keeping the anchor. */
     public func extendToEnd(): Unit {
         cursor.value = text.value.size
     }
 
+    /** Moves the caret to the start of the current line, collapsing any selection (Home). */
     public func moveToLineStart(): Unit {
         extendToLineStart()
         anchor.value = cursor.value
     }
 
+    /** Moves the caret to the end of the current line, collapsing any selection (End). */
     public func moveToLineEnd(): Unit {
         extendToLineEnd()
         anchor.value = cursor.value
     }
 
+    /** Extends the selection to the start of the current line, keeping the anchor (Shift+Home). */
     public func extendToLineStart(): Unit {
         cursor.value = lineStartBeforeOrAt(text.value, cursor.value)
     }
 
+    /** Extends the selection to the end of the current line, keeping the anchor (Shift+End). */
     public func extendToLineEnd(): Unit {
         cursor.value = lineEndAfterOrAt(text.value, cursor.value)
     }
 
+    /** Moves the caret one line up keeping the column, collapsing any selection (Up). */
     public func moveLineUp(): Unit {
         extendLineUp()
         anchor.value = cursor.value
     }
 
+    /** Moves the caret one line down keeping the column, collapsing any selection (Down). */
     public func moveLineDown(): Unit {
         extendLineDown()
         anchor.value = cursor.value
@@ -244,6 +263,7 @@ public class TextEditState {
     // Column-preserving vertical motion that keeps the anchor, so Shift+Up / Shift+Down grow
     // the selection. The plain move* variants above delegate here and then collapse.
 
+    /** Extends the selection one line up keeping the column and the anchor (Shift+Up). */
     public func extendLineUp(): Unit {
         let current = normalizedTextCursor(text.value, cursor.value)
         let currentStart = lineStartBeforeOrAt(text.value, current)
@@ -257,6 +277,7 @@ public class TextEditState {
         cursor.value = advanceTextCursorByBytes(text.value, previousStart, column, previousEnd)
     }
 
+    /** Extends the selection one line down keeping the column and the anchor (Shift+Down). */
     public func extendLineDown(): Unit {
         let current = normalizedTextCursor(text.value, cursor.value)
         let currentEnd = lineEndAfterOrAt(text.value, current)
@@ -279,5 +300,23 @@ public class TextEditState {
     /** Moves the caret to `position` while keeping the anchor (a drag-select). */
     public func extendTo(position: Int64): Unit {
         cursor.value = normalizedTextCursor(text.value, position)
+    }
+}
+
+/*
+ * Copies the selection to the system clipboard, returning whether anything was copied.
+ * Clipboard access can fail without a desktop session; a failed platform write reports
+ * false (nothing copied) rather than raising, so Ctrl+C/Ctrl+X never crash the editor.
+ * Shared by TextField and TextArea.
+ */
+internal func copyEditSelection(edit: TextEditState): Bool {
+    if (!edit.hasSelection()) {
+        return false
+    }
+    try {
+        Clipboard.setText(edit.selectedText())
+        true
+    } catch (_: Exception) {
+        false
     }
 }

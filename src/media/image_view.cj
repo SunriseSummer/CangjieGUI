@@ -3,6 +3,11 @@ package cui.media
 import sdl.{Rect, Size, Texture, UiEvent}
 import cui.core.{Length, LengthUnit, UiContext, Widget, emit}
 
+/*
+ * How an image resolves a frame whose aspect ratio differs from its own: `Stretch` fills
+ * both axes ignoring aspect, `Contain` letterboxes to show the whole image, and `Cover`
+ * fills the frame and crops the overflow.
+ */
 public enum ImageFit {
     | Stretch
     | Contain
@@ -81,10 +86,12 @@ public class ImageView <: Widget & Resource {
         false
     }
 
+    /** Whether `close` has been called; a closed view stops drawing its texture. */
     public func isClosed(): Bool {
         closed
     }
 
+    /** Releases the view's claim on its texture; the shared cache owns the actual texture. */
     public func close(): Unit {
         closed = true
     }

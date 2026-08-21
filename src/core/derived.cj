@@ -57,7 +57,7 @@ public class DerivedState<T> <: Observable<T> {
 
     public prop revision: UInt64 {
         get() {
-            let _ = refreshIfStale()
+            let _ = refreshIfStale() // cjcheck-ignore: ignore-result # called for its refresh side effect; selfRevision is read next
             selfRevision
         }
     }

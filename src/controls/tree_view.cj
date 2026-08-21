@@ -1,7 +1,7 @@
 package cui.controls
 
 import std.collection.{ArrayList, HashSet}
-import sdl.{Color, FontSizes, IconName, Key, MouseButton, Pen, Rect, Size, UiEvent, drawIcon}
+import sdl.{FontSizes, IconName, Key, MouseButton, Pen, Rect, Size, UiEvent, drawIcon}
 import cui.core.{Bindable, CUI_SMALL_H, CursorShape, ScrollBar, maxScrollOffset, State, UiContext, Widget, requireControlId,
     claimHoverIfInside, clampScrollOffset, drawSurface, drawVerticalScrollBar, emit, focusableControlIdentity,
     localState, scrollLineIndex, scrollLineRemainder, scrollOffsetAfterWheel}
@@ -150,7 +150,7 @@ public class TreeView <: Widget {
             revealRowIndex(selectedIndex())
             lastRevealed.value = selected.value
         }
-        drawSurface(ctx, frame, ctx.theme.fieldSurface(ctx.showFocusRing(controlId)))
+        drawSurface(ctx, frame, ctx.theme.fieldSurface(active: ctx.showFocusRing(controlId)))
 
         ctx.renderer.pushClip(viewport)
         var i = scrollLineIndex(scrollStateValue.value)
@@ -261,7 +261,7 @@ public class TreeView <: Widget {
         if (current >= 0) {
             let row = rows[current]
             if (row.hasChildren && !row.expanded) {
-                setExpanded(row.id, true)
+                setExpanded(row.id, expand: true)
             } else if (row.hasChildren && row.expanded && current + 1 < rows.size) {
                 selectRow(current + 1)
             }
@@ -278,7 +278,7 @@ public class TreeView <: Widget {
         if (current >= 0) {
             let row = rows[current]
             if (row.hasChildren && row.expanded) {
-                setExpanded(row.id, false)
+                setExpanded(row.id, expand: false)
             } else {
                 let parent = parentIndex(current)
                 if (parent >= 0) {
@@ -361,12 +361,12 @@ public class TreeView <: Widget {
     }
 
     private func toggleExpanded(id: String): Unit {
-        setExpanded(id, !expandedState.value.contains(id))
+        setExpanded(id, expand: !expandedState.value.contains(id))
     }
 
     // Rebuilds the expansion set as a fresh value so the state write is observed (a mutated-in-place
     // set would keep the same reference and could be missed by change tracking).
-    private func setExpanded(id: String, expand: Bool): Unit {
+    private func setExpanded(id: String, expand!: Bool): Unit {
         let next = HashSet<String>()
         for (existing in expandedState.value) {
             next.add(existing)
@@ -391,7 +391,7 @@ public class TreeView <: Widget {
         }
         let disclosureX = rect.x + 6.0 + Float32(row.depth) * TREE_INDENT
         if (row.hasChildren) {
-            drawChevron(ctx, disclosureX + TREE_TWISTY_W / 2.0, rect.centerY(), row.expanded, textColor)
+            drawTwisty(ctx, disclosureX + TREE_TWISTY_W / 2.0, rect.centerY(), Pen(width: 1.6, color: textColor), expanded: row.expanded)
         }
         var contentX = disclosureX + TREE_TWISTY_W
         match (row.icon) {
@@ -406,10 +406,9 @@ public class TreeView <: Widget {
     }
 }
 
-// A disclosure chevron: pointing down when expanded, right when collapsed — the conventional twisty.
-private func drawChevron(ctx: UiContext, cx: Float32, cy: Float32, expanded: Bool, color: Color): Unit {
-    let pen = Pen(width: 1.6, color: color)
-    let arm: Float32 = 3.0
+// A disclosure chevron: pointing down when expanded, right when collapsed — the conventional
+// twisty, shared by TreeView (smaller) and Accordion (slightly larger, via pen/arm).
+internal func drawTwisty(ctx: UiContext, cx: Float32, cy: Float32, pen: Pen, expanded!: Bool, arm!: Float32 = 3.0): Unit {
     if (expanded) {
         ctx.renderer.strokeLine(cx - arm, cy - arm * 0.5, cx, cy + arm * 0.5, pen)
         ctx.renderer.strokeLine(cx, cy + arm * 0.5, cx + arm, cy - arm * 0.5, pen)
@@ -427,7 +426,8 @@ private func treeContentHeight(rows: Array<TreeRow>): Float32 {
     Float32(rows.size) * CUI_SMALL_H
 }
 
-private func seedExpanded(ids: Array<String>): HashSet<String> {
+// Builds the initial expansion set from ids; also reused by tree_view_test.
+internal func seedExpanded(ids: Array<String>): HashSet<String> {
     let set = HashSet<String>()
     for (id in ids) {
         set.add(id)

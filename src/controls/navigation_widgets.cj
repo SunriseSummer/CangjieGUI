@@ -2,10 +2,14 @@ package cui.controls
 
 import std.collection.ArrayList
 import sdl.{Key, MouseButton, Rect, Size, UiEvent, clampF32}
-import cui.core.{Bindable, CUI_CONTROL_H, CUI_GAP, CursorShape, Spring, UiContext, Widget, buildChildren,
+import cui.core.{clampItemIndex, Bindable, CUI_CONTROL_H, CUI_GAP, CursorShape, Spring, UiContext, Widget, buildChildren,
     claimHoverIfInside, drawFocusRing, drawSurface, emit, focusableControlIdentity, localState, requireControlId,
     unregisterFocusable}
 
+/*
+ * A row of mutually exclusive segments bound to a `Bindable<Int64>` index, with a sliding
+ * selection pill. A single focus stop: Tab reaches the strip, Left/Right move the selection.
+ */
 public class SegmentedControl <: Widget {
     private let items: Array<String>
     private let selected: Bindable<Int64>
@@ -28,7 +32,7 @@ public class SegmentedControl <: Widget {
         }
         let cid = focusableControlIdentity(base)
         this.controlId = cid
-        let start = Float32(clampIndex(selected.value, items.size))
+        let start = Float32(clampItemIndex(selected.value, items.size))
         this.indicatorSpring = localState<Spring>("${cid}:indicator") {Spring(start)}.value
         emit(this)
     }
@@ -46,8 +50,8 @@ public class SegmentedControl <: Widget {
         if (items.size == 0) {
             return
         }
-        drawSurface(ctx, frame, ctx.theme.fieldSurface(false))
-        let target = Float32(clampIndex(selected.value, items.size))
+        drawSurface(ctx, frame, ctx.theme.fieldSurface())
+        let target = Float32(clampItemIndex(selected.value, items.size))
         drawSlidingSegments(ctx, frame, items, indicatorSpring.animate(ctx, target: target))
         if (ctx.showFocusRing(controlId)) {
             drawFocusRing(ctx, frame, ctx.theme.controlRadius)
@@ -61,7 +65,7 @@ public class SegmentedControl <: Widget {
                 if (frame.contains(x, y) && items.size > 0) {
                     ctx.focus(controlId)
                     let segmentW = frame.w / Float32(items.size)
-                    selected.value = clampIndex(Int64((x - frame.x) / segmentW), items.size)
+                    selected.value = clampItemIndex(Int64((x - frame.x) / segmentW), items.size)
                     return true
                 }
             case UiEvent.KeyDown(Key.Left, _) => return stepSelection(ctx, -1)
@@ -79,11 +83,16 @@ public class SegmentedControl <: Widget {
         if (!ctx.hasFocus(controlId) || items.size == 0) {
             return false
         }
-        selected.value = clampIndex(clampIndex(selected.value, items.size) + delta, items.size)
+        selected.value = clampItemIndex(clampItemIndex(selected.value, items.size) + delta, items.size)
         true
     }
 }
 
+/*
+ * A tab strip over a page area: `labels` name the tabs, the body block declares one page
+ * per label, and `selected` binds the visible page index. Only the selected page is laid
+ * out and drawn. The strip is a single focus stop with Left/Right switching tabs.
+ */
 public class TabView <: Widget {
     private let labels: Array<String>
     private let selected: Bindable<Int64>
@@ -111,7 +120,7 @@ public class TabView <: Widget {
         // Only the active page can receive events, so stops on hidden pages would be dead
         // ends for Tab: building registers every page's controls, then the inactive pages'
         // stops are taken out again. Switching tabs re-registers on the next frame's rebuild.
-        let active = clampIndex(selected.value, this.pages.size)
+        let active = clampItemIndex(selected.value, this.pages.size)
         var i = 0
         while (i < this.pages.size) {
             if (i != active) {
@@ -123,7 +132,7 @@ public class TabView <: Widget {
         }
         // The active-tab indicator slides between tabs; started at the current tab so a static
         // first frame is settled (snapshot-stable).
-        let start = Float32(clampIndex(selected.value, labels.size))
+        let start = Float32(clampItemIndex(selected.value, labels.size))
         this.indicatorSpring = localState<Spring>("${cid}:indicator") {Spring(start)}.value
         emit(this)
     }
@@ -182,7 +191,7 @@ public class TabView <: Widget {
     }
 
     private func pageIndex(): Int64 {
-        clampIndex(selected.value, pages.size)
+        clampItemIndex(selected.value, pages.size)
     }
 
     private func layoutActivePage(ctx: UiContext): Unit {
@@ -217,8 +226,8 @@ public class TabView <: Widget {
             return
         }
         let header = Rect(frame.x, frame.y, frame.w, CUI_CONTROL_H)
-        drawSurface(ctx, header, ctx.theme.fieldSurface(false))
-        let target = Float32(clampIndex(selected.value, labels.size))
+        drawSurface(ctx, header, ctx.theme.fieldSurface())
+        let target = Float32(clampItemIndex(selected.value, labels.size))
         drawSlidingSegments(ctx, header, labels, indicatorSpring.animate(ctx, target: target))
         if (ctx.showFocusRing(controlId)) {
             drawFocusRing(ctx, header, ctx.theme.controlRadius)
@@ -232,7 +241,7 @@ public class TabView <: Widget {
                 if (header.contains(x, y) && labels.size > 0) {
                     ctx.focus(controlId)
                     let tabW = frame.w / Float32(labels.size)
-                    selected.value = clampIndex(Int64((x - frame.x) / tabW), labels.size)
+                    selected.value = clampItemIndex(Int64((x - frame.x) / tabW), labels.size)
                     return true
                 }
             case UiEvent.KeyDown(Key.Left, _) => return stepTab(ctx, -1)
@@ -246,7 +255,7 @@ public class TabView <: Widget {
         if (!ctx.hasFocus(controlId) || labels.size == 0) {
             return false
         }
-        selected.value = clampIndex(clampIndex(selected.value, labels.size) + delta, labels.size)
+        selected.value = clampItemIndex(clampItemIndex(selected.value, labels.size) + delta, labels.size)
         true
     }
 }
@@ -270,15 +279,5 @@ private func drawSlidingSegments(ctx: UiContext, row: Rect, items: Array<String>
         }
         ctx.renderer.textCenter(items[i], cell, color)
         i += 1
-    }
-}
-
-private func clampIndex(index: Int64, count: Int64): Int64 {
-    if (count <= 0 || index < 0) {
-        0
-    } else if (index >= count) {
-        count - 1
-    } else {
-        index
     }
 }

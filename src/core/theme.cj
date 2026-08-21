@@ -69,6 +69,7 @@ public struct Theme {
         this.borderWidth = borderWidth
     }
 
+    /** The built-in light palette, the default for `DesktopApp`. */
     public static func light(): Theme {
         Theme(
             bg: Color.rgb(242, 245, 249),
@@ -90,6 +91,7 @@ public struct Theme {
         )
     }
 
+    /** The built-in dark palette; pass to `DesktopApp(theme: ...)` to opt in. */
     public static func dark(): Theme {
         Theme(
             bg: Color.rgb(18, 22, 29),
@@ -111,6 +113,7 @@ public struct Theme {
         )
     }
 
+    /** The flat background surface used by `Panel` and other grouping containers. */
     public func panelSurface(): SurfaceStyle {
         SurfaceStyle(
             panel,
@@ -122,6 +125,7 @@ public struct Theme {
         )
     }
 
+    /** An elevated surface with border and shadow, used by cards, popups and overlays. */
     public func raisedSurface(): SurfaceStyle {
         SurfaceStyle(
             panelRaised,
@@ -133,7 +137,8 @@ public struct Theme {
         )
     }
 
-    public func fieldSurface(active: Bool): SurfaceStyle {
+    /** The input-well surface for text fields and similar editors; `active` marks focus. */
+    public func fieldSurface(active!: Bool = false): SurfaceStyle {
         SurfaceStyle(
             if (active) {
                 fieldActive
@@ -156,6 +161,7 @@ public struct Theme {
         )
     }
 
+    /** The button fill/border set for `role` (normal, primary or danger). */
     public func buttonSurface(role: ButtonRole): SurfaceStyle {
         match (role) {
             case ButtonRole.Primary => SurfaceStyle(
@@ -185,6 +191,7 @@ public struct Theme {
         }
     }
 
+    /** The accent-tinted surface that marks the selected row, tab or item. */
     public func selectedSurface(): SurfaceStyle {
         SurfaceStyle(accent, border: accent, radius: controlRadius, borderWidth: borderWidth)
     }

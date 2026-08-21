@@ -89,7 +89,7 @@ public init(
 
 **异常**
 
-- `CuiException` — 应用元数据或 SDL hint 无法应用，或者窗口、渲染器、文本输入初始化失败时；CUI 不捕获或改写该异常。
+- `SdlException` — 应用元数据或 SDL hint 无法应用，或者窗口、渲染器、文本输入初始化失败时；CUI 不捕获或改写该异常。
 
 ## 方法
 
@@ -119,7 +119,7 @@ public func setMinimumSize(width: Int32, height: Int32): Unit
 
 **异常**
 
-- `CuiException` — SDL 拒绝设置窗口最小尺寸时；CUI 不捕获或改写该异常。
+- `SdlException` — SDL 拒绝设置窗口最小尺寸时；CUI 不捕获或改写该异常。
 
 ### useBaseCursor
 
@@ -157,7 +157,7 @@ public func openFileDialog(options!: FileDialogOptions = FileDialogOptions()): F
 
 **异常**
 
-- `CuiException` — 文件对话框选项非法时；CUI 不捕获或改写该异常。
+- `SdlException` — 文件对话框选项非法时；CUI 不捕获或改写该异常。
 
 ### saveFileDialog
 
@@ -175,7 +175,7 @@ public func saveFileDialog(options!: FileDialogOptions = FileDialogOptions()): F
 
 **异常**
 
-- `CuiException` — 文件对话框选项非法时；CUI 不捕获或改写该异常。
+- `SdlException` — 文件对话框选项非法时；CUI 不捕获或改写该异常。
 
 ### openFolderDialog
 
@@ -193,7 +193,7 @@ public func openFolderDialog(options!: FileDialogOptions = FileDialogOptions()):
 
 **异常**
 
-- `CuiException` — 文件夹对话框选项非法时；CUI 不捕获或改写该异常。
+- `SdlException` — 文件夹对话框选项非法时；CUI 不捕获或改写该异常。
 
 ### run
 

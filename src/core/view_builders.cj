@@ -2,6 +2,11 @@ package cui.core
 
 import sdl.{Rect, Size, UiEvent}
 
+/*
+ * A vertical stack: lays its children top to bottom with `spacing` between them and
+ * `padding` around them. The body block declares children; alignment and main-axis
+ * distribution are configured with the fluent modifiers. `hug()` opts out of flexing.
+ */
 public class VStack <: Widget {
     private let stack: Stack
 
@@ -64,7 +69,7 @@ public class VStack <: Widget {
 
     /** Controls whether this stack itself participates in its parent's flex pass. */
     public func flexible(value: Bool): VStack {
-        stack.setFlexible(value)
+        stack.setFlexible(value: value)
         this
     }
 
@@ -74,11 +79,16 @@ public class VStack <: Widget {
      * should be exactly as tall as what it holds).
      */
     public func hug(): VStack {
-        stack.setFlexible(false)
+        stack.setFlexible(value: false)
         this
     }
 }
 
+/*
+ * A horizontal stack: lays its children left to right with `spacing` between them and
+ * `padding` around them. The body block declares children; alignment and main-axis
+ * distribution are configured with the fluent modifiers. `hug()` opts out of flexing.
+ */
 public class HStack <: Widget {
     private let stack: Stack
 
@@ -141,7 +151,7 @@ public class HStack <: Widget {
 
     /** Controls whether this stack itself participates in its parent's flex pass. */
     public func flexible(value: Bool): HStack {
-        stack.setFlexible(value)
+        stack.setFlexible(value: value)
         this
     }
 
@@ -151,7 +161,7 @@ public class HStack <: Widget {
      * should be exactly as wide as what it holds).
      */
     public func hug(): HStack {
-        stack.setFlexible(false)
+        stack.setFlexible(value: false)
         this
     }
 }

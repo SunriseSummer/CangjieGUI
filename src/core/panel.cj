@@ -2,6 +2,11 @@ package cui.core
 
 import sdl.{Insets, Rect, Size, SurfaceStyle, UiEvent}
 
+/*
+ * A themed grouping container: paints the theme's panel surface (or a custom style)
+ * behind its content with configurable insets. The building block for cards, sidebars
+ * and toolbars; use `style(...)` for a custom surface and `hug()` to stop it flexing.
+ */
 public class Panel <: Widget {
     private let child: Widget
     private var panelInsets: LengthInsets

@@ -1,7 +1,7 @@
 package cui.controls
 
 import std.collection.{ArrayList, HashSet}
-import sdl.{Color, FontSizes, Key, MouseButton, Pen, Rect, Size, UiEvent}
+import sdl.{FontSizes, Key, MouseButton, Pen, Rect, Size, UiEvent}
 import cui.core.{CursorShape, LAYOUT_UNBOUNDED, State, UiContext, Widget, resolveControlKey, buildKeyedChild,
     drawFocusRing, emit, focusableControlIdentity, localState}
 
@@ -224,24 +224,12 @@ public class Accordion <: Widget {
         if (ctx.showFocusRing(headerId)) {
             drawFocusRing(ctx, rect, ctx.theme.smallRadius)
         }
-        drawDisclosure(ctx, rect.x + 16.0, rect.centerY(), isExpanded, ctx.theme.mutedText)
+        drawTwisty(ctx, rect.x + 16.0, rect.centerY(), Pen(width: 1.7, color: ctx.theme.mutedText), expanded: isExpanded, arm: 3.5)
         let textY = rect.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
         ctx.renderer.text(titles[index], rect.x + 32.0, textY, ctx.theme.text, pointSize: FontSizes.CONTROL)
     }
 }
 
-// A disclosure chevron pointing down when expanded, right when collapsed.
-private func drawDisclosure(ctx: UiContext, cx: Float32, cy: Float32, expanded: Bool, color: Color): Unit {
-    let pen = Pen(width: 1.7, color: color)
-    let arm: Float32 = 3.5
-    if (expanded) {
-        ctx.renderer.strokeLine(cx - arm, cy - arm * 0.5, cx, cy + arm * 0.5, pen)
-        ctx.renderer.strokeLine(cx, cy + arm * 0.5, cx + arm, cy - arm * 0.5, pen)
-    } else {
-        ctx.renderer.strokeLine(cx - arm * 0.5, cy - arm, cx + arm * 0.5, cy, pen)
-        ctx.renderer.strokeLine(cx + arm * 0.5, cy, cx - arm * 0.5, cy + arm, pen)
-    }
-}
 
 // The seed expansion set: the requested indices, capped to one when `single`.
 private func seedExpanded(indices: Array<Int64>, single: Bool): HashSet<Int64> {

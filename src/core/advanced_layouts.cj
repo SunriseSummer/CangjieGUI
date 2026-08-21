@@ -66,7 +66,7 @@ public class ZStack <: Widget {
         match (event) {
             case UiEvent.Frame(_) =>
                 for (child in children) {
-                    let _ = child.handle(ctx, event)
+                    broadcastEvent(child, ctx, event)
                 }
                 return false
             case _ => ()
@@ -254,12 +254,12 @@ public class FlowRow <: Widget {
     }
 
     public func measure(ctx: UiContext, available: Size): Size {
-        let extent = flowExtent(ctx, available, false, Rect.zero())
+        let extent = flowExtent(ctx, available, Rect.zero(), shouldLayout: false)
         Size(min(available.w, extent.w), min(available.h, extent.h))
     }
 
     public func layout(ctx: UiContext, rect: Rect): Unit {
-        let _ = flowExtent(ctx, Size(rect.w, rect.h), true, rect)
+        let _ = flowExtent(ctx, Size(rect.w, rect.h), rect, shouldLayout: true) // cjcheck-ignore: ignore-result # layout pass wants the child placement side effect; the extent is measure-pass output
     }
 
     public func draw(ctx: UiContext): Unit {
@@ -279,7 +279,7 @@ public class FlowRow <: Widget {
         collectFocusableIds(children)
     }
 
-    private func flowExtent(ctx: UiContext, available: Size, shouldLayout: Bool, frame: Rect): Size {
+    private func flowExtent(ctx: UiContext, available: Size, frame: Rect, shouldLayout!: Bool): Size {
         let hGap = max(0.0, ctx.resolve(horizontalGap))
         let vGap = max(0.0, ctx.resolve(verticalGap))
         var x: Float32 = 0.0
@@ -434,7 +434,7 @@ internal func dispatchChildren(children: Array<Widget>, ctx: UiContext, event: U
     match (event) {
         case UiEvent.Frame(_) =>
             for (child in children) {
-                let _ = child.handle(ctx, event)
+                broadcastEvent(child, ctx, event)
             }
             return false
         case _ => ()
@@ -449,7 +449,8 @@ internal func dispatchChildren(children: Array<Widget>, ctx: UiContext, event: U
     false
 }
 
-private func gapExtent(count: Int64, gap: Float32): Float32 {
+// Total space consumed by the gaps between `count` children (shared by grid/flow/stack).
+internal func gapExtent(count: Int64, gap: Float32): Float32 {
     if (count <= 1) {
         0.0
     } else {

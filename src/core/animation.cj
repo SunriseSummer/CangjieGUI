@@ -52,7 +52,9 @@ public class Spring {
 
     /** Whether the spring has reached its target and stopped. */
     public func settled(): Bool {
-        current == goal && velocity == 0.0
+        // Exact comparison is the settle sentinel: tick() assigns current = goal and
+        // velocity = 0.0 bit-for-bit when the spring lands; an epsilon would settle early.
+        current == goal && velocity == 0.0 // cjcheck-ignore: float-equal # sentinel identity written verbatim by tick()
     }
 
     /*
@@ -93,20 +95,13 @@ public class Spring {
         let force = -stiffness * (current - goal) - damping * velocity
         velocity += force * dt
         current += velocity * dt
-        if (springMagnitude(current - goal) < SPRING_SETTLE_POS && springMagnitude(velocity) < SPRING_SETTLE_VEL) {
+        if (absF32(current - goal) < SPRING_SETTLE_POS && absF32(velocity) < SPRING_SETTLE_VEL) {
             current = goal
             velocity = 0.0
         }
     }
 }
 
-private func springMagnitude(value: Float32): Float32 {
-    if (value < 0.0) {
-        -value
-    } else {
-        value
-    }
-}
 
 /*
  * A duration-based tween: eases a value from where it is toward a target over a fixed time using an
@@ -168,7 +163,7 @@ public class Animator {
 
     /** Retargets, restarting the ease from the current value. A no-op when already heading there. */
     public func target(value: Float32): Unit {
-        if (value != to) {
+        if (value != to) { // cjcheck-ignore: float-equal # retarget no-op check compares the caller's own previous value verbatim
             from = current
             to = value
             elapsedMs = 0.0
@@ -185,7 +180,8 @@ public class Animator {
 
     /** Whether the animation has reached its target and stopped (a pending delay still counts as busy). */
     public func settled(): Bool {
-        from == to || elapsedMs >= totalMs
+        // Exact comparison is the settle sentinel: reset()/tick() assign from = to verbatim.
+        from == to || elapsedMs >= totalMs // cjcheck-ignore: float-equal # sentinel identity written verbatim by reset()/tick()
     }
 
     /*

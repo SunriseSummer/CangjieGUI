@@ -66,9 +66,7 @@ public class Button <: Widget {
      * between containers). Throws `IllegalArgumentException` when `value` is empty.
      */
     public func key(value: String): Button {
-        requireControlId(value, "Button")
-        reregisterFocusable(controlId, value)
-        controlId = value
+        controlId = rekeyControl(controlId, value, "Button")
         this
     }
 
@@ -117,34 +115,7 @@ public class Button <: Widget {
     }
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
-        claimHoverIfInside(ctx, event, frame, controlId, CursorShape.Interactive)
-        match (event) {
-            case UiEvent.MouseDown(MouseButton.Left, x, y) =>
-                if (frame.contains(x, y)) {
-                    ctx.focus(controlId)
-                    ctx.press(controlId)
-                    return true
-                }
-            case UiEvent.MouseUp(MouseButton.Left, x, y) =>
-                if (ctx.isPressed(controlId)) {
-                    if (frame.contains(x, y)) {
-                        onClick()
-                    }
-                    return true
-                }
-            case UiEvent.KeyDown(Key.Enter, _) =>
-                if (ctx.hasFocus(controlId)) {
-                    onClick()
-                    return true
-                }
-            case UiEvent.KeyDown(Key.Space, _) =>
-                if (ctx.hasFocus(controlId)) {
-                    onClick()
-                    return true
-                }
-            case _ => ()
-        }
-        false
+        handleButtonProtocol(ctx, event, frame, controlId, onClick)
     }
 
     public func focusableId(): ?String {
@@ -152,25 +123,78 @@ public class Button <: Widget {
     }
 
     private func buttonStyle(ctx: UiContext): SurfaceStyle {
-        match (customStyle) {
-            case Some(value) => value
-            case None =>
-                let base = ctx.theme.buttonSurface(buttonRole)
-                match (buttonRole) {
-                    case ButtonRole.Normal =>
-                        var style = base
-                        if (ctx.isPressed(controlId)) {
-                            style = style.withFill(ctx.theme.accentSoft)
-                        } else if (ctx.isHovered(controlId)) {
-                            // Single-winner hover: in overlapping layouts only the visually
-                            // top-most claimant highlights (same protocol as the cursor shape).
-                            style = style.withFill(ctx.theme.fieldActive)
-                        }
-                        // The focus ring (drawn in draw() on keyboard focus) shows where
-                        // Enter/Space will land — no need to also recolour the border.
-                        style
-                    case _ => base
+        buttonInteractionStyle(ctx, controlId, buttonRole, customStyle)
+    }
+}
+
+/*
+ * The shared push-button interaction protocol: press claims focus, a release inside fires
+ * `onClick` (dragging off before release cancels), and Enter/Space activate while focused.
+ * Extracted so `Button` and `IconButton` stay behaviourally identical by construction.
+ */
+protected func handleButtonProtocol(
+    ctx: UiContext,
+    event: UiEvent,
+    frame: Rect,
+    controlId: String,
+    onClick: () -> Unit
+): Bool {
+    claimHoverIfInside(ctx, event, frame, controlId, CursorShape.Interactive)
+    match (event) {
+        case UiEvent.MouseDown(MouseButton.Left, x, y) =>
+            if (frame.contains(x, y)) {
+                ctx.focus(controlId)
+                ctx.press(controlId)
+                return true
+            }
+        case UiEvent.MouseUp(MouseButton.Left, x, y) =>
+            if (ctx.isPressed(controlId)) {
+                if (frame.contains(x, y)) {
+                    onClick()
                 }
-        }
+                return true
+            }
+        case UiEvent.KeyDown(Key.Enter, _) =>
+            if (ctx.hasFocus(controlId)) {
+                onClick()
+                return true
+            }
+        case UiEvent.KeyDown(Key.Space, _) =>
+            if (ctx.hasFocus(controlId)) {
+                onClick()
+                return true
+            }
+        case _ => ()
+    }
+    false
+}
+
+/*
+ * The shared push-button surface: a custom style wins outright; the Normal role layers
+ * pressed/hovered fills over the theme surface (single-winner hover — only the top-most
+ * claimant highlights); Primary/Danger keep their strong fill in every interaction state.
+ * The focus ring, drawn separately on keyboard focus, marks where Enter/Space will land.
+ */
+protected func buttonInteractionStyle(
+    ctx: UiContext,
+    controlId: String,
+    buttonRole: ButtonRole,
+    customStyle: ?SurfaceStyle
+): SurfaceStyle {
+    match (customStyle) {
+        case Some(value) => value
+        case None =>
+            let base = ctx.theme.buttonSurface(buttonRole)
+            match (buttonRole) {
+                case ButtonRole.Normal =>
+                    var style = base
+                    if (ctx.isPressed(controlId)) {
+                        style = style.withFill(ctx.theme.accentSoft)
+                    } else if (ctx.isHovered(controlId)) {
+                        style = style.withFill(ctx.theme.fieldActive)
+                    }
+                    style
+                case _ => base
+            }
     }
 }

@@ -12,7 +12,7 @@ package cui
  * Both layers are re-exported here so applications only need `import cui.*`.
  */
 public import sdl.Color
-public import sdl.CuiException
+public import sdl.SdlException
 public import sdl.FontSizes
 public import sdl.FontStyle
 public import sdl.Fonts

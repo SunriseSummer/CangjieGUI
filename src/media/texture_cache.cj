@@ -12,7 +12,7 @@ import sdl.{Renderer, Texture, TextureBlendMode}
  * load is cached as `None` so a missing file is not retried every frame; call `invalidateImage`
  * after (re)writing the file to retry. UI-thread only, like the rest of the framework.
  */
-private var cacheRenderer: ?Renderer = None
+private var cacheRenderer: ?Renderer = None // cjcheck-ignore: global-var # UI-thread-only module cache owner (see file comment)
 private let cachedTextures = HashMap<String, ?Texture>()
 
 // Returns the cached texture for `path`, loading and caching it (or the failure) on first use.
@@ -62,7 +62,7 @@ public func invalidateImage(path: String): Unit {
         case Some(Some(texture)) => texture.close()
         case _ => ()
     }
-    let _ = cachedTextures.remove(path)
+    let _ = cachedTextures.remove(path) // cjcheck-ignore: ignore-result # the removed entry was already closed above; a miss means nothing to invalidate
 }
 
 /** Empties the image cache, closing every cached texture; images reload on next draw. */

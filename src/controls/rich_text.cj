@@ -278,8 +278,11 @@ public class RichText <: Widget {
     private func layoutFor(ctx: UiContext, width: Float32, ps: Float32, lineHeight: Float32): RichLayout {
         let vpProbe = ctx.resolve(Length(1.0, LengthUnit.Vp))
         match (cached) {
-            case Some(layout) where cachedPointSize == ps && cachedVpProbe == vpProbe &&
-                (cachedWidthKey == width || (layout.lines <= 1 && layout.width <= width)) => layout
+            // Exact float comparison is deliberate: the cache keys are reused input values,
+            // not computed approximations, so equality means "same inputs as last time" and
+            // the worst case of a near-miss is one redundant re-layout, never a wrong one.
+            case Some(layout) where cachedPointSize == ps && cachedVpProbe == vpProbe && // cjcheck-ignore: float-equal # cache-key identity; miss only costs a re-layout
+                (cachedWidthKey == width || (layout.lines <= 1 && layout.width <= width)) => layout // cjcheck-ignore: float-equal # cache-key identity; miss only costs a re-layout
             case _ =>
                 let sizes = resolveSpanSizes(ctx, ps)
                 let layout = layoutRichSpans(

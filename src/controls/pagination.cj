@@ -2,7 +2,7 @@ package cui.controls
 
 import std.collection.ArrayList
 import sdl.{Color, FontSizes, MouseButton, Pen, Rect, Size, UiEvent}
-import cui.core.{Bindable, CursorShape, UiContext, Widget, resolveControlKey, emit}
+import cui.core.{clampItemIndex, Bindable, CursorShape, UiContext, Widget, resolveControlKey, emit}
 
 private let PAGE_BTN_W: Float32 = 34.0
 private let PAGE_BTN_H: Float32 = 34.0
@@ -54,7 +54,7 @@ public class Pagination <: Widget {
 
     public func draw(ctx: UiContext): Unit {
         let page = clampPage(current.value, pageCount)
-        drawArrow(ctx, prevRect, true, page > 0)
+        drawArrow(ctx, prevRect, pointsLeft: true, enabled: page > 0)
         for (i in 0..items.size) {
             let value = items[i]
             if (value == PAGE_ELLIPSIS) {
@@ -63,7 +63,7 @@ public class Pagination <: Widget {
                 drawPage(ctx, itemRects[i], value, value == page)
             }
         }
-        drawArrow(ctx, nextRect, false, page < pageCount - 1)
+        drawArrow(ctx, nextRect, pointsLeft: false, enabled: page < pageCount - 1)
     }
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
@@ -136,7 +136,7 @@ public class Pagination <: Widget {
         drawCentered(ctx, "…", rect, ctx.theme.mutedText)
     }
 
-    private func drawArrow(ctx: UiContext, rect: Rect, pointsLeft: Bool, enabled: Bool): Unit {
+    private func drawArrow(ctx: UiContext, rect: Rect, pointsLeft!: Bool, enabled!: Bool): Unit {
         let hovered = enabled && rect.contains(ctx.mouseX, ctx.mouseY)
         let fill = if (hovered) {
             ctx.theme.fieldActive
@@ -168,16 +168,9 @@ public class Pagination <: Widget {
     }
 }
 
+// Kept as a named wrapper: "page" reads better than "item index" at pagination call sites.
 internal func clampPage(page: Int64, pageCount: Int64): Int64 {
-    if (pageCount <= 0) {
-        0
-    } else if (page < 0) {
-        0
-    } else if (page >= pageCount) {
-        pageCount - 1
-    } else {
-        page
-    }
+    clampItemIndex(page, pageCount)
 }
 
 /*

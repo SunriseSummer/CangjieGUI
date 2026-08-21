@@ -27,8 +27,8 @@ import sdl.{Rect, Size, UiEvent}
  * a single thread and the whole tree is rebuilt top to bottom each frame, and every
  * block balances its push and pop through `buildChildren`.
  */
-var openBlocks = ArrayList<ArrayList<Widget>>()
-var activeStateStore: ?StateStore = None
+let openBlocks = ArrayList<ArrayList<Widget>>()
+var activeStateStore: ?StateStore = None // cjcheck-ignore: global-var # single-threaded build-scope state; set/restored by buildRoot (see file comment)
 
 /*
  * Register a freshly constructed widget with the enclosing builder block. Every widget
@@ -285,4 +285,15 @@ class EmptyView <: Widget {
     public func handle(_: UiContext, _: UiEvent): Bool {
         false
     }
+}
+
+/*
+ * The shared body of a control's `key(...)` modifier: validates the explicit identity and
+ * swaps the auto-generated focus registration for it. Returns the validated id so the
+ * caller's only remaining work is storing it and returning itself for chaining.
+ */
+protected func rekeyControl(previous: String, value: String, kind: String): String {
+    requireControlId(value, kind)
+    reregisterFocusable(previous, value)
+    value
 }

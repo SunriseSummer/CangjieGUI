@@ -2,8 +2,8 @@ package cui.controls
 
 import std.collection.ArrayList
 import sdl.{MouseButton, Rect, Size, SurfaceStyle, UiEvent, clampF32}
-import cui.core.{CUI_SHADOW_CLEARANCE, CursorShape, State, UiContext, Widget, resolveControlKey, buildLazyChildren,
-    drawSurface, emit, lazyKeyOrIndex, localState}
+import cui.core.{CUI_SHADOW_CLEARANCE, CursorShape, State, UiContext, Widget, broadcastEvent, resolveControlKey,
+    buildLazyChildren, drawSurface, emit, lazyKeyOrIndex, localState}
 
 // Width of the drag handle at the left of each row.
 private let REORDER_HANDLE_W: Float32 = 30.0
@@ -108,12 +108,12 @@ public class ReorderableList <: Widget {
         // Non-dragged rows at their (possibly shifted) slots.
         for (i in 0..rows.size) {
             if (i != dragging) {
-                drawRow(ctx, i, rowTop(i, target), false)
+                drawRow(ctx, i, rowTop(i, target), lifted: false)
             }
         }
         // The dragged row last, lifted, so it floats above the rest.
         if (dragging >= 0 && dragging < rows.size) {
-            drawRow(ctx, dragging, rowTop(dragging, target), true)
+            drawRow(ctx, dragging, rowTop(dragging, target), lifted: true)
         }
     }
 
@@ -122,7 +122,7 @@ public class ReorderableList <: Widget {
         match (event) {
             case UiEvent.Frame(_) =>
                 for (row in rows) {
-                    let _ = row.handle(ctx, event)
+                    broadcastEvent(row, ctx, event)
                 }
                 return false
             case UiEvent.MouseDown(MouseButton.Left, x, y) =>
@@ -266,7 +266,7 @@ public class ReorderableList <: Widget {
         index
     }
 
-    private func drawRow(ctx: UiContext, i: Int64, top: Float32, lifted: Bool): Unit {
+    private func drawRow(ctx: UiContext, i: Int64, top: Float32, lifted!: Bool): Unit {
         let rowRect = Rect(frame.x, top, frame.w, rowHeight)
         if (lifted) {
             // A raised surface with a shadow so the dragged row reads as picked up.

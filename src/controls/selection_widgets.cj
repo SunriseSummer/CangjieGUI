@@ -1,11 +1,15 @@
 package cui.controls
 
 import sdl.{Color, FontSizes, Key, MouseButton, Rect, Size, UiEvent}
-import cui.core.{Bindable, CUI_CONTROL_H, CUI_SMALL_H, CursorShape, ScrollBar, maxScrollOffset, Spring, State, UiContext, Widget, requireControlId,
+import cui.core.{rekeyControl, clampItemIndex, Bindable, CUI_CONTROL_H, CUI_SMALL_H, CursorShape, ScrollBar, maxScrollOffset, Spring, State, UiContext, Widget, requireControlId,
     claimHoverIfInside, clampScrollOffset, drawFocusRing, drawSurface, drawVerticalScrollBar, emit,
-    focusableControlIdentity, localState, reregisterFocusable, scrollLineIndex, scrollLineRemainder,
+    focusableControlIdentity, localState, scrollLineIndex, scrollLineRemainder,
     scrollOffsetAfterWheel}
 
+/*
+ * A labelled on/off toggle bound to a `Bindable<Bool>`, with an animated check fill.
+ * Click or Space/Enter toggles; a focus stop in Tab traversal.
+ */
 public class Checkbox <: Widget {
     private let label: String
     private let checked: Bindable<Bool>
@@ -33,9 +37,7 @@ public class Checkbox <: Widget {
      * Throws `IllegalArgumentException` when `value` is empty.
      */
     public func key(value: String): Checkbox {
-        requireControlId(value, "Checkbox")
-        reregisterFocusable(controlId, value)
-        controlId = value
+        controlId = rekeyControl(controlId, value, "Checkbox")
         this
     }
 
@@ -55,7 +57,7 @@ public class Checkbox <: Widget {
         }
         let t = fillSpring.animate(ctx, target: goal)
         let box = Rect(frame.x, frame.y + 7.0, 18.0, 18.0)
-        drawSurface(ctx, box, ctx.theme.fieldSurface(false).withBorder(ctx.theme.panelEdge.lerp(ctx.theme.accent, t)))
+        drawSurface(ctx, box, ctx.theme.fieldSurface().withBorder(ctx.theme.panelEdge.lerp(ctx.theme.accent, t)))
         // The fill grows from the centre to fill the box as it is ticked.
         if (t > 0.001) {
             let full = box.inset(4.0)
@@ -107,6 +109,11 @@ public class Checkbox <: Widget {
     }
 }
 
+/*
+ * A scrollable single-selection list of strings bound to a `Bindable<Int64>` index, with
+ * a scroll bar and keyboard support (Up/Down move, Home/End jump). A changed selection is
+ * scrolled into view; plain wheel/drag scrolling is left alone.
+ */
 public class ListView <: Widget {
     private let items: Array<String>
     private let selected: Bindable<Int64>
@@ -179,7 +186,7 @@ public class ListView <: Widget {
             revealRow(selected.value)
             lastRevealed.value = selected.value
         }
-        drawSurface(ctx, frame, ctx.theme.fieldSurface(ctx.showFocusRing(controlId)))
+        drawSurface(ctx, frame, ctx.theme.fieldSurface(active: ctx.showFocusRing(controlId)))
 
         let viewport = listViewport(frame)
         ctx.renderer.pushClip(viewport)
@@ -263,15 +270,7 @@ public class ListView <: Widget {
     }
 
     private func clampIndex(index: Int64): Int64 {
-        if (items.size <= 0) {
-            0
-        } else if (index < 0) {
-            0
-        } else if (index >= items.size) {
-            items.size - 1
-        } else {
-            index
-        }
+        clampItemIndex(index, items.size)
     }
 
     private func applySelection(index: Int64): Unit {

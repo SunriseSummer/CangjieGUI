@@ -53,7 +53,7 @@ class Stack <: Widget {
         spacing = value
     }
 
-    func setFlexible(value: Bool): Unit {
+    func setFlexible(value!: Bool): Unit {
         flexible = value
     }
 
@@ -277,11 +277,7 @@ class Stack <: Widget {
     }
 
     private func gapTotal(gap: Float32, count: Int64): Float32 {
-        if (count <= 1) {
-            0.0
-        } else {
-            Float32(count - 1) * gap
-        }
+        gapExtent(count, gap)
     }
 
     private func mainOf(size: Size): Float32 {

@@ -1,6 +1,6 @@
 package cui.core
 
-import sdl.{Color, FontSizes, IconName, Key, MouseButton, Rect, Size, SurfaceStyle, UiEvent, drawIcon}
+import sdl.{Color, FontSizes, IconName, Rect, Size, SurfaceStyle, UiEvent, drawIcon}
 
 private let ICON_DEFAULT_SIZE: Float32 = 18.0
 private let ICON_BUTTON_PAD: Float32 = 10.0
@@ -111,9 +111,7 @@ public class IconButton <: Widget {
      * Throws `IllegalArgumentException` when `value` is empty.
      */
     public func key(value: String): IconButton {
-        requireControlId(value, "IconButton")
-        reregisterFocusable(controlId, value)
-        controlId = value
+        controlId = rekeyControl(controlId, value, "IconButton")
         this
     }
 
@@ -169,34 +167,7 @@ public class IconButton <: Widget {
     }
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
-        claimHoverIfInside(ctx, event, frame, controlId, CursorShape.Interactive)
-        match (event) {
-            case UiEvent.MouseDown(MouseButton.Left, x, y) =>
-                if (frame.contains(x, y)) {
-                    ctx.focus(controlId)
-                    ctx.press(controlId)
-                    return true
-                }
-            case UiEvent.MouseUp(MouseButton.Left, x, y) =>
-                if (ctx.isPressed(controlId)) {
-                    if (frame.contains(x, y)) {
-                        onClick()
-                    }
-                    return true
-                }
-            case UiEvent.KeyDown(Key.Enter, _) =>
-                if (ctx.hasFocus(controlId)) {
-                    onClick()
-                    return true
-                }
-            case UiEvent.KeyDown(Key.Space, _) =>
-                if (ctx.hasFocus(controlId)) {
-                    onClick()
-                    return true
-                }
-            case _ => ()
-        }
-        false
+        handleButtonProtocol(ctx, event, frame, controlId, onClick)
     }
 
     public func focusableId(): ?String {
@@ -223,27 +194,7 @@ public class IconButton <: Widget {
     }
 
     private func buttonStyle(ctx: UiContext): SurfaceStyle {
-        match (customStyle) {
-            case Some(value) => value
-            case None =>
-                let base = ctx.theme.buttonSurface(buttonRole)
-                match (buttonRole) {
-                    case ButtonRole.Normal =>
-                        var style = base
-                        if (ctx.isPressed(controlId)) {
-                            style = style.withFill(ctx.theme.accentSoft)
-                        } else if (ctx.isHovered(controlId)) {
-                            // Single-winner hover: in overlapping layouts only the visually
-                            // top-most claimant highlights (same protocol as the cursor shape).
-                            style = style.withFill(ctx.theme.fieldActive)
-                        }
-                        // The focus ring (drawn in draw() on keyboard focus) shows where
-                        // Enter/Space will land — same convention as Button: a pointer
-                        // press must not leave a keyboard-style accent border behind.
-                        style
-                    case _ => base
-                }
-        }
+        buttonInteractionStyle(ctx, controlId, buttonRole, customStyle)
     }
 }
 

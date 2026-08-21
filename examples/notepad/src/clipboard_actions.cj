@@ -4,13 +4,13 @@
  */
 package cui_notepad
 
-import cui.{Clipboard, CuiException, State, TextEditState}
+import cui.{Clipboard, SdlException, State, TextEditState}
 
 func copyAll(body: State<String>, status: State<String>): Unit {
     try {
         Clipboard.setText(body.value)
         status.value = "已复制到剪贴板"
-    } catch (e: CuiException) {
+    } catch (e: SdlException) {
         status.value = "无法访问剪贴板"
     }
 }
@@ -26,7 +26,7 @@ func pasteClipboard(body: State<String>, cursor: State<Int64>, anchor: State<Int
         // 内容末尾，编辑区不会残留幻影选区。
         TextEditState(body, cursor: Some(cursor), anchor: Some(anchor)).insert(text)
         status.value = "已粘贴剪贴板内容"
-    } catch (e: CuiException) {
+    } catch (e: SdlException) {
         status.value = "无法读取剪贴板"
     }
 }

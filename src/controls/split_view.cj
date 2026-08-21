@@ -2,8 +2,8 @@ package cui.controls
 
 import std.collection.ArrayList
 import sdl.{Color, Key, MouseButton, Rect, Size, UiEvent, clampF32}
-import cui.core.{Axis, Bindable, CursorShape, State, UiContext, Widget, resolveControlKey, buildChild, drawFocusRing,
-    emit, localState, registerFocusable}
+import cui.core.{Axis, Bindable, CursorShape, State, UiContext, Widget, broadcastEvent, resolveControlKey, buildChild,
+    drawFocusRing, emit, localState, registerFocusable}
 
 // The hit area of the divider is widened by this many logical pixels on each side of its
 // visual strip, so a thin divider stays easy to grab without enlarging the seam on screen.
@@ -120,8 +120,8 @@ public class SplitView <: Widget {
         }
         match (event) {
             case UiEvent.Frame(_) =>
-                let _ = first.handle(ctx, event)
-                let _ = second.handle(ctx, event)
+                broadcastEvent(first, ctx, event)
+                broadcastEvent(second, ctx, event)
                 return false
             case UiEvent.MouseDown(MouseButton.Left, x, y) => if (hit.contains(x, y)) {
                 ctx.focus(dividerId)
@@ -185,10 +185,10 @@ public class SplitView <: Widget {
         match (axis) {
             case Axis.Horizontal =>
                 ctx.renderer.fill(Rect(strip.centerX() - lineW / 2.0, strip.y, lineW, strip.h), lineColor)
-                drawGrip(ctx, strip.centerX(), strip.centerY(), false, gripColor)
+                drawGrip(ctx, strip.centerX(), strip.centerY(), gripColor, along: false)
             case Axis.Vertical =>
                 ctx.renderer.fill(Rect(strip.x, strip.centerY() - lineW / 2.0, strip.w, lineW), lineColor)
-                drawGrip(ctx, strip.centerX(), strip.centerY(), true, gripColor)
+                drawGrip(ctx, strip.centerX(), strip.centerY(), gripColor, along: true)
         }
         if (ctx.showFocusRing(dividerId)) {
             drawFocusRing(ctx, strip, ctx.theme.smallRadius)
@@ -197,7 +197,7 @@ public class SplitView <: Widget {
 
     // Three dots centred on the seam, laid along its length (down a vertical divider, across a
     // horizontal one), marking where to grab.
-    private func drawGrip(ctx: UiContext, cx: Float32, cy: Float32, along: Bool, color: Color): Unit {
+    private func drawGrip(ctx: UiContext, cx: Float32, cy: Float32, color: Color, along!: Bool): Unit {
         let gap: Float32 = 4.0
         var i: Int64 = -1
         while (i <= 1) {

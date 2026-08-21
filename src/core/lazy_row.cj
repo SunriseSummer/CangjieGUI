@@ -1,6 +1,5 @@
 package cui.core
 
-import std.collection.ArrayList
 import sdl.{Rect, Size, UiEvent}
 
 /**
@@ -102,7 +101,7 @@ public class LazyRow <: Widget {
     public func layout(ctx: UiContext, rect: Rect): Unit {
         frame = rect
         // Record the viewport width for the next frame's build; write-on-change to avoid churn.
-        let _ = viewportWidthState.setIfChanged(rect.w)
+        let _ = viewportWidthState.setIfChanged(rect.w) // cjcheck-ignore: ignore-result # write-on-change only; whether it changed is irrelevant here
         let content = lazyContentHeight(count, itemWidth, spacing)
         // Correct the live offset for the next frame in case the content shrank.
         let clamped = clampScrollOffset(scrollStateValue.value, content, rect.w)
@@ -143,14 +142,14 @@ public class LazyRow <: Widget {
         drawHorizontalScrollBar(ctx, frame, frameScroll, content, frame.w, active: scrollBar.dragging(ctx))
     }
 
-    public func handle(ctx: UiContext, event: UiEvent): Bool {
+    public func handle(ctx: UiContext, event: UiEvent): Bool { // cjcheck-ignore: long-function # flat single-match event table; each arm is one interaction, splitting would scatter the wheel/drag pairing
         let content = lazyContentHeight(count, itemWidth, spacing)
         let viewportW = frame.w
         match (event) {
             case UiEvent.Frame(_) =>
                 for (pair in visibleItems) {
                     let (_, widget) = pair
-                    let _ = widget.handle(ctx, event)
+                    broadcastEvent(widget, ctx, event)
                 }
                 return false
             case UiEvent.MouseWheel(wheelX, wheelY, pointerX, pointerY) =>
@@ -205,13 +204,6 @@ public class LazyRow <: Widget {
     }
 
     public func focusableIds(): Array<String> {
-        let ids = ArrayList<String>()
-        for (pair in visibleItems) {
-            let (_, widget) = pair
-            for (fid in widget.focusableIds()) {
-                ids.add(fid)
-            }
-        }
-        ids.toArray()
+        collectLazyFocusableIds(visibleItems)
     }
 }

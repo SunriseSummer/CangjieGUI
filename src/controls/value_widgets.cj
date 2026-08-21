@@ -6,6 +6,10 @@ import cui.core.{Bindable, CUI_CONTROL_H, CUI_SMALL_H, CursorShape, Observable, 
 
 private let VALUE_CONTROL_W: Float32 = 180.0
 
+/*
+ * A read-only horizontal progress indicator for an `Observable<Float32>` value within
+ * `range`. The fill animates toward the value; not focusable and consumes no input.
+ */
 public class ProgressBar <: Widget {
     private let value: Observable<Float32>
     private var lowerBound: Float32
@@ -46,7 +50,7 @@ public class ProgressBar <: Widget {
         // the control's edge (nor the label read -0% / 101%).
         let shown = clampF32(fillSpring.animate(ctx, target: amount), 0.0, 1.0)
         let fill = Rect(frame.x, frame.y, frame.w * shown, frame.h)
-        drawSurface(ctx, frame, ctx.theme.fieldSurface(false))
+        drawSurface(ctx, frame, ctx.theme.fieldSurface())
         ctx.renderer.fillRoundedRect(fill, ctx.theme.smallRadius, ctx.theme.accent)
         ctx.renderer.textCenter("${Int64(shown * 100.0)}%", frame, ctx.theme.text, pointSize: FontSizes.CAPTION)
     }
@@ -56,6 +60,11 @@ public class ProgressBar <: Widget {
     }
 }
 
+/*
+ * A horizontal value slider bound to a `Bindable<Float32>` within `range`; `step` of 0
+ * is continuous, a positive step snaps to multiples. Drag or Left/Right arrows adjust;
+ * a focus stop in Tab traversal.
+ */
 public class Slider <: Widget {
     private let id: String
     private let value: Bindable<Float32>

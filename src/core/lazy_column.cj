@@ -112,7 +112,7 @@ public class LazyColumn <: Widget {
     public func layout(ctx: UiContext, rect: Rect): Unit {
         frame = rect
         // Record the viewport height for the next frame's build; write-on-change to avoid churn.
-        let _ = viewportHeightState.setIfChanged(rect.h)
+        let _ = viewportHeightState.setIfChanged(rect.h) // cjcheck-ignore: ignore-result # write-on-change only; whether it changed is irrelevant here
         let content = lazyContentHeight(count, itemHeight, spacing)
         // Correct the live offset for the next frame in case the content shrank.
         let clamped = clampScrollOffset(scrollStateValue.value, content, rect.h)
@@ -159,7 +159,7 @@ public class LazyColumn <: Widget {
             case UiEvent.Frame(_) =>
                 for (pair in visibleItems) {
                     let (_, widget) = pair
-                    let _ = widget.handle(ctx, event)
+                    broadcastEvent(widget, ctx, event)
                 }
                 return false
             case UiEvent.MouseWheel(_, wheelY, pointerX, pointerY) =>
@@ -206,14 +206,7 @@ public class LazyColumn <: Widget {
     }
 
     public func focusableIds(): Array<String> {
-        let ids = ArrayList<String>()
-        for (pair in visibleItems) {
-            let (_, widget) = pair
-            for (fid in widget.focusableIds()) {
-                ids.add(fid)
-            }
-        }
-        ids.toArray()
+        collectLazyFocusableIds(visibleItems)
     }
 }
 
@@ -298,7 +291,7 @@ protected func lazyKeyOrIndex(key: ?((Int64) -> String)): (Int64) -> String {
  * LazyGrid(photos, 4, 160.0, spacing: 12.0, columnSpacing: 12.0) { photo => photoCell(photo) }
  * ```
  */
-public func LazyGrid<T>(
+public func LazyGrid<T>( // cjcheck-ignore: param-count # public fluent factory: named params with defaults are the rule's own recommended form; a config struct would break the declarative call style
     data: Array<T>,
     columns: Int64,
     itemHeight: Float32,
@@ -324,4 +317,17 @@ public func LazyGrid<T>(
             }
         }.spacing(columnSpacing)
     }
+}
+
+// Collects the focus ids of the currently materialized items, in declaration order —
+// shared by the lazy containers, whose Tab ring only contains on-screen rows.
+protected func collectLazyFocusableIds(visibleItems: Array<(Int64, Widget)>): Array<String> {
+    let ids = ArrayList<String>()
+    for (pair in visibleItems) {
+        let (_, widget) = pair
+        for (fid in widget.focusableIds()) {
+            ids.add(fid)
+        }
+    }
+    ids.toArray()
 }

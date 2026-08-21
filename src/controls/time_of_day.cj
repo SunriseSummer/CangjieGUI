@@ -21,7 +21,7 @@ public struct TimeOfDay <: Equatable<TimeOfDay> {
         this.minute = total % 60
     }
 
-    /** The current wall-clock time from the system clock. Throws `CuiException` if it cannot be read. */
+    /** The current wall-clock time from the system clock. Throws `SdlException` if it cannot be read. */
     public static func now(): TimeOfDay {
         let t = Time.currentDateTime()
         TimeOfDay(Int64(t.hour), Int64(t.minute))
@@ -93,7 +93,8 @@ private func wrapMinutes(total: Int64): Int64 {
     (total % 1440 + 1440) % 1440
 }
 
-private func padTwo(value: Int64): String {
+// Zero-pads a 0-99 value to two digits; shared by the date/time controls' formatting.
+internal func padTwo(value: Int64): String {
     if (value >= 0 && value < 10) {
         "0${value}"
     } else {

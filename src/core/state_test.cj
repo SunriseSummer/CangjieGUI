@@ -46,7 +46,8 @@ func rememberedStateSurvivesRebuildAndResetsAfterUnmount(): Unit {
         store
     )
     let second = captured.value.getOrThrow()
-    @Expect(refEq((first as Object).getOrThrow(), (second as Object).getOrThrow()))
+    // A failed cast should fail the test loudly, so getOrThrow is the intended behaviour.
+    @Expect(refEq((first as Object).getOrThrow(), (second as Object).getOrThrow())) // cjcheck-ignore: unchecked-cast # test asserts identity; a cast failure must fail the test
     @Expect(second.value, Int64(42))
 
     let _ = buildRoot({=> Spacer()}, store)
@@ -59,7 +60,7 @@ func rememberedStateSurvivesRebuildAndResetsAfterUnmount(): Unit {
         store
     )
     let third = captured.value.getOrThrow()
-    @Expect(!refEq((first as Object).getOrThrow(), (third as Object).getOrThrow()))
+    @Expect(!refEq((first as Object).getOrThrow(), (third as Object).getOrThrow())) // cjcheck-ignore: unchecked-cast # test asserts identity; a cast failure must fail the test
     @Expect(third.value, Int64(7))
 }
 

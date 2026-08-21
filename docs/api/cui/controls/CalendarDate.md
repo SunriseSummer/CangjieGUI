@@ -108,7 +108,7 @@ public static func today(): CalendarDate
 
 **异常**
 
-- `CuiException` — `Time.currentDateTime()`（见同版本 SDL API 参考中的 `sdl.system.Time`）读取系统实时钟或把时间戳换算为本地日历字段失败时；CUI 不捕获或改写该异常。
+- `SdlException` — `Time.currentDateTime()`（见同版本 SDL API 参考中的 `sdl.system.Time`）读取系统实时钟或把时间戳换算为本地日历字段失败时；CUI 不捕获或改写该异常。
 
 ### daysInMonth
 

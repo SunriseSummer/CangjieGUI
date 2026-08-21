@@ -2,6 +2,12 @@ package cui.core
 
 import sdl.{FrameInfo, Rect, Size, UiEvent}
 
+/*
+ * Wraps a subtree with an event interceptor: `onEvent` sees every event before the child
+ * and consumes it by returning true. Frame ticks are broadcast (never consumable), so the
+ * hook observes them but cannot stop the child's animations. Use for container-level
+ * shortcuts or gestures that a stock control does not expose.
+ */
 public class EventHandler <: Widget {
     private let child: Widget
     private let onEvent: (UiEvent) -> Bool
@@ -27,8 +33,9 @@ public class EventHandler <: Widget {
     public func handle(ctx: UiContext, event: UiEvent): Bool {
         match (event) {
             case UiEvent.Frame(_) =>
-                let _ = onEvent(event)
-                let _ = child.handle(ctx, event)
+                // Frame ticks broadcast: the hook's consumed flag must not stop the fan-out.
+                let _ = onEvent(event) // cjcheck-ignore: ignore-result # broadcast semantics: a frame tick must not be intercepted by the hook
+                broadcastEvent(child, ctx, event)
                 return false
             case _ => ()
         }
@@ -63,6 +70,12 @@ public class EventHandler <: Widget {
     }
 }
 
+/*
+ * Wraps a subtree with a per-frame hook: `onFrame` runs on every rendered frame with that
+ * frame's timing info. Registering one keeps the dirty-frame loop rendering continuously
+ * (the hook is a per-frame contract), so idle windows with a FrameHandler are not free —
+ * prefer `Spring`/`Animator` for value animation and use this for polling-style work.
+ */
 public class FrameHandler <: Widget {
     private let child: Widget
     private let onFrame: (FrameInfo) -> Unit
@@ -92,7 +105,7 @@ public class FrameHandler <: Widget {
                 // firing (animations, dialog polling) instead of being frozen by dirty-frame skipping.
                 ctx.requestFrame()
                 onFrame(info)
-                let _ = child.handle(ctx, event)
+                broadcastEvent(child, ctx, event)
                 return false
             case _ => return child.handle(ctx, event)
         }

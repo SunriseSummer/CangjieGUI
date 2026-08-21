@@ -75,11 +75,22 @@ class UndoHistory {
         Some(redoStack.remove(at: redoStack.size - 1))
     }
 
+    /** Whether an undo step is available. */
     public func canUndo(): Bool {
         !undoStack.isEmpty()
     }
 
+    /** Whether a redo step is available. */
     public func canRedo(): Bool {
         !redoStack.isEmpty()
+    }
+}
+
+// Applies an optional history step: Some restores the snapshot, None (nothing to undo/redo)
+// leaves the editor untouched. Shared by TextField and TextArea so undo/redo read as one line.
+internal func applyHistoryStep(step: ?TextSnapshot, apply: (TextSnapshot) -> Unit): Unit {
+    match (step) {
+        case Some(state) => apply(state)
+        case None => ()
     }
 }

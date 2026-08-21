@@ -179,6 +179,152 @@ internal func asciiWordEnd(runes: Array<Rune>, start: Int64): Int64 {
  * size this is identical to top-of-line placement. Returns the placed items, the total content height
  * (sum of line heights), and the widest line.
  */
+/*
+ * The mutable pen of the first layout pass: the current x, the current line index, the per-line
+ * heights, the accumulated fragments and the widest line so far. Extracted so the span-kind
+ * placement functions stay small and share one wrapping vocabulary (`wrapLine`, `place`).
+ */
+class RichFlow {
+    let frags = ArrayList<LaidFrag>()
+    let lineHeights = ArrayList<Float32>()
+    // The wrap width and the inline-icon geometry are flow constants, carried here so the
+    // per-span placement functions take only what varies per span.
+    let maxWidth: Float32
+    let iconSize: Float32
+    let spanGap: Float32
+    var x: Float32 = 0.0
+    var line: Int64 = 0
+    var widest: Float32 = 0.0
+
+    init(maxWidth!: Float32, iconSize!: Float32, spanGap!: Float32) {
+        this.maxWidth = maxWidth
+        this.iconSize = iconSize
+        this.spanGap = spanGap
+        lineHeights.add(0.0)
+    }
+
+    // Starts the next line; the caller retries its current fragment there.
+    func wrapLine(): Unit {
+        x = 0.0
+        line += 1
+        lineHeights.add(0.0)
+    }
+
+    // Records a fragment at the pen, grows the line height to fit it, and advances the pen.
+    func place(frag: LaidFrag): Unit {
+        frags.add(frag)
+        if (frag.height > lineHeights[line]) {
+            lineHeights[line] = frag.height
+        }
+        x += frag.width
+        widest = max(widest, x)
+    }
+}
+
+// One span with its position and resolved point size — the per-span trio every placement
+// function needs; bundled so their signatures stay within the parameter budget.
+struct SpanRun {
+    let span: RichSpan
+    let index: Int64
+    let size: Float32
+
+    init(span: RichSpan, index: Int64, size: Float32) {
+        this.span = span
+        this.index = index
+        this.size = size
+    }
+}
+
+// Places one text run into the flow, wrapping at rune boundaries with the word-level
+// refinements documented on `layoutRichSpans`.
+private func flowTextSpan(
+    flow: RichFlow,
+    run: SpanRun,
+    text: String,
+    fragHeight!: Float32,
+    spanMeasure!: (String) -> Float32
+): Unit {
+    let span = run.span
+    let maxWidth = flow.maxWidth
+    let runes = text.toRuneArray()
+    var i = 0
+    while (i < runes.size) {
+        // A wrapped continuation never starts with the space the line broke on (the
+        // i > 0 guard keeps a span's own leading space, e.g. a separator span).
+        if (flow.x == 0.0 && i > 0 && runes[i] == r' ') {
+            i += 1
+            continue
+        }
+        var fit = maxRunesFitting(runes, i, maxWidth - flow.x, spanMeasure)
+        if (fit == 0) {
+            if (flow.x > 0.0) {
+                // Nothing more fits on this line; wrap and retry the same rune.
+                flow.wrapLine()
+                continue
+            }
+            // A single rune overflows even a full line; place it anyway to make progress.
+            fit = 1
+        }
+        if (i + fit < runes.size && runes[i + fit] != r' ') {
+            // Breaking mid-run: prefer to land just after the run's last space. When no space
+            // exists and the break falls inside an ASCII word, move the whole word to the next
+            // line when it fits one, instead of cutting it.
+            let backed = backUpToSpace(runes, i, fit)
+            if (backed == fit && flow.x > 0.0 && isAsciiWordRune(runes[i]) &&
+                asciiWordWrapsWhole(runes, i, fit, maxWidth, spanMeasure)) {
+                flow.wrapLine()
+                continue
+            }
+            fit = backed
+        }
+        let segment = runeSlice(runes, i, i + fit)
+        flow.place(
+            LaidFrag(x: flow.x, line: flow.line, height: fragHeight, kind: PlacedKind.PlacedText(segment),
+                color: span.color, muted: span.isMuted, style: span.style, font: span.fontFace,
+                size: run.size, width: spanMeasure(segment), spanIndex: run.index, onTap: span.tapAction,
+                highlight: span.highlightColor))
+        i += fit
+    }
+}
+
+// The fit shortened to land just after the run's last space, or `fit` unchanged when none exists.
+private func backUpToSpace(runes: Array<Rune>, start: Int64, fit: Int64): Int64 {
+    var back = fit - 1
+    while (back > 0) {
+        if (runes[start + back] == r' ') {
+            return back + 1
+        }
+        back -= 1
+    }
+    fit
+}
+
+// Whether the ASCII word being split extends past the fit AND fits a full line on its own.
+private func asciiWordWrapsWhole(
+    runes: Array<Rune>,
+    start: Int64,
+    fit: Int64,
+    maxWidth: Float32,
+    measure: (String) -> Float32
+): Bool {
+    let wordEnd = asciiWordEnd(runes, start)
+    start + fit < wordEnd && measure(runeSlice(runes, start, wordEnd)) <= maxWidth
+}
+
+// Places one inline icon into the flow as a square box, wrapping first when it overflows.
+private func flowIconSpan(flow: RichFlow, run: SpanRun, icon: IconName): Unit {
+    let span = run.span
+    let iconSize = flow.iconSize
+    if (flow.x + iconSize > flow.maxWidth && flow.x > 0.0) {
+        flow.wrapLine()
+    }
+    flow.place(
+        LaidFrag(x: flow.x, line: flow.line, height: iconSize, kind: PlacedKind.PlacedIcon(icon),
+            color: span.color, muted: false, style: span.style, font: span.fontFace, size: run.size,
+            width: iconSize, spanIndex: run.index, onTap: span.tapAction, highlight: span.highlightColor))
+    flow.x += flow.spanGap
+}
+
 internal func layoutRichSpans(
     spans: Array<RichSpan>,
     spanSizes: Array<Float32>,
@@ -188,111 +334,34 @@ internal func layoutRichSpans(
     widthOf: (String, Float32, FontStyle, ?String) -> Float32,
     heightOf: (Float32, FontStyle, ?String) -> Float32
 ): RichLayout {
-    let frags = ArrayList<LaidFrag>()
-    let lineHeights = ArrayList<Float32>()
-    lineHeights.add(0.0)
-    var x: Float32 = 0.0
-    var line: Int64 = 0
-    var widest: Float32 = 0.0
+    let flow = RichFlow(maxWidth: maxWidth, iconSize: iconSize, spanGap: spanGap)
     for (si in 0..spans.size) {
-        let span = spans[si]
-        let size = spanSizes[si]
+        let run = SpanRun(spans[si], si, spanSizes[si])
+        let span = run.span
         match (span.kind) {
             case RichSpanKind.SpanText(text) =>
-                let fragHeight = heightOf(size, span.style, span.fontFace)
                 // Bind this run's size, style, and font so widths reflect the actual metrics (a bigger
                 // or bolder run is wider) and wrapping breaks where the run really overflows.
-                let spanMeasure = {s: String => widthOf(s, size, span.style, span.fontFace)}
-                let runes = text.toRuneArray()
-                var i = 0
-                while (i < runes.size) {
-                    // A wrapped continuation never starts with the space the line broke on (the
-                    // i > 0 guard keeps a span's own leading space, e.g. a separator span).
-                    if (x == 0.0 && i > 0 && runes[i] == r' ') {
-                        i += 1
-                        continue
-                    }
-                    var fit = maxRunesFitting(runes, i, maxWidth - x, spanMeasure)
-                    if (fit == 0) {
-                        if (x > 0.0) {
-                            // Nothing more fits on this line; wrap and retry the same rune.
-                            x = 0.0
-                            line += 1
-                            lineHeights.add(0.0)
-                            continue
-                        }
-                        // A single rune overflows even a full line; place it anyway to make progress.
-                        fit = 1
-                    }
-                    if (i + fit < runes.size && runes[i + fit] != r' ') {
-                        // Breaking mid-run: prefer to land just after the run's last space.
-                        var back = fit - 1
-                        var atSpace = false
-                        while (back > 0) {
-                            if (runes[i + back] == r' ') {
-                                fit = back + 1
-                                atSpace = true
-                                break
-                            }
-                            back -= 1
-                        }
-                        // No space to back to and the break falls inside an ASCII word: move the
-                        // whole word to the next line when it fits one, instead of cutting it.
-                        if (!atSpace && x > 0.0 && isAsciiWordRune(runes[i])) {
-                            let wordEnd = asciiWordEnd(runes, i)
-                            if (i + fit < wordEnd && spanMeasure(runeSlice(runes, i, wordEnd)) <= maxWidth) {
-                                x = 0.0
-                                line += 1
-                                lineHeights.add(0.0)
-                                continue
-                            }
-                        }
-                    }
-                    let segment = runeSlice(runes, i, i + fit)
-                    let segWidth = spanMeasure(segment)
-                    frags.add(
-                        LaidFrag(x: x, line: line, height: fragHeight, kind: PlacedKind.PlacedText(segment),
-                            color: span.color, muted: span.isMuted, style: span.style, font: span.fontFace,
-                            size: size, width: segWidth, spanIndex: si, onTap: span.tapAction,
-                            highlight: span.highlightColor))
-                    if (fragHeight > lineHeights[line]) {
-                        lineHeights[line] = fragHeight
-                    }
-                    x += segWidth
-                    widest = max(widest, x)
-                    i += fit
-                }
+                flowTextSpan(flow, run, text,
+                    fragHeight: heightOf(run.size, span.style, span.fontFace),
+                    spanMeasure: {s: String => widthOf(s, run.size, span.style, span.fontFace)})
             case RichSpanKind.SpanIcon(icon) =>
-                if (x + iconSize > maxWidth && x > 0.0) {
-                    x = 0.0
-                    line += 1
-                    lineHeights.add(0.0)
-                }
-                frags.add(
-                    LaidFrag(x: x, line: line, height: iconSize, kind: PlacedKind.PlacedIcon(icon),
-                        color: span.color, muted: false, style: span.style, font: span.fontFace, size: size,
-                        width: iconSize, spanIndex: si, onTap: span.tapAction, highlight: span.highlightColor))
-                if (iconSize > lineHeights[line]) {
-                    lineHeights[line] = iconSize
-                }
-                x += iconSize
-                widest = max(widest, x)
-                x += spanGap
+                flowIconSpan(flow, run, icon)
         }
     }
-    if (frags.isEmpty()) {
+    if (flow.frags.isEmpty()) {
         return RichLayout(Array<PlacedItem>(), 0.0, 0.0, 0)
     }
     // Second pass: stack the lines and centre each fragment within its line's height.
     let lineTops = ArrayList<Float32>()
     var acc: Float32 = 0.0
-    for (h in lineHeights) {
+    for (h in flow.lineHeights) {
         lineTops.add(acc)
         acc += h
     }
     let placed = ArrayList<PlacedItem>()
-    for (frag in frags) {
-        placed.add(frag.placed(lineTops[frag.line] + (lineHeights[frag.line] - frag.height) / 2.0))
+    for (frag in flow.frags) {
+        placed.add(frag.placed(lineTops[frag.line] + (flow.lineHeights[frag.line] - frag.height) / 2.0))
     }
-    RichLayout(placed.toArray(), acc, widest, lineHeights.size)
+    RichLayout(placed.toArray(), acc, flow.widest, flow.lineHeights.size)
 }

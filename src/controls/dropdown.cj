@@ -1,7 +1,7 @@
 package cui.controls
 
-import sdl.{Color, FontSizes, Key, MouseButton, Pen, Rect, Size, SurfaceStyle, UiEvent}
-import cui.core.{Bindable, CUI_CONTROL_H, CUI_SMALL_H, CursorShape, Overlay, ScrollBar, State, UiContext, Widget, resolveControlKey,
+import sdl.{Color, FontSizes, Key, MouseButton, Rect, Size, SurfaceStyle, UiEvent}
+import cui.core.{drawFieldChevron, clampItemIndex, Bindable, CUI_CONTROL_H, CUI_SMALL_H, CursorShape, Overlay, ScrollBar, State, UiContext, Widget, resolveControlKey,
     claimHoverIfInside, clampScrollOffset, drawSurface, drawVerticalScrollBar, emit, localState, registerFocusable,
     scrollBarGutter, scrollOffsetAfterWheel}
 
@@ -56,13 +56,13 @@ public class Dropdown <: Widget {
     }
 
     public func draw(ctx: UiContext): Unit {
-        drawSurface(ctx, frame, ctx.theme.fieldSurface(ctx.showFocusRing(id) || open.value))
+        drawSurface(ctx, frame, ctx.theme.fieldSurface(active: ctx.showFocusRing(id) || open.value))
         let labelArea = Rect(frame.x + 10.0, frame.y, max(0.0, frame.w - 40.0), frame.h)
         ctx.renderer.pushClip(labelArea)
         let textY = frame.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
         ctx.renderer.text(currentLabel(), labelArea.x, textY, ctx.theme.text, pointSize: FontSizes.CONTROL)
         ctx.renderer.popClip()
-        drawChevron(ctx)
+        drawFieldChevron(ctx, frame)
 
         // While open, register the popup as the interactive overlay: it is drawn on top and
         // gets events before the tree (see the shell's dispatch order).
@@ -187,7 +187,7 @@ public class Dropdown <: Widget {
         }
         // Clamp the current index into range before stepping (matching SegmentedControl/TabView),
         // so the move is relative to the displayed selection and the addition cannot overflow.
-        selected.value = clampDropdownIndex(clampDropdownIndex(selected.value, items.size) + delta, items.size)
+        selected.value = clampItemIndex(clampItemIndex(selected.value, items.size) + delta, items.size)
         revealRow(selected.value, popup)
     }
 
@@ -278,15 +278,6 @@ public class Dropdown <: Widget {
         drawVerticalScrollBar(ctx, list, offset, contentH, listH, active: popupBar.dragging(ctx))
     }
 
-    // A down chevron drawn as two strokes, so it never depends on a font glyph.
-    private func drawChevron(ctx: UiContext): Unit {
-        let cx = frame.right() - 18.0
-        let cy = frame.centerY()
-        let pen = Pen(width: 1.6, color: ctx.theme.mutedText)
-        ctx.renderer.strokeLine(cx - 4.0, cy - 2.0, cx, cy + 2.5, pen)
-        ctx.renderer.strokeLine(cx, cy + 2.5, cx + 4.0, cy - 2.0, pen)
-    }
-
     private func drawRowLabel(ctx: UiContext, text: String, row: Rect, color: Color): Unit {
         let textY = row.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
         ctx.renderer.text(text, row.x + 8.0, textY, color, pointSize: FontSizes.CONTROL)
@@ -301,23 +292,11 @@ public class Dropdown <: Widget {
         if (items.isEmpty()) {
             "—"
         } else {
-            items[clampDropdownIndex(selected.value, items.size)]
+            items[clampItemIndex(selected.value, items.size)]
         }
     }
 
     public func isFlexible(): Bool {
         false
-    }
-}
-
-private func clampDropdownIndex(index: Int64, count: Int64): Int64 {
-    if (count <= 0) {
-        0
-    } else if (index < 0) {
-        0
-    } else if (index >= count) {
-        count - 1
-    } else {
-        index
     }
 }

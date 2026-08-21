@@ -1,6 +1,6 @@
 package cui.core
 
-import sdl.{Color, Rect, clampF32}
+import sdl.{Color, Pen, Rect, clampF32}
 
 /**
  * A two-stop linear gradient fill for a rounded background — from `start` to `end`, running vertically
@@ -160,4 +160,17 @@ protected func drawConfigurableShadow(ctx: UiContext, rect: Rect, radius: Float3
     ctx
         .renderer
         .fillRoundedRectSoft(base, spreadRadius, shadow.color.withAlpha(alpha / 2), feather: feather * 0.55)
+}
+
+/*
+ * A small down chevron drawn as two strokes near the right edge of `frame` — the shared
+ * open-popup affordance for dropdown-style fields (Dropdown, ComboBox). Stroke-drawn so
+ * it never depends on a font glyph.
+ */
+protected func drawFieldChevron(ctx: UiContext, frame: Rect): Unit {
+    let cx = frame.right() - 18.0
+    let cy = frame.centerY()
+    let pen = Pen(width: 1.6, color: ctx.theme.mutedText)
+    ctx.renderer.strokeLine(cx - 4.0, cy - 2.0, cx, cy + 2.5, pen)
+    ctx.renderer.strokeLine(cx, cy + 2.5, cx + 4.0, cy - 2.0, pen)
 }

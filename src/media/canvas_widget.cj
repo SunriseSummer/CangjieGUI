@@ -36,7 +36,7 @@ public class CanvasWidget <: Widget {
     }
 
     public func draw(ctx: UiContext): Unit {
-        drawSurface(ctx, frame, ctx.theme.fieldSurface(false))
+        drawSurface(ctx, frame, ctx.theme.fieldSurface())
         ctx.renderer.pushClip(frame.inset(1.0))
         onDraw(ctx.renderer, frame)
         ctx.renderer.popClip()

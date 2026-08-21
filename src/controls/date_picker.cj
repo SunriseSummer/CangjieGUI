@@ -62,7 +62,7 @@ public class DatePicker <: Widget {
     }
 
     public func draw(ctx: UiContext): Unit {
-        drawSurface(ctx, frame, ctx.theme.fieldSurface(ctx.showFocusRing(id) || open.value))
+        drawSurface(ctx, frame, ctx.theme.fieldSurface(active: ctx.showFocusRing(id) || open.value))
         let labelArea = Rect(frame.x + 10.0, frame.y, max(0.0, frame.w - 36.0), frame.h)
         ctx.renderer.pushClip(labelArea)
         let textY = frame.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
@@ -127,20 +127,7 @@ public class DatePicker <: Widget {
     private func handleOverlay(ctx: UiContext, event: UiEvent, popup: Rect): Bool {
         match (event) {
             case UiEvent.MouseDown(MouseButton.Left, x, y) =>
-                if (popup.contains(x, y)) {
-                    if (prevArrowRect(popup).contains(x, y)) {
-                        shiftMonth(-1)
-                    } else if (nextArrowRect(popup).contains(x, y)) {
-                        shiftMonth(1)
-                    } else {
-                        let day = dayAt(popup, x, y)
-                        if (day > 0) {
-                            selectDay(ctx, day)
-                        }
-                    }
-                    return true
-                }
-                close(ctx) // dismiss on a click outside the calendar
+                pressOverlay(ctx, popup, x, y)
                 true
             case UiEvent.KeyDown(Key.Escape, _) =>
                 close(ctx)
@@ -184,6 +171,24 @@ public class DatePicker <: Widget {
                 false
             case _ => false
         }
+    }
+
+    // A primary press: month arrows page, a day cell selects, anywhere outside dismisses.
+    private func pressOverlay(ctx: UiContext, popup: Rect, x: Float32, y: Float32): Unit {
+        if (popup.contains(x, y)) {
+            if (prevArrowRect(popup).contains(x, y)) {
+                shiftMonth(-1)
+            } else if (nextArrowRect(popup).contains(x, y)) {
+                shiftMonth(1)
+            } else {
+                let day = dayAt(popup, x, y)
+                if (day > 0) {
+                    selectDay(ctx, day)
+                }
+            }
+            return
+        }
+        close(ctx) // dismiss on a click outside the calendar
     }
 
     // Pages the shown month, keeping the highlighted day within the new month's length.
@@ -284,11 +289,11 @@ public class DatePicker <: Widget {
         let titleW = ctx.renderer.textWidth(title, pointSize: FontSizes.CONTROL)
         let titleY = header.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
         ctx.renderer.text(title, header.centerX() - titleW / 2.0, titleY, ctx.theme.text, pointSize: FontSizes.CONTROL)
-        drawArrow(ctx, prevArrowRect(popup), true)
-        drawArrow(ctx, nextArrowRect(popup), false)
+        drawArrow(ctx, prevArrowRect(popup), pointsLeft: true)
+        drawArrow(ctx, nextArrowRect(popup), pointsLeft: false)
     }
 
-    private func drawArrow(ctx: UiContext, box: Rect, pointsLeft: Bool): Unit {
+    private func drawArrow(ctx: UiContext, box: Rect, pointsLeft!: Bool): Unit {
         let hovered = box.contains(ctx.mouseX, ctx.mouseY)
         let color = if (hovered) {
             ctx.theme.accent

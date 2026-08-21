@@ -15,13 +15,6 @@ private func sampleRoots(): Array<TreeNode> {
     ]
 }
 
-private func expandedSet(ids: Array<String>): HashSet<String> {
-    let set = HashSet<String>()
-    for (id in ids) {
-        set.add(id)
-    }
-    set
-}
 
 private func makeTree(selected: State<String>, expanded: State<HashSet<String>>): TreeView {
     TreeView(sampleRoots(), selected, scroll: Some(State<Float32>(0.0)), expanded: Some(expanded), key: "tree")
@@ -31,9 +24,9 @@ private func makeTree(selected: State<String>, expanded: State<HashSet<String>>)
 func flattenTreeDescendsOnlyIntoExpandedNodes(): Unit {
     let roots = sampleRoots()
     // Nothing expanded: only the two roots are visible.
-    @Expect(flattenTree(roots, expandedSet([])).size, 2)
+    @Expect(flattenTree(roots, seedExpanded([])).size, 2)
     // Expanding "a" reveals its two children between the roots: a, a1, a2, b.
-    let rows = flattenTree(roots, expandedSet(["a"]))
+    let rows = flattenTree(roots, seedExpanded(["a"]))
     @Expect(rows.size, 4)
     @Expect(rows[0].id, "a")
     @Expect(rows[1].id, "a1")
@@ -43,7 +36,7 @@ func flattenTreeDescendsOnlyIntoExpandedNodes(): Unit {
 
 @Test
 func flattenTreeMarksDepthAndChildren(): Unit {
-    let rows = flattenTree(sampleRoots(), expandedSet(["a"]))
+    let rows = flattenTree(sampleRoots(), seedExpanded(["a"]))
     @Expect(rows[0].depth, 0)
     @Expect(rows[0].hasChildren)
     @Expect(rows[0].expanded)
@@ -58,7 +51,7 @@ func flattenTreeMarksDepthAndChildren(): Unit {
 func treeViewClickSelectsRow(): Unit {
     let ctx = treeTestContext()
     let selected = State<String>("")
-    let tree = makeTree(selected, State<HashSet<String>>(expandedSet(["a"])))
+    let tree = makeTree(selected, State<HashSet<String>>(seedExpanded(["a"])))
     tree.layout(ctx, Rect(0.0, 0.0, 240.0, 300.0))
 
     // Rows: 0=a 1=a1 2=a2 3=b. Row 1 (a1) centre is at viewport.y(6)+1*28+14 = 48; click past its chevron column.
@@ -69,7 +62,7 @@ func treeViewClickSelectsRow(): Unit {
 @Test
 func treeViewClickChevronTogglesExpansion(): Unit {
     let ctx = treeTestContext()
-    let expanded = State<HashSet<String>>(expandedSet(["a"]))
+    let expanded = State<HashSet<String>>(seedExpanded(["a"]))
     let tree = makeTree(State<String>(""), expanded)
     tree.layout(ctx, Rect(0.0, 0.0, 240.0, 300.0))
 
@@ -83,7 +76,7 @@ func treeViewClickChevronTogglesExpansion(): Unit {
 func treeViewArrowKeysMoveSelection(): Unit {
     let ctx = treeTestContext()
     let selected = State<String>("")
-    let tree = makeTree(selected, State<HashSet<String>>(expandedSet(["a"])))
+    let tree = makeTree(selected, State<HashSet<String>>(seedExpanded(["a"])))
     tree.layout(ctx, Rect(0.0, 0.0, 240.0, 300.0))
     ctx.focus("tree")
 
@@ -103,7 +96,7 @@ func treeViewArrowKeysMoveSelection(): Unit {
 @Test
 func treeViewRightExpandsCollapsedNode(): Unit {
     let ctx = treeTestContext()
-    let expanded = State<HashSet<String>>(expandedSet([]))
+    let expanded = State<HashSet<String>>(seedExpanded([]))
     let tree = makeTree(State<String>("a"), expanded)
     tree.layout(ctx, Rect(0.0, 0.0, 240.0, 300.0))
     ctx.focus("tree")
@@ -117,7 +110,7 @@ func treeViewRightExpandsCollapsedNode(): Unit {
 func treeViewRightDescendsIntoOpenNode(): Unit {
     let ctx = treeTestContext()
     let selected = State<String>("a")
-    let tree = makeTree(selected, State<HashSet<String>>(expandedSet(["a"])))
+    let tree = makeTree(selected, State<HashSet<String>>(seedExpanded(["a"])))
     tree.layout(ctx, Rect(0.0, 0.0, 240.0, 300.0))
     ctx.focus("tree")
 
@@ -129,7 +122,7 @@ func treeViewRightDescendsIntoOpenNode(): Unit {
 @Test
 func treeViewLeftCollapsesOpenNode(): Unit {
     let ctx = treeTestContext()
-    let expanded = State<HashSet<String>>(expandedSet(["a"]))
+    let expanded = State<HashSet<String>>(seedExpanded(["a"]))
     let tree = makeTree(State<String>("a"), expanded)
     tree.layout(ctx, Rect(0.0, 0.0, 240.0, 300.0))
     ctx.focus("tree")
@@ -142,7 +135,7 @@ func treeViewLeftCollapsesOpenNode(): Unit {
 func treeViewLeftAscendsFromLeafToParent(): Unit {
     let ctx = treeTestContext()
     let selected = State<String>("a1")
-    let tree = makeTree(selected, State<HashSet<String>>(expandedSet(["a"])))
+    let tree = makeTree(selected, State<HashSet<String>>(seedExpanded(["a"])))
     tree.layout(ctx, Rect(0.0, 0.0, 240.0, 300.0))
     ctx.focus("tree")
 
@@ -154,7 +147,7 @@ func treeViewLeftAscendsFromLeafToParent(): Unit {
 @Test
 func treeViewEnterTogglesSelectedNode(): Unit {
     let ctx = treeTestContext()
-    let expanded = State<HashSet<String>>(expandedSet([]))
+    let expanded = State<HashSet<String>>(seedExpanded([]))
     let tree = makeTree(State<String>("a"), expanded)
     tree.layout(ctx, Rect(0.0, 0.0, 240.0, 300.0))
     ctx.focus("tree")
@@ -166,7 +159,7 @@ func treeViewEnterTogglesSelectedNode(): Unit {
 @Test
 func treeViewIgnoresKeysWhenUnfocused(): Unit {
     let ctx = treeTestContext()
-    let expanded = State<HashSet<String>>(expandedSet([]))
+    let expanded = State<HashSet<String>>(seedExpanded([]))
     let tree = makeTree(State<String>("a"), expanded)
     tree.layout(ctx, Rect(0.0, 0.0, 240.0, 300.0))
     // No focus: navigation keys are not consumed and nothing expands.
