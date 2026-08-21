@@ -6,4 +6,4 @@ output-type = "static"
 description = "Declarative desktop GUI framework for Cangjie"
 
 [dependencies]
-sdl = { path = "../CangjieSDL" }
+sdl = { git = "https://github.com/SunriseSummer/CangjieSDL.git" }
