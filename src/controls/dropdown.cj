@@ -1,9 +1,10 @@
 package cui.controls
 
 import sdl.{Color, FontSizes, Key, MouseButton, Rect, Size, SurfaceStyle, UiEvent}
-import cui.core.{drawFieldChevron, clampItemIndex, Bindable, CUI_CONTROL_H, CUI_SMALL_H, CursorShape, Overlay, ScrollBar, State, UiContext, Widget, resolveControlKey,
-    claimHoverIfInside, clampScrollOffset, drawSurface, drawVerticalScrollBar, emit, localState, registerFocusable,
-    scrollBarGutter, scrollOffsetAfterWheel}
+import cui.core.{drawFieldChevron, clampItemIndex, Bindable, CUI_CONTROL_H, CUI_SMALL_H, CursorShape, Overlay, ScrollBar,
+    State, UiContext, Widget, resolveControlKey, claimHoverIfInside, clampScrollOffset, drawSurface,
+    drawVerticalScrollBar, emit, localState, registerFocusable, registerRectOverlayWhen, scrollBarGutter,
+    scrollOffsetAfterWheel}
 
 private let DROPDOWN_DEFAULT_W: Float32 = 190.0
 private let DROPDOWN_POPUP_PAD: Float32 = 5.0
@@ -51,8 +52,10 @@ public class Dropdown <: Widget {
         Size(min(available.w, DROPDOWN_DEFAULT_W), CUI_CONTROL_H)
     }
 
-    public func layout(_: UiContext, rect: Rect): Unit {
+    public func layout(ctx: UiContext, rect: Rect): Unit {
         frame = rect
+        registerRectOverlayWhen(ctx, open.value, {=> popupRect(ctx)}, {c, e, popup => handleOverlay(c, e, popup)},
+            {c, popup => drawPopup(c, popup)}, overlayOwner)
     }
 
     public func draw(ctx: UiContext): Unit {
@@ -64,12 +67,13 @@ public class Dropdown <: Widget {
         ctx.renderer.popClip()
         drawFieldChevron(ctx, frame)
 
-        // While open, register the popup as the interactive overlay: it is drawn on top and
-        // gets events before the tree (see the shell's dispatch order).
+        // Idempotent re-registration keeps direct/custom shells that open during handle then draw
+        // compatible; DesktopApp has already registered the same owner from stable layout.
         if (open.value) {
             let popup = popupRect(ctx)
-            ctx.setOverlay(Overlay(handleEvent: {c, e => handleOverlay(c, e, popup)},
-                render: {c => drawPopup(c, popup)}, owner: overlayOwner))
+            ctx.setOverlay(
+                Overlay(handleEvent: {c, e => handleOverlay(c, e, popup)}, render: {c => drawPopup(c, popup)},
+                    owner: overlayOwner))
         }
     }
 

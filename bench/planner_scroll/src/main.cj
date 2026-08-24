@@ -10,6 +10,7 @@
  * Arguments are passed through cjpm's `--run-args`:
  *   --run-args "8"          block count (default 16)
  *   --run-args "ss1"        supersample factor 1 (off); ss2 is the default — isolates fill cost
+ *   --run-args "pair"       run ss2 then ss1 in one process so power/scheduler drift is shared
  *   --run-args "--profile"  per-phase frame breakdown (build/layout/draw/resolve/present)
  * combine freely, e.g. --run-args "8 ss1 --profile".
  *
@@ -28,8 +29,17 @@ private let SCROLL_STEP: Float32 = 24.0
 private let SCROLL_SPAN: Float32 = 3200.0
 
 main(): Int64 {
+    if (pairedArgument()) {
+        runPlanner(2)
+        runPlanner(1)
+        return 0
+    }
+    runPlanner(supersampleArgument())
+    0
+}
+
+private func runPlanner(supersample: Int32): Unit {
     let blocks = blocksArgument()
-    let supersample = supersampleArgument()
     let scroll = State<Float32>(0.0)
     let sweep = ScrollSweep(SCROLL_SPAN, SCROLL_STEP)
     let accumulator = BenchAccumulator(group: "内容页滚动（上机实测）", name: "${blocks} 区块 ss${supersample}x", scroll: scroll,
@@ -45,7 +55,6 @@ main(): Int64 {
         BenchDriver(accumulator)
         plannerScrollView(scroll, blocks)
     }
-    return 0
 }
 
 func plannerScrollView(scroll: State<Float32>, blocks: Int64): Unit {
@@ -83,6 +92,15 @@ private func supersampleArgument(): Int32 {
         }
     }
     2
+}
+
+private func pairedArgument(): Bool {
+    for (arg in getCommandLine()) {
+        if (arg == "pair") {
+            return true
+        }
+    }
+    false
 }
 
 private func parsePositiveInt(text: String): Int64 {

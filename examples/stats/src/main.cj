@@ -11,7 +11,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = StatsModel()
-    let app = DesktopApp(WindowSpec("CUI 数据看板", 640, 560, scale: 1.5), theme: statsTheme())
+    let app = DesktopApp(WindowSpec("CUI 数据看板", 640, 560, scale: 1.0), theme: statsTheme())
     app.setMinimumSize(540, 480)
     app.run {
         statsView(model)

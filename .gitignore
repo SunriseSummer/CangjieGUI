@@ -1,6 +1,8 @@
 target/
 **/target/
 bench/results/
+examples/.e2e-results/
+.devtools/fixtures/desktop_lifecycle/*.bmp
 __pycache__/
 *.gcda
 *.gcno

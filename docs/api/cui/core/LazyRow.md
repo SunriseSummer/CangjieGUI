@@ -18,7 +18,7 @@ LazyRow <: [`Widget`](Widget.md)
 
 ## 说明
 
-可见窗口在构建期由上一帧保留的滚动偏移与视口宽度决定（首帧假定 720 逻辑像素的视口宽，布局立即校正），左右各多建 2 列。只有可见条目真实存在：条目内局部状态随滚出销毁，需要跨滚动存活的状态请上提到应用模型；`key` 给条目稳定标识、`id` 界定保留状态的作用域、`scroll` 允许外部持有偏移，均与 [`LazyColumn`](LazyColumn.md) 同义。滚轮的水平分量（触控板平移、侧倾滚轮）直接驱动条带；只有垂直分量时把它重映射到水平方向——朝向自己滚（向下）条带向右前进，普通鼠标也能滚。内容溢出时底缘保留滚动条车道，条目高度相应让出。
+可见窗口在构建期由上一帧保留的滚动偏移与视口宽度决定（首帧假定 720 逻辑像素，布局立即校正）。预取按像素并沿滚动方向自适应扩展。只有预取范围内的条目真实存在；`key`、`revision`、[`LazyViewportController`](LazyViewportController.md)、`overscan`、状态卸载与顶部（此处为左侧）锚定均与 [`LazyColumn`](LazyColumn.md) 同义。滚轮水平分量直接驱动条带；只有垂直分量时映射到水平方向。内容溢出时底缘保留滚动条车道。
 
 ## 示例
 
@@ -73,6 +73,9 @@ public init(
     scroll!: ?State<Float32> = None,
     key!: ?((Int64) -> String) = None,
     id!: ?String = None,
+    revision!: UInt64 = UInt64(0),
+    controller!: ?LazyViewportController = None,
+    overscan!: Float32 = 144.0,
     item!: (Int64) -> Unit
 )
 ```
@@ -85,6 +88,9 @@ public init(
 - `scroll!`: `?`[`State`](State.md)`<Float32>` — 外部持有的滚动偏移；默认 `None`，由条带按 `id` 自持。
 - `key!`: `?((Int64) -> String)` — 条目的稳定标识函数，让条目状态跟随数据跨插入/重排；默认 `None`，按索引键控。
 - `id!`: `?String` — 容器标识，界定保留的滚动与条目状态；默认 `None` 按构建顺序自动推导，显式给出时须非空。
+- `revision!`: `UInt64` — key 顺序版本；结构变化时递增以保持左侧稳定 key 锚定。
+- `controller!`: `?`[`LazyViewportController`](LazyViewportController.md) — 外部滚动/按 key 定位；与 `scroll` 二选一。
+- `overscan!`: `Float32` — 静止预取像素；默认 `144.0`。
 - `item!`: `(Int64) -> Unit` — 条目构建器，收到条目索引；只对视口附近的条目调用。
 
 **异常**
@@ -105,6 +111,9 @@ public static func of<T>(
     scroll!: ?State<Float32> = None,
     key!: ?((T) -> String) = None,
     id!: ?String = None,
+    revision!: UInt64 = UInt64(0),
+    controller!: ?LazyViewportController = None,
+    overscan!: Float32 = 144.0,
     item!: (T) -> Unit
 ): LazyRow
 ```
@@ -117,6 +126,9 @@ public static func of<T>(
 - `scroll!`: `?`[`State`](State.md)`<Float32>` — 外部滚动偏移；默认 `None`。
 - `key!`: `?((T) -> String)` — 条目的稳定标识函数；默认 `None` 按索引键控。
 - `id!`: `?String` — 容器标识；默认 `None` 自动推导。
+- `revision!`: `UInt64` — key 顺序版本。
+- `controller!`: `?`[`LazyViewportController`](LazyViewportController.md) — 外部控制器；与 `scroll` 二选一。
+- `overscan!`: `Float32` — 静止预取像素。
 - `item!`: `(T) -> Unit` — 条目构建器，直接收到条目。
 
 **返回值** `LazyRow` — 配置好的条带。

@@ -25,17 +25,14 @@ class BookingModel {
         this.checkOut = State<CalendarDate>(today.addingDays(2))
         this.nights = derive(this.checkIn, this.checkOut, {ci, co => nightsBetween(ci, co)})
         this.nightlyRate = this.roomType.map({t => rateFor(t)})
-        this.total = derive(this.nights, this.nightlyRate, {n, r => if (n > 0) {
-            n * r
-        } else {
-            0
-        }})
+        this.total = derive(this.nights, this.nightlyRate, {
+            n, r => if (n > 0) {
+                n * r
+            } else {
+                0
+            }
+        })
         this.isValid = this.nights.map({n => n > 0})
-        // 编辑任一输入即作废上一次回执，避免与新选择不一致的陈旧信息残留。
-        let _ = this.checkIn.observe({_, _ => this.invalidateConfirmation()})
-        let _ = this.checkOut.observe({_, _ => this.invalidateConfirmation()})
-        let _ = this.roomType.observe({_, _ => this.invalidateConfirmation()})
-        let _ = this.guests.observe({_, _ => this.invalidateConfirmation()})
     }
 
     /** 提交预订：仅当日期有效时写入回执，否则不动。 */

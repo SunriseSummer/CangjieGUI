@@ -14,7 +14,7 @@ public class StateStore
 
 ## 说明
 
-键在当前 [`Keyed`](Keyed.md) 作用域内解析，因此重复的组件可以使用相同的内部状态名而互不串扰。同一构建内重复使用同一键、或键对应的值类型改变，都会立即抛出异常而不是悄悄返回错误的状态。构建期的作用域与访问簿记由桌面应用对象在每帧构建前后维护。
+键在当前 [`Keyed`](Keyed.md) 作用域内解析，因此重复的组件可以使用相同的内部状态名而互不串扰。同一构建内重复使用同一键、或键对应的值类型改变，都会立即抛出异常而不是悄悄返回错误的状态。构建期采用层次化所有权：retained 父边界命中时无需遍历全部后代；只有真实卸载才递归清理。一次根构建的所有权变化、retained 替换与 lifecycle effect 延迟到成功结束后提交，失败构建不会破坏上次已提交的树。宿主外直接调用 `remember` 的条目持久到 `clear()`，不参与构建期卸载判定。
 
 ## 示例
 
@@ -48,7 +48,7 @@ main(): Unit {
 | 成员 | 说明 |
 |---|---|
 | [`remember<T>(key: String, initial: () -> T)`](#remember) | 返回当前作用域下键 `key` 对应的状态，首次使用时以 `initial` 创建。 |
-| [`clear()`](#clear) | 移除全部保留的状态值。 |
+| [`clear()`](#clear) | 移除全部保留状态并关闭挂载的 lifecycle effect。 |
 
 ## 构造函数
 
@@ -86,7 +86,8 @@ public func remember<T>(key: String, initial: () -> T): State<T>
 
 ### clear
 
-移除全部保留的状态值。下一次 `remember` 将重新以 `initial` 创建。
+移除全部保留的状态值并按子树/声明逆序关闭 lifecycle effect。下一次 `remember` 将重新以 `initial` 创建；
+cleanup 抛异常时仍继续清理其余资源，最后重抛首个异常，失败 Resource 保留供下次 `clear` 重试。
 
 ```cangjie
 public func clear(): Unit

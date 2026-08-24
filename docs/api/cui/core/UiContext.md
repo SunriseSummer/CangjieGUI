@@ -4,7 +4,7 @@
 
 `cui.core` 包中的 public class
 
-每帧传给全部组件回调的服务枢纽：渲染器与主题、指针与帧状态，以及焦点、悬停、按下、拖拽、提示与浮层等共享交互协议。整个应用只有一个实例，跨帧存续——组件树每帧重建，需要活过重建的交互状态都保存在这里。
+渲染帧中传给实际执行组件回调的服务枢纽：渲染器与主题、指针与帧状态，以及焦点、悬停、按下、拖拽、提示与浮层等共享交互协议。整个应用只有一个实例，跨帧存续——普通组件值会随构建更新，retained 边界又可能复用实例，因此需要稳定、统一协调的交互状态保存在这里，而不依赖某个 Widget 的偶然寿命。
 
 ## 声明
 
@@ -76,6 +76,12 @@ main(): Unit {
 | 成员 | 说明 |
 |---|---|
 | [`resolve(...)`](#resolve) | 把带单位的长度换算为逻辑像素。 |
+| `eventMetadata()` / `eventModifiers()` | 当前派发事件的时间、窗口、物理/逻辑键和事件时刻修饰键快照。 |
+| `setImeComposition(...)` / `imeComposition(id)` | 保存并读取聚焦控件的未提交 IME pre-edit。 |
+| `setImeCandidates(...)` / `imeCandidates(id)` | 保存可选的 IME 候选快照。 |
+| `clearImeComposition()` | 在提交、blur 或窗口失焦时清理 pre-edit 与候选。 |
+| [`paragraphCacheStats()`](#paragraphcachestats) | 返回跨帧段落布局 LRU 的命中、容量与淘汰快照。 |
+| [`resetParagraphCacheStats()`](#resetparagraphcachestats) | 清零段落缓存计数而不丢弃缓存内容。 |
 | [`requestClose()`](#requestclose) | 请求退出应用：置位 `shouldClose`，宿主据此结束主循环。 |
 | [`requestFrame()`](#requestframe) | 请求在无输入、无状态变化时也渲染下一帧。 |
 | [`focusNext()`](#focusnext) | 把键盘焦点移到焦点环中的下一个控件，到末尾时回绕。 |
@@ -146,6 +152,30 @@ public init(renderer: Renderer, theme: Theme)
 - `theme`: [`Theme`](Theme.md) — 控件取色的主题，如 `Theme.light()` / `Theme.dark()`。
 
 ## 方法
+
+### eventMetadata / eventModifiers
+
+返回宿主为当前 `UiEventRecord` 安装的事件时刻快照。键盘快捷键和 Shift+Tab 必须使用 `eventModifiers()`，避免事件排队到下一帧后查询全局键盘状态而得到错误结果；直接调用 widget 的纯逻辑测试默认得到空快照。
+
+### IME composition
+
+`setImeComposition` 保存 pre-edit 文本及 IME 选择范围，但不写入应用的 `Bindable<String>`；`TextInput` 到达时才提交。状态按聚焦控件 id 隔离，焦点变化、窗口失焦和 commit 会清理。`imeComposition` 供文本控件绘制未提交文本及下划线，`imeCandidates` 供自定义候选 UI/诊断。
+
+### paragraphCacheStats
+
+返回 [`ParagraphCacheStats`](ParagraphCacheStats.md)。缓存由整个 `UiContext` 共享，能穿过每帧 `Label` 实例重建；默认按约 4 MiB 字节预算执行真 LRU，而非按条目数限制。键覆盖精确宽度、字号、样式、字体/注册表代数和行数上限。
+
+```cangjie
+public func paragraphCacheStats(): ParagraphCacheStats
+```
+
+### resetParagraphCacheStats
+
+清零命中、未命中和淘汰累计值，但保留缓存内容，便于在预热后单独采样稳定窗口。
+
+```cangjie
+public func resetParagraphCacheStats(): Unit
+```
 
 ### resolve
 

@@ -12,7 +12,7 @@ public class ZStack <: Widget {
     private var contentAlignment = Alignment.Center
 
     public init(body!: () -> Unit) {
-        children = buildChildren(body)
+        children = buildChildren("ZStack", body)
         emit(this)
     }
 
@@ -102,7 +102,7 @@ public class Grid <: Widget {
             throw IllegalArgumentException("Grid columns must be greater than zero")
         }
         this.columns = columns
-        this.children = buildChildren(body)
+        this.children = buildChildren("Grid", body)
         emit(this)
     }
 
@@ -225,7 +225,7 @@ public class FlowRow <: Widget {
     private var verticalGap: Length = vpLength(CUI_GAP)
 
     public init(body!: () -> Unit) {
-        children = buildChildren(body)
+        children = buildChildren("FlowRow", body)
         emit(this)
     }
 
@@ -317,7 +317,7 @@ public class ScrollView <: Widget {
 
     public init(key!: ?String = None, body!: () -> Unit) {
         let ident = resolveControlKey(key, "ScrollView")
-        child = buildChild(body)
+        child = buildChild("ScrollView", body)
         scrollOffset = localState<Float32>("ScrollView:${ident}:offset") {0.0}
         scrollBar = ScrollBar("ScrollView:${ident}:thumb")
         emit(this)

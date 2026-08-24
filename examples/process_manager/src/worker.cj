@@ -12,8 +12,13 @@ import cui.FrameInfo
 
 class RefreshWorker {
     private let mutex = Mutex()
+    private let snapshotFixture: ?String
     private var pending: ?String = None
     private var busy = false
+
+    init(snapshotFixture!: ?String = None) {
+        this.snapshotFixture = snapshotFixture
+    }
 
     func request(): Unit {
         var shouldStart = false
@@ -31,7 +36,10 @@ class RefreshWorker {
             // busy 从此永远为 true，之后所有自动/手动刷新都被 request() 挡住且毫无提示。
             // 因此失败也走 publish —— busy 得以复位，错误文案在进程页对用户可见。
             try {
-                publish(loadProcesses())
+                match (snapshotFixture) {
+                    case Some(snapshot) => publish(snapshot)
+                    case None => publish(loadProcesses())
+                }
             } catch (e: Exception) {
                 publish("进程快照采集失败：${e.message}")
             }

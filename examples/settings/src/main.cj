@@ -10,7 +10,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = SettingsModel()
-    let app = DesktopApp(WindowSpec("CUI 设置", 620, 640, scale: 1.5), theme: settingsTheme())
+    let app = DesktopApp(WindowSpec("CUI 设置", 620, 640, scale: 1.0), theme: settingsTheme())
     app.setMinimumSize(480, 480)
     app.run {
         settingsView(model)

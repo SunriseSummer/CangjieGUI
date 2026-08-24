@@ -1,8 +1,8 @@
 package cui.controls
 
 import std.collection.ArrayList
-import sdl.{Color, FontSizes, Rect, Size, UiEvent, clampF32}
-import cui.core.{UiContext, Widget, emit}
+import sdl.{Color, FontSizes, FrameInfo, Rect, Size, UiEvent, clampF32}
+import cui.core.{UiContext, Widget, emit, registerFrameSubscriber}
 
 private let TOAST_MARGIN: Float32 = 16.0
 private let TOAST_WIDTH: Float32 = 320.0
@@ -93,6 +93,7 @@ public class ToastLayer <: Widget {
 
     public init(toaster: Toaster) {
         this.toaster = toaster
+        registerFrameSubscriber({ctx, info => tick(ctx, info)})
         emit(this)
     }
 
@@ -134,12 +135,7 @@ public class ToastLayer <: Widget {
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
         match (event) {
-            case UiEvent.Frame(info) =>
-                toaster.tick(info.deltaMs)
-                // Keep frames coming while toasts animate; without this the idle loop would freeze them.
-                if (!toaster.isEmpty()) {
-                    ctx.requestFrame()
-                }
+            case UiEvent.Frame(info) => tick(ctx, info)
             case _ => ()
         }
         false
@@ -149,14 +145,24 @@ public class ToastLayer <: Widget {
         let a = Int64(clampF32(alpha, 0.0, 1.0) * 255.0)
         let accent = toastColor(ctx, toast.kind)
         // Soft shadow, card, then a coloured accent bar and the message — all faded by `alpha`.
-        ctx.renderer.fillRoundedRect(rect.shift(0.0, 3.0), ctx.theme.controlRadius,
-            ctx.theme.shadow.withAlpha(Int64(clampF32(alpha, 0.0, 1.0) * 40.0)))
+        ctx
+            .renderer
+            .fillRoundedRect(rect.shift(0.0, 3.0), ctx.theme.controlRadius,
+                ctx.theme.shadow.withAlpha(Int64(clampF32(alpha, 0.0, 1.0) * 40.0)))
         ctx.renderer.fillRoundedRect(rect, ctx.theme.controlRadius, ctx.theme.panelRaised.withAlpha(a))
         ctx.renderer.fillRoundedRect(Rect(rect.x + 6.0, rect.y + 8.0, 4.0, rect.h - 16.0), 2.0, accent.withAlpha(a))
         let textY = rect.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
         ctx.renderer.pushClip(Rect(rect.x + 18.0, rect.y, rect.w - 28.0, rect.h))
         ctx.renderer.text(toast.message, rect.x + 18.0, textY, ctx.theme.text.withAlpha(a), pointSize: FontSizes.CONTROL)
         ctx.renderer.popClip()
+    }
+
+    private func tick(ctx: UiContext, info: FrameInfo): Unit {
+        toaster.tick(info.deltaMs)
+        // Keep frames coming while toasts animate; without this the idle loop would freeze them.
+        if (!toaster.isEmpty()) {
+            ctx.requestFrame()
+        }
     }
 }
 

@@ -18,7 +18,7 @@ Keyed <: [`Widget`](Widget.md)
 
 ## 说明
 
-组件树每帧重建，跨帧存续的局部状态（[`rememberState`](functions.md#rememberstate)）与控件交互标识（焦点、按下）都按字符串键索引。`Keyed` 打开一个标识作用域：块内 `rememberState("draft")` 的完整键以本键为命名空间，同一行构建函数因此可以被复用任意多次而互不串扰；块内控件按声明顺序自动派生的交互标识同样被隔离。
+普通组件值可在渲染更新中重建，而 retained scope 也需要在重排/条件挂载间保持声明身份；跨帧局部状态（[`rememberState`](functions.md#rememberstate)）与控件交互标识（焦点、按下）因此都按字符串键索引。`Keyed` 打开一个标识作用域：块内 `rememberState("draft")` 的完整键以本键为命名空间，同一行构建函数因此可以被复用任意多次而互不串扰；块内控件按声明顺序自动派生的交互标识同样被隔离。
 
 列表场景不必手写 `Keyed`：[`ForEach`](functions.md#foreach) 为每个条目声明一棵键随条目走的 `Keyed` 子树（重排、删除后状态跟随原条目），[`ForEachIndexed`](functions.md#foreachindexed) 则以位置为键。`participatesInLayout` 被转发，因此 `ForEach` 里 `.visible(false)` 的条目不会留下多余的间距空位。
 

@@ -10,7 +10,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = ShadowsModel()
-    let app = DesktopApp(WindowSpec("CUI 多重阴影", 640, 560, scale: 1.5), theme: shadowsTheme())
+    let app = DesktopApp(WindowSpec("CUI 多重阴影", 640, 560, scale: 1.0), theme: shadowsTheme())
     app.setMinimumSize(560, 460)
     app.run {
         shadowsView(model)

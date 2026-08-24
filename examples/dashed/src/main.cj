@@ -11,7 +11,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = DashedModel()
-    let app = DesktopApp(WindowSpec("CUI 虚线边框", 620, 640, scale: 1.5), theme: dashedTheme())
+    let app = DesktopApp(WindowSpec("CUI 虚线边框", 620, 640, scale: 1.0), theme: dashedTheme())
     app.setMinimumSize(540, 540)
     app.run {
         dashedView(model)

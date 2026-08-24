@@ -12,7 +12,7 @@ let WENKAI_PATH = "<path/to>/LXGWWenKai-Regular.ttf"
 
 main(): Unit {
     Fonts.register(WENKAI, WENKAI_PATH)
-    let app = DesktopApp(WindowSpec("苍翠 · 千里江山", 1200, 400, scale: 1.5), theme: cangcuiTheme())
+    let app = DesktopApp(WindowSpec("苍翠 · 千里江山", 1200, 400, scale: 1.0), theme: cangcuiTheme())
     app.run {
         cangcuiView()
     }

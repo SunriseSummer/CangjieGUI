@@ -12,7 +12,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = TypographyModel()
-    let app = DesktopApp(WindowSpec("CUI 字体样式", 640, 720, scale: 1.5), theme: typographyTheme())
+    let app = DesktopApp(WindowSpec("CUI 字体样式", 640, 720, scale: 1.0), theme: typographyTheme())
     app.setMinimumSize(520, 560)
     app.run {
         typographyView(model)

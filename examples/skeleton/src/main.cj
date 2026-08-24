@@ -11,7 +11,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = SkeletonModel()
-    let app = DesktopApp(WindowSpec("CUI 骨架屏", 620, 600, scale: 1.5), theme: skeletonTheme())
+    let app = DesktopApp(WindowSpec("CUI 骨架屏", 620, 600, scale: 1.0), theme: skeletonTheme())
     app.setMinimumSize(520, 460)
     app.run {
         skeletonView(model)

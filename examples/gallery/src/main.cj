@@ -10,7 +10,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let items = seedGallery()
-    let app = DesktopApp(WindowSpec("CUI 作品画廊", 820, 640, scale: 1.5))
+    let app = DesktopApp(WindowSpec("CUI 作品画廊", 820, 640, scale: 1.0))
     app.setMinimumSize(560, 480)
     app.run {
         galleryView(items)

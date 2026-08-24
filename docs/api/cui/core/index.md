@@ -15,13 +15,17 @@ UI 核心包：提供 [`Widget`](Widget.md) 接口和链式修饰器、栈/网�
 | 类型 | 说明 |
 |---|---|
 | [`Animator`](Animator.md) | 按固定时长与 [`Easing`](Easing.md) 曲线把数值从当前位置补间到目标的动画器——CSS transition 与 SwiftUI/Compose `.animation(...)` 背后的模型。 |
+| [`AutomaticScopeDiagnostics`](AutomaticScopeDiagnostics.md) | 自动作用域的依赖/脏来源、body/layout/paint 命中、命令预算与退避诊断。 |
 | [`Binding`](Binding.md) | 指向另一个可绑定值中某个字段的双向绑定，用 Bindable.project 创建。 |
 | [`Button`](Button.md) | 带按主题显示的背景与边框与居中标题的按压按钮，在按钮内部按下并松开时触发 `onClick`。 |
 | [`DerivedState`](DerivedState.md) | 由一个或多个源计算出的只读可观察状态，用 derive 或 Observable.map 创建。 |
 | [`Divider`](Divider.md) | 分隔内容的 1 逻辑像素发丝线，走向由 `axis` 指定、长度由父栈拉伸铺满。 |
+| [`EffectCleanup`](EffectCleanup.md) | 把 cleanup 闭包适配为可重试、幂等的 effect Resource。 |
 | [`EventHandler`](EventHandler.md) | 在子树收到事件之前先把每个事件交给回调的透明包装组件，回调返回 `true` 即消费该事件。 |
 | [`Flexible`](Flexible.md) | 把内容纳入所在栈空间分配的包装组件：按权重分得剩余空间，而非按内容收缩。 |
 | [`FlowRow`](FlowRow.md) | 把子组件从左到右排布、放不下时自动换到内容高度新行的流式容器。 |
+| [`FrameSchedule`](FrameSchedule.md) | 组件发出的立即或定时下一帧请求快照，供宿主精确等待事件和截止时间。 |
+| [`FrameScheduler`](FrameScheduler.md) | 每应用独立的状态失效代数、事务合并与 UI 线程归属协调器。 |
 | [`FrameHandler`](FrameHandler.md) | 每渲染帧调用一次回调并自动请求续帧的透明包装组件，是时间驱动动画与帧内轮询的挂载点。 |
 | [`Grid`](Grid.md) | 把子组件排进固定列数、等宽单元格的网格容器，行高取本行最高的单元格。 |
 | [`HScrollBar`](HScrollBar.md) | [`ScrollBar`](ScrollBar.md) 的水平镜像：为沿 x 轴滚动的表面提供同样的滑块拖拽与轨道分页控制器。 |
@@ -32,11 +36,16 @@ UI 核心包：提供 [`Widget`](Widget.md) 接口和链式修饰器、栈/网�
 | [`Label`](Label.md) | 单行或多行文本组件：默认单行、溢出以省略号截断，字体样式经链式构建器就地配置。 |
 | [`LazyColumn`](LazyColumn.md) | 只构建视口附近行的定行高垂直滚动列表，构建、布局与绘制均为 O(可见) 而非 O(行数)。 |
 | [`LazyList`](LazyList.md) | 行高由 `heightOf` 逐行给定的惰性垂直滚动列表，是 [`LazyColumn`](LazyColumn.md) 的变高对应物。 |
+| [`LazyListExtents`](LazyListExtents.md) | Fenwick 可变行高模型，单行更新与前缀定位为 O(log N)。 |
 | [`LazyRow`](LazyRow.md) | 只构建视口附近列的定列宽水平滚动条带，是 [`LazyColumn`](LazyColumn.md) 的水平对应物。 |
+| [`LazyScrollAlignment`](LazyScrollAlignment.md) | 按稳定 key 定位时的起边、居中、末边或最近边对齐。 |
+| [`LazyViewportController`](LazyViewportController.md) | 持有惰性视口偏移并按稳定 key 定位条目。 |
 | [`Overlay`](Overlay.md) | 浮在整棵组件树之上的交互浮层：下拉弹出面板、菜单或对话框。 |
 | [`Panel`](Panel.md) | 带主题表面与内容内边距的卡片式容器，是划分界面区块的基础构件。 |
 | [`Pulse`](Pulse.md) | 永动的循环时间线——骨架屏微光、呼吸状态点、加载脉冲。 |
 | [`Reveal`](Reveal.md) | 在零与内容自然高度之间缓动过渡的展开/收起容器，切换 `shown` 即让内容滑入滑出。 |
+| [`RetainedGraphDiagnostics`](RetainedGraphDiagnostics.md) | 已提交 retained 执行图、effect 和失败 cleanup 的确定性诊断快照。 |
+| [`RetainedSubtree`](RetainedSubtree.md) | 显式 retained 高级边界；普通 UI 已由框架自动建立组合作用域。 |
 | [`ScrollBar`](ScrollBar.md) | 供滚动容器内部复用的垂直滚动条拖拽控制器，把命中滚动条的按下与移动转发给它，即得一致的滑块拖拽与轨道分页行为。 |
 | [`ScrollView`](ScrollView.md) | 裁剪显示、支持滚轮与拖动滚动条的垂直滚动视口，滚动位置按稳定标识跨帧保留。 |
 | [`Spacer`](Spacer.md) | 测量为零并吸收所在栈剩余空间的空白弹性组件，把兄弟组件推向两端。 |
@@ -60,8 +69,11 @@ UI 核心包：提供 [`Widget`](Widget.md) 接口和链式修饰器、栈/网�
 | [`Gradient`](Gradient.md) | 圆角背景用的双色线性渐变填充，默认自上而下、`vertical` 为 false 时自左向右。 |
 | [`Length`](Length.md) | 带显式单位的一维尺寸，写作 `100.px`、`24.vp` 或 `15.fp`。 |
 | [`LengthInsets`](LengthInsets.md) | 四边各自携带单位的间距，供 padding 类 API 使用，布局时解析为逻辑像素的 `Insets`。 |
+| [`ParagraphCacheStats`](ParagraphCacheStats.md) | 跨即时树重建的段落布局 LRU 命中、容量与淘汰诊断。 |
+| [`RetainedScopeDiagnostics`](RetainedScopeDiagnostics.md) | 一个 retained scope 的身份、直接所有权、dirty 原因和分相统计。 |
 | [`Shadow`](Shadow.md) | 可配置的组件阴影，包含水平/垂直偏移、模糊、扩散和颜色，作用类似 CSS `box-shadow`。 |
 | [`Theme`](Theme.md) | 组件共用的外观设置：按用途提供背景、面板、输入框、文字、强调色和危险色，并保存统一的圆角与描边宽度（逻辑像素）。 |
+| [`RetainedSubtreeStats`](RetainedSubtreeStats.md) | 保留边界累计的分相依赖/命中、自动失效、命令数和估算字节。 |
 
 **接口**
 
@@ -101,8 +113,12 @@ UI 核心包：提供 [`Widget`](Widget.md) 接口和链式修饰器、栈/网�
 | [`ForEach`](functions.md#foreach) | 为每个数据项声明一棵键控子树。 |
 | [`ForEachIndexed`](functions.md#foreachindexed) | 以位置为标识、为每个数据项声明一棵键控子树。 |
 | [`LazyGrid`](functions.md#lazygrid) | 垂直滚动的虚拟化网格：`data` 排成 `columns` 等宽列并按行开窗，海量均匀单元格（照片墙、卡片网格）只花一屏的成本。 |
-| [`currentStateGeneration`](functions.md#currentstategeneration) | 当前 UI 线程的全局状态写代数。 |
+| [`currentStateGeneration`](functions.md#currentstategeneration) | 兼容诊断用的进程级原子状态写代数。 |
+| [`lifecycleEffect`](functions.md#lifecycleeffect) | 按显式 revision 事务替换和清理 Resource effect。 |
+| [`mountEffect`](functions.md#mounteffect) | 在当前声明身份成功提交后挂载一次 Resource。 |
 | [`rememberState`](functions.md#rememberstate) | 返回由活动 [`DesktopApp`](../desktop/DesktopApp.md) 构建保留的局部状态。 |
+| [`subscribeFrame`](functions.md#subscribeframe) | 为自定义 Widget 显式登记逐帧回调，避免合成 Frame 全树广播。 |
+| [`broadcastEvent`](functions.md#broadcastevent) | 派发不可消费的广播阶段并有意丢弃组件返回值；普通输入不得使用。 |
 | [`drawFocusRing`](functions.md#drawfocusring) | 绘制键盘焦点环：贴着控件的强调色圆角描边，画在边界外 2 像素处，读作独立于控件自身边缘的光晕。 |
 | [`emit`](functions.md#emit) | 把新构造的组件注册进最内层打开的构建块。 |
 | [`focusableControlIdentity`](functions.md#focusablecontrolidentity) | 一步完成按构建顺序分配标识并注册为焦点项。 |

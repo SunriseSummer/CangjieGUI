@@ -59,37 +59,45 @@ main(): Unit {
 
 ### 4. 只补真正全局的按键
 
+`UiEvent.KeyDown` 的第二个载荷是 repeat `Bool`，不是修饰键。桌面宿主会先取空 SDL 队列再派发，稍后查询 `Keyboard.modifiers()` 可能已经看到 KeyUp 后的全局状态。组合键应使用 `EventHandler` 的上下文感知回调，从 `ctx.eventModifiers()` 读取与当前事件一起保存的快照；字母键以 `Key.Letter` 携带大写 ASCII 码：
+
 ```cangjie role=variation
-EventHandler(onEvent: {event =>
+EventHandler(onEvent: {ctx, event =>
     match (event) {
-        case UiEvent.KeyDown(Key.S, modifiers) if (modifiers.ctrl) =>
-            model.save()
-            true
+        case UiEvent.KeyDown(Key.Letter(code), _) =>
+            let modifiers = ctx.eventModifiers()
+            if (code == UInt8(83) && modifiers.command) { // ASCII 'S'
+                model.save()
+                true
+            } else {
+                false
+            }
         case _ => false
     }
 }) {
-    editorPage(model)
+    TextArea(model.body)
 }
 ```
 
-具体修饰键字段以项目使用的 CUI 版本为准；关键是只消费确认命中的组合键，其他事件返回 `false`。若 Modal 已打开，根级处理器还必须先检查模态状态，详见[键盘与焦点](keyboard-and-focus.md)。
+`modifiers.command` 在 Ctrl 或 GUI(Command) 任一按下时为真，适合跨平台快捷键。关键是读取事件时快照、只消费确认命中的组合键，并把其他事件继续交给子树。若 Modal 已打开，根级处理器还必须先检查模态状态，详见[键盘与焦点](keyboard-and-focus.md)。纯逻辑测试使用 `WidgetTestHost.frameRecords` 注入带 modifiers 的 `UiEventRecord`，不要依赖测试机器的当前键盘状态。
 
 ## 确认结果
 
-输入多行文字，使用 Shift+方向键选择，再撤销和重做，编辑行为应保持正常。用菜单执行“保存”，计数增加但文本和焦点不丢失。添加全局补丁后，Ctrl+S 与菜单调用同一动作；普通 `S` 仍进入编辑器。
+输入多行文字，使用 Shift+方向键选择，再撤销和重做，编辑行为应保持正常。用菜单执行“保存”，计数增加但文本和焦点不丢失。加入上下文感知 `EventHandler` 后，Ctrl/Cmd+S 与菜单调用同一动作；普通 `S` 仍进入编辑器。
 
 接着测试输入法组合、Windows CRLF 粘贴和只读模式复制。若外部加载新文档并接管光标状态，光标与选区锚点要一起更新。打开菜单后按 Tab，应关闭菜单并把遍历交还全局焦点，而不是把用户困在下拉层。
 
 ## 常见错误
 
 - 以为菜单的快捷键文字会自动注册事件。
+- 把 `KeyDown` 的 repeat `Bool` 当成 modifiers，或在延迟派发时查询全局 `Keyboard.modifiers()`。
 - 用字符下标修改 `TextArea` 光标：其光标与锚点使用 UTF-8 字节偏移。
 - 外部移动光标却不同时移动锚点：下一次输入会替换意外选区。
 - 捕获所有 Ctrl 组合键并返回 `true`：复制、粘贴与撤销失效。
 
 ## 相关 API
 
-[TextArea](../../api/cui/text/TextArea.md)、[MenuBar](../../api/cui/controls/MenuBar.md)、[MenuItem](../../api/cui/controls/MenuItem.md)、[EventHandler](../../api/cui/core/EventHandler.md)。
+[TextArea](../../api/cui/text/TextArea.md)、[MenuBar](../../api/cui/controls/MenuBar.md)、[MenuItem](../../api/cui/controls/MenuItem.md)、[EventHandler](../../api/cui/core/EventHandler.md)、[UiContext](../../api/cui/core/UiContext.md#eventmetadata--eventmodifiers) 与 [WidgetTestHost](../../api/cui/testing/WidgetTestHost.md)。
 
 ## 下一步
 

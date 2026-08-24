@@ -4,17 +4,30 @@ import sdl.{FrameInfo, Rect, Size, UiEvent}
 
 /*
  * Wraps a subtree with an event interceptor: `onEvent` sees every event before the child
- * and consumes it by returning true. Frame ticks are broadcast (never consumable), so the
- * hook observes them but cannot stop the child's animations. Use for container-level
- * shortcuts or gestures that a stock control does not expose.
+ * and consumes it by returning true. The context-aware overload exposes event-time metadata for
+ * modifier shortcuts; the one-argument overload remains source compatible. The hook explicitly
+ * subscribes to frame ticks (never consumable), while child frame subscribers are registered
+ * independently. Use for container-level shortcuts or gestures that a stock control does not expose.
  */
 public class EventHandler <: Widget {
     private let child: Widget
-    private let onEvent: (UiEvent) -> Bool
+    private let onEvent: (UiContext, UiEvent) -> Bool
 
     public init(onEvent!: (UiEvent) -> Bool, body!: () -> Unit) {
-        this.child = buildChild(body)
+        this.onEvent = {_, event => onEvent(event)}
+        registerFrameSubscriber({
+            _, info => let _ = onEvent(UiEvent.Frame(info))
+        })
+        this.child = buildChild("EventHandler", body)
+        emit(this)
+    }
+
+    public init(onEvent!: (UiContext, UiEvent) -> Bool, body!: () -> Unit) {
         this.onEvent = onEvent
+        registerFrameSubscriber({
+            ctx, info => let _ = onEvent(ctx, UiEvent.Frame(info))
+        })
+        this.child = buildChild("ContextEventHandler", body)
         emit(this)
     }
 
@@ -33,13 +46,13 @@ public class EventHandler <: Widget {
     public func handle(ctx: UiContext, event: UiEvent): Bool {
         match (event) {
             case UiEvent.Frame(_) =>
-                // Frame ticks broadcast: the hook's consumed flag must not stop the fan-out.
-                let _ = onEvent(event) // cjcheck-ignore: ignore-result # broadcast semantics: a frame tick must not be intercepted by the hook
+                // Direct-call compatibility: a Frame tick cannot be intercepted by the hook.
+                let _ = onEvent(ctx, event) // cjcheck-ignore: ignore-result # broadcast semantics: a frame tick must not be intercepted by the hook
                 broadcastEvent(child, ctx, event)
                 return false
             case _ => ()
         }
-        if (onEvent(event)) {
+        if (onEvent(ctx, event)) {
             return true
         }
         child.handle(ctx, event)
@@ -81,8 +94,15 @@ public class FrameHandler <: Widget {
     private let onFrame: (FrameInfo) -> Unit
 
     public init(onFrame!: (FrameInfo) -> Unit, body!: () -> Unit) {
-        this.child = buildChild(body)
         this.onFrame = onFrame
+        registerFrameSubscriber(
+            {
+                ctx, info =>
+                    ctx.requestFrame()
+                    onFrame(info)
+            }
+        )
+        this.child = buildChild("FrameHandler", body)
         emit(this)
     }
 

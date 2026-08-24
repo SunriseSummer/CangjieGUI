@@ -1,10 +1,13 @@
 package cui.controls
 
 import std.collection.ArrayList
-import sdl.{Key, MouseButton, Rect, Size, UiEvent, clampF32}
+import sdl.{Color, FontSizes, Key, MouseButton, Rect, Size, UiEvent, clampF32}
 import cui.core.{clampItemIndex, Bindable, CUI_CONTROL_H, CUI_GAP, CursorShape, Spring, UiContext, Widget, buildChildren,
     claimHoverIfInside, drawFocusRing, drawSurface, emit, focusableControlIdentity, localState, requireControlId,
-    unregisterFocusable}
+    unregisterFocusable, ellipsize}
+
+private let SEGMENT_MIN_WIDTH: Float32 = 96.0
+private let SEGMENT_LABEL_PADDING: Float32 = 12.0
 
 /*
  * A row of mutually exclusive segments bound to a `Bindable<Int64>` index, with a sliding
@@ -37,8 +40,8 @@ public class SegmentedControl <: Widget {
         emit(this)
     }
 
-    public func measure(_: UiContext, available: Size): Size {
-        let desired = max(96.0, Float32(items.size) * 96.0)
+    public func measure(ctx: UiContext, available: Size): Size {
+        let desired = segmentedRowDesiredWidth(ctx, items)
         Size(min(available.w, desired), CUI_CONTROL_H)
     }
 
@@ -116,7 +119,7 @@ public class TabView <: Widget {
         }
         let cid = focusableControlIdentity(base)
         this.controlId = cid
-        this.pages = buildChildren(body)
+        this.pages = buildChildren("TabView", body)
         // Only the active page can receive events, so stops on hidden pages would be dead
         // ends for Tab: building registers every page's controls, then the inactive pages'
         // stops are taken out again. Switching tabs re-registers on the next frame's rebuild.
@@ -277,7 +280,35 @@ private func drawSlidingSegments(ctx: UiContext, row: Rect, items: Array<String>
         } else {
             ctx.theme.text
         }
-        ctx.renderer.textCenter(items[i], cell, color)
+        drawSegmentLabel(ctx, items[i], cell, color)
         i += 1
     }
+}
+
+// Equal segments preserve the control's selection geometry; the widest label determines their
+// natural width so a roomy toolbar does not truncate only because an old fixed width was too small.
+private func segmentedRowDesiredWidth(ctx: UiContext, items: Array<String>): Float32 {
+    var widest: Float32 = 0.0
+    for (item in items) {
+        widest = max(widest, ctx.renderer.textWidth(item, pointSize: FontSizes.BODY))
+    }
+    let segmentCount = max(1, items.size)
+    max(SEGMENT_MIN_WIDTH, widest + 2.0 * SEGMENT_LABEL_PADDING) * Float32(segmentCount)
+}
+
+// Text is independently fitted and clipped per cell. This remains necessary after content-aware
+// measurement because an enclosing flex row may legitimately allocate less than the natural width.
+private func drawSegmentLabel(ctx: UiContext, text: String, cell: Rect, color: Color): Unit {
+    let textArea = Rect(cell.x + SEGMENT_LABEL_PADDING, cell.y, max(0.0, cell.w - 2.0 * SEGMENT_LABEL_PADDING), cell.h)
+    let fitted = fittedSegmentLabel(ctx, text, cell.w)
+    ctx.renderer.pushClip(textArea)
+    try {
+        ctx.renderer.textCenter(fitted, textArea, color, pointSize: FontSizes.BODY)
+    } finally {
+        ctx.renderer.popClip()
+    }
+}
+
+func fittedSegmentLabel(ctx: UiContext, text: String, segmentWidth: Float32): String {
+    ellipsize(ctx, text, max(0.0, segmentWidth - 2.0 * SEGMENT_LABEL_PADDING), FontSizes.BODY)
 }

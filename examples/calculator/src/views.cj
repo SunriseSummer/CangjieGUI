@@ -37,7 +37,7 @@ func displayPanel(model: CalcModel): Unit {
     Panel {
         VStack {
             Label(pendingText(model)).muted().textAlign(TextAlign.Trailing).fontSize(FontSizes.CAPTION)
-            Label(model.display)
+            Label(model.display.value)
                 .textAlign(TextAlign.Trailing)
                 .foregroundColor(Color.rgb(248, 250, 252))
                 .fontSize(FontSizes.DISPLAY)
@@ -47,7 +47,7 @@ func displayPanel(model: CalcModel): Unit {
 
 // 结果上方的小字行：已存操作数与待定运算符；空占位保证显示屏高度稳定。
 func pendingText(model: CalcModel): String {
-    match (model.pending) {
+    match (model.pending.value) {
         case Some(op) => "${formatValue(model.stored)} ${opSymbol(op)}"
         case None => " "
     }

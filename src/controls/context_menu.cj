@@ -1,8 +1,7 @@
 package cui.controls
 
 import sdl.{Key, MouseButton, Rect, Size, UiEvent}
-import cui.core.{Axis, CursorShape, Overlay, State, UiContext, Widget, resolveControlKey, buildChild, emit,
-    localState}
+import cui.core.{Axis, CursorShape, Overlay, State, UiContext, Widget, resolveControlKey, buildChild, emit, localState}
 
 private let CONTEXT_MENU_MARGIN: Float32 = 4.0
 
@@ -28,7 +27,7 @@ public class ContextMenu <: Widget {
     private var frame = Rect.zero()
 
     public init(items!: Array<MenuItem>, key!: ?String = None, body!: () -> Unit) {
-        this.child = buildChild(body)
+        this.child = buildChild("ContextMenu", body)
         this.items = items
         let ident = "ContextMenu:${resolveControlKey(key, "ContextMenu")}"
         this.overlayOwner = ident
@@ -46,14 +45,21 @@ public class ContextMenu <: Widget {
     public func layout(ctx: UiContext, rect: Rect): Unit {
         frame = rect
         child.layout(ctx, rect)
+        if (open.value && !items.isEmpty()) {
+            let menu = menuRect(ctx)
+            ctx.setOverlay(
+                Overlay(handleEvent: {c, e => handleMenu(c, e, menu)},
+                    render: {c => drawMenuPopup(c, menu, items, highlight.value)}, owner: overlayOwner))
+        }
     }
 
     public func draw(ctx: UiContext): Unit {
         child.draw(ctx)
         if (open.value && !items.isEmpty()) {
             let menu = menuRect(ctx)
-            ctx.setOverlay(Overlay(handleEvent: {c, e => handleMenu(c, e, menu)},
-                render: {c => drawMenuPopup(c, menu, items, highlight.value)}, owner: overlayOwner))
+            ctx.setOverlay(
+                Overlay(handleEvent: {c, e => handleMenu(c, e, menu)},
+                    render: {c => drawMenuPopup(c, menu, items, highlight.value)}, owner: overlayOwner))
         }
     }
 

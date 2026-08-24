@@ -10,7 +10,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = CornersModel()
-    let app = DesktopApp(WindowSpec("CUI 逐角圆角", 620, 620, scale: 1.5), theme: cornersTheme())
+    let app = DesktopApp(WindowSpec("CUI 逐角圆角", 620, 620, scale: 1.0), theme: cornersTheme())
     app.setMinimumSize(520, 480)
     app.run {
         cornersView(model)

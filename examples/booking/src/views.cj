@@ -8,9 +8,10 @@
 package cui_booking
 
 import cui.{Button, ButtonRole, CrossAxisAlignment, DatePicker, FontSizes, HStack, Label, LengthUnits, Panel,
-    SegmentedControl, Spacer, Stepper, VStack}
+    SegmentedControl, Spacer, Stepper, VStack, mountEffect}
 
 func bookingView(model: BookingModel): Unit {
+    mountReceiptInvalidation(model)
     VStack {
         appHeader()
         formPanel(model)
@@ -19,11 +20,27 @@ func bookingView(model: BookingModel): Unit {
     }.spacing(14.vp).padding(18.vp)
 }
 
+// Observations are UI lifecycle resources: they are installed only after a successful root build
+// and are cancelled automatically when this view identity unmounts.
+func mountReceiptInvalidation(model: BookingModel): Unit {
+    mountEffect("invalidate-receipt/check-in", {
+        => model.checkIn.observe({_, _ => model.invalidateConfirmation()})
+    })
+    mountEffect("invalidate-receipt/check-out", {
+        => model.checkOut.observe({_, _ => model.invalidateConfirmation()})
+    })
+    mountEffect("invalidate-receipt/room-type", {
+        => model.roomType.observe({_, _ => model.invalidateConfirmation()})
+    })
+    mountEffect("invalidate-receipt/guests", {
+        => model.guests.observe({_, _ => model.invalidateConfirmation()})
+    })
+}
+
 func appHeader(): Unit {
     VStack {
         Label("酒店预订").fontSize(BOOKING_TITLE)
-        Label("选择入住与退房日期，实时计算晚数与合计；日期可点选或键盘方向键调整").muted()
-            .fontSize(FontSizes.CAPTION)
+        Label("选择入住与退房日期，实时计算晚数与合计；日期可点选或键盘方向键调整").muted().fontSize(FontSizes.CAPTION)
     }.spacing(2.vp).hug()
 }
 

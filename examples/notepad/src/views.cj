@@ -13,7 +13,7 @@ import cui.{Axis, Button, ButtonRole, Checkbox, DesktopApp, Divider, EventHandle
     IconButton, IconName, Label, LengthUnits, Panel, Spacer, TextAlign, TextArea, Tooltip, VStack}
 
 func notepadView(model: NotepadModel, app: DesktopApp, documentPath: String): Unit {
-    EventHandler(onEvent: {event => handleNotepadEvent(event, model, app, documentPath)}) {
+    EventHandler(onEvent: {ctx, event => handleNotepadEvent(ctx, event, model, app, documentPath)}) {
         VStack {
             toolbar(model, app, documentPath)
             if (model.confirmingNew.value) {

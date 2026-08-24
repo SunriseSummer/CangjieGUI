@@ -10,7 +10,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = SearchModel()
-    let app = DesktopApp(WindowSpec("CUI 搜索高亮", 640, 600, scale: 1.5), theme: highlightTheme())
+    let app = DesktopApp(WindowSpec("CUI 搜索高亮", 640, 600, scale: 1.0), theme: highlightTheme())
     app.setMinimumSize(520, 480)
     app.run {
         highlightView(model)

@@ -10,7 +10,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = LinksModel()
-    let app = DesktopApp(WindowSpec("CUI 可点击链接", 620, 600, scale: 1.5), theme: linksTheme())
+    let app = DesktopApp(WindowSpec("CUI 可点击链接", 620, 600, scale: 1.0), theme: linksTheme())
     app.setMinimumSize(520, 480)
     app.run {
         linksView(model)

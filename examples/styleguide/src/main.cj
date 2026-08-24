@@ -10,7 +10,7 @@ package cui_styleguide
 import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
-    let app = DesktopApp(WindowSpec("CUI 设计令牌", 660, 720, scale: 1.5), theme: styleguideTheme())
+    let app = DesktopApp(WindowSpec("CUI 设计令牌", 660, 720, scale: 1.0), theme: styleguideTheme())
     app.setMinimumSize(560, 560)
     app.run {
         styleguideView()

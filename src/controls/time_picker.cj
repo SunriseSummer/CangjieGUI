@@ -2,7 +2,7 @@ package cui.controls
 
 import sdl.{FontSizes, IconName, Key, MouseButton, Pen, Rect, Size, SurfaceStyle, UiEvent, clampF32, drawIcon}
 import cui.core.{Bindable, CUI_CONTROL_H, CursorShape, Overlay, State, UiContext, Widget, resolveControlKey,
-    claimHoverIfInside, drawSurface, emit, localState, registerFocusable}
+    claimHoverIfInside, drawSurface, emit, localState, registerFocusable, registerRectOverlayWhen}
 
 private let TP_FIELD_W: Float32 = 132.0
 private let TP_CELL_W: Float32 = 34.0
@@ -79,8 +79,10 @@ public class TimePicker <: Widget {
         Size(min(available.w, TP_FIELD_W), CUI_CONTROL_H)
     }
 
-    public func layout(_: UiContext, rect: Rect): Unit {
+    public func layout(ctx: UiContext, rect: Rect): Unit {
         frame = rect
+        registerRectOverlayWhen(ctx, open.value, {=> popupRect(ctx)}, {c, e, popup => handleOverlay(c, e, popup)},
+            {c, popup => drawPopup(c, popup)}, overlayOwner)
     }
 
     public func draw(ctx: UiContext): Unit {
@@ -95,19 +97,21 @@ public class TimePicker <: Widget {
 
         if (open.value) {
             let popup = popupRect(ctx)
-            ctx.setOverlay(Overlay(handleEvent: {c, e => handleOverlay(c, e, popup)}, render: {c => drawPopup(c, popup)},
-                owner: overlayOwner))
+            ctx.setOverlay(
+                Overlay(handleEvent: {c, e => handleOverlay(c, e, popup)}, render: {c => drawPopup(c, popup)},
+                    owner: overlayOwner))
         }
     }
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
         claimHoverIfInside(ctx, event, frame, id, CursorShape.Interactive)
         match (event) {
-            case UiEvent.MouseDown(MouseButton.Left, x, y) => if (frame.contains(x, y)) {
-                ctx.focus(id)
-                open.value = true
-                return true
-            }
+            case UiEvent.MouseDown(MouseButton.Left, x, y) =>
+                if (frame.contains(x, y)) {
+                    ctx.focus(id)
+                    open.value = true
+                    return true
+                }
             case UiEvent.KeyDown(Key.Enter, _) => return openIfFocused(ctx)
             case UiEvent.KeyDown(Key.Space, _) => return openIfFocused(ctx)
             case UiEvent.KeyDown(Key.Down, _) => return openIfFocused(ctx)
@@ -394,8 +398,7 @@ public class TimePicker <: Widget {
     private func hourAt(popup: Rect, x: Float32, y: Float32): Int64 {
         let gx = popup.x + TP_PAD
         let gy = hoursOriginY(popup)
-        if (x < gx || x >= gx + TP_CELL_W * Float32(TP_HOUR_COLS) || y < gy || y >= gy + TP_CELL_H *
-            Float32(TP_HOUR_ROWS)) {
+        if (x < gx || x >= gx + TP_CELL_W * Float32(TP_HOUR_COLS) || y < gy || y >= gy + TP_CELL_H * Float32(TP_HOUR_ROWS)) {
             return -1
         }
         let col = Int64((x - gx) / TP_CELL_W)
@@ -470,8 +473,9 @@ public class TimePicker <: Widget {
         let amount = Float32(minute) / 59.0
         let knobX = track.x + track.w * amount
         ctx.renderer.fillRoundedRect(track, ctx.theme.smallRadius, ctx.theme.field)
-        ctx.renderer.fillRoundedRect(Rect(track.x, track.y, track.w * amount, track.h), ctx.theme.smallRadius,
-            ctx.theme.accent)
+        ctx
+            .renderer
+            .fillRoundedRect(Rect(track.x, track.y, track.w * amount, track.h), ctx.theme.smallRadius, ctx.theme.accent)
         ctx.renderer.fillCircle(knobX, row.centerY() + 1.5, 9.5, ctx.theme.shadow.withAlpha(30))
         ctx.renderer.fillCircle(knobX, row.centerY(), 8.5, ctx.theme.panelRaised)
         ctx.renderer.strokeCircle(knobX, row.centerY(), 8.0, Pen(width: 2.0, color: ctx.theme.accent), segments: 40)

@@ -1,14 +1,14 @@
 package cui.core
 
-import sdl.UiEvent
+import sdl.{Rect, UiEvent}
 
 /*
  * An interactive overlay — a dropdown, menu popup, or dialog — that floats above the whole
  * tree. The shell gives the open overlays events *before* the tree, so their clicks and keys
  * are not stolen by controls underneath, and paints them *last*, on top. A control registers
- * one during its draw (via `UiContext.setOverlay`) for as long as it is open; the shell clears
- * the stack at the start of each frame, so a control that stops registering (closes) removes
- * its overlay. Contrast the tooltip, which is a simpler draw-only overlay.
+ * one during stable layout (and idempotently during draw for custom-shell compatibility) for as
+ * long as it is open; the shell clears the stack before each layout pass. Contrast the tooltip,
+ * which is a simpler draw-only overlay.
  *
  * Overlays stack: registration order is z-order, events walk the stack top-down and drawing
  * bottom-up, so a popup opened inside a dialog floats above it and sees events first. `owner`
@@ -33,4 +33,31 @@ public class Overlay {
     func render(ctx: UiContext): Unit {
         onRender(ctx)
     }
+}
+
+/** Registers a lazily constructed overlay only while its owner is open. */
+protected func registerOverlayWhen(ctx: UiContext, open: Bool, overlay: () -> Overlay): Unit {
+    if (open) {
+        ctx.setOverlay(overlay())
+    }
+}
+
+/** Shared rectangular-popup registration used by picker-like controls. */
+protected func registerRectOverlayWhen(
+    ctx: UiContext,
+    open: Bool,
+    popup: () -> Rect,
+    handle: (UiContext, UiEvent, Rect) -> Bool,
+    render: (UiContext, Rect) -> Unit,
+    owner: String
+): Unit {
+    registerOverlayWhen(
+        ctx,
+        open,
+        {
+            =>
+                let rect = popup()
+                Overlay(handleEvent: {c, e => handle(c, e, rect)}, render: {c => render(c, rect)}, owner: owner)
+        }
+    )
 }

@@ -404,6 +404,24 @@ private func fragText(item: PlacedItem): String {
 }
 
 @Test
+func richTextWrappingNeverSplitsExtendedGraphemeClusters(): Unit {
+    // A 10px line is narrower than every multi-rune cluster. Each cluster may overflow intact, but
+    // no fragment may contain only a combining mark, a ZWJ, or half a regional-indicator pair.
+    let original = "e\u{0301}x👩‍💻y🇨🇳z"
+    let layout = runLayout([RichSpan.text(original)], 10.0, 20.0, 16.0, 3.0, TEN_PX_PER_RUNE)
+    let joined = StringBuilder()
+    for (item in layout.items) {
+        let value = fragText(item)
+        @Expect(value != "\u{0301}")
+        @Expect(value != "‍")
+        @Expect(value != "🇨")
+        @Expect(value != "🇳")
+        joined.append(value)
+    }
+    @Expect(joined.toString(), original)
+}
+
+@Test
 func richTextBreakPrefersSpaceBoundary(): Unit {
     // "hello world" 共 110px 放进 80px：8 字符处强断会切在 "wo" 中，回退到空格后——
     // 首行 "hello "、次行整词 "world"。

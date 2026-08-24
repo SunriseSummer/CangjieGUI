@@ -2,7 +2,7 @@ package cui.controls
 
 import std.collection.ArrayList
 import sdl.{Color, FontStyle, IconName}
-import cui.core.{maxRunesFitting, runeSlice}
+import cui.core.{graphemeRuneBoundaries, maxRunesFitting, runeSlice}
 
 // A span fragment placed at a position during layout: a text slice or an icon at (x, y) in content space.
 enum PlacedKind {
@@ -247,6 +247,7 @@ private func flowTextSpan(
     let span = run.span
     let maxWidth = flow.maxWidth
     let runes = text.toRuneArray()
+    let graphemeBoundaries = graphemeRuneBoundaries(runes)
     var i = 0
     while (i < runes.size) {
         // A wrapped continuation never starts with the space the line broke on (the
@@ -256,22 +257,20 @@ private func flowTextSpan(
             continue
         }
         var fit = maxRunesFitting(runes, i, maxWidth - flow.x, spanMeasure)
+        fit = snapToGraphemeBoundary(graphemeBoundaries, i, fit)
         if (fit == 0) {
-            if (flow.x > 0.0) {
-                // Nothing more fits on this line; wrap and retry the same rune.
-                flow.wrapLine()
+            fit = resolveOverflowingGrapheme(flow, runes, graphemeBoundaries, i, spanMeasure)
+            if (fit < 0) {
                 continue
             }
-            // A single rune overflows even a full line; place it anyway to make progress.
-            fit = 1
         }
         if (i + fit < runes.size && runes[i + fit] != r' ') {
             // Breaking mid-run: prefer to land just after the run's last space. When no space
             // exists and the break falls inside an ASCII word, move the whole word to the next
             // line when it fits one, instead of cutting it.
             let backed = backUpToSpace(runes, i, fit)
-            if (backed == fit && flow.x > 0.0 && isAsciiWordRune(runes[i]) &&
-                asciiWordWrapsWhole(runes, i, fit, maxWidth, spanMeasure)) {
+            if (backed == fit && flow.x > 0.0 && isAsciiWordRune(runes[i]) && asciiWordWrapsWhole(runes, i, fit,
+                maxWidth, spanMeasure)) {
                 flow.wrapLine()
                 continue
             }
@@ -280,11 +279,54 @@ private func flowTextSpan(
         let segment = runeSlice(runes, i, i + fit)
         flow.place(
             LaidFrag(x: flow.x, line: flow.line, height: fragHeight, kind: PlacedKind.PlacedText(segment),
-                color: span.color, muted: span.isMuted, style: span.style, font: span.fontFace,
-                size: run.size, width: spanMeasure(segment), spanIndex: run.index, onTap: span.tapAction,
-                highlight: span.highlightColor))
+                color: span.color, muted: span.isMuted, style: span.style, font: span.fontFace, size: run.size,
+                width: spanMeasure(segment), spanIndex: run.index, onTap: span.tapAction, highlight: span.highlightColor))
         i += fit
     }
+}
+
+private func resolveOverflowingGrapheme(
+    flow: RichFlow,
+    runes: Array<Rune>,
+    boundaries: Array<Int64>,
+    start: Int64,
+    measure: (String) -> Float32
+): Int64 {
+    let clusterRunes = nextGraphemeBoundary(boundaries, start) - start
+    if (measure(runeSlice(runes, start, start + clusterRunes)) <= flow.maxWidth - flow.x) {
+        return clusterRunes
+    }
+    if (flow.x > 0.0) {
+        // Retry the whole cluster on a fresh line instead of accepting a partial-rune fit.
+        flow.wrapLine()
+        return -1
+    }
+    // A whole user-perceived glyph overflows even a full line; keep it intact and make progress.
+    // Layout overflow is recoverable, broken emoji/combining text is not.
+    clusterRunes
+}
+
+private func snapToGraphemeBoundary(boundaries: Array<Int64>, start: Int64, count: Int64): Int64 {
+    let wanted = start + count
+    var answer = start
+    for (boundary in boundaries) {
+        if (boundary > wanted) {
+            break
+        }
+        if (boundary >= start) {
+            answer = boundary
+        }
+    }
+    answer - start
+}
+
+private func nextGraphemeBoundary(boundaries: Array<Int64>, start: Int64): Int64 {
+    for (boundary in boundaries) {
+        if (boundary > start) {
+            return boundary
+        }
+    }
+    start
 }
 
 // The fit shortened to land just after the run's last space, or `fit` unchanged when none exists.
@@ -319,9 +361,9 @@ private func flowIconSpan(flow: RichFlow, run: SpanRun, icon: IconName): Unit {
         flow.wrapLine()
     }
     flow.place(
-        LaidFrag(x: flow.x, line: flow.line, height: iconSize, kind: PlacedKind.PlacedIcon(icon),
-            color: span.color, muted: false, style: span.style, font: span.fontFace, size: run.size,
-            width: iconSize, spanIndex: run.index, onTap: span.tapAction, highlight: span.highlightColor))
+        LaidFrag(x: flow.x, line: flow.line, height: iconSize, kind: PlacedKind.PlacedIcon(icon), color: span.color,
+            muted: false, style: span.style, font: span.fontFace, size: run.size, width: iconSize, spanIndex: run.index,
+            onTap: span.tapAction, highlight: span.highlightColor))
     flow.x += flow.spanGap
 }
 
@@ -343,10 +385,9 @@ internal func layoutRichSpans(
                 // Bind this run's size, style, and font so widths reflect the actual metrics (a bigger
                 // or bolder run is wider) and wrapping breaks where the run really overflows.
                 flowTextSpan(flow, run, text,
-                    fragHeight: heightOf(run.size, span.style, span.fontFace),
-                    spanMeasure: {s: String => widthOf(s, run.size, span.style, span.fontFace)})
-            case RichSpanKind.SpanIcon(icon) =>
-                flowIconSpan(flow, run, icon)
+                fragHeight: heightOf(run.size, span.style, span.fontFace),
+                spanMeasure: {s: String => widthOf(s, run.size, span.style, span.fontFace)})
+            case RichSpanKind.SpanIcon(icon) => flowIconSpan(flow, run, icon)
         }
     }
     if (flow.frags.isEmpty()) {

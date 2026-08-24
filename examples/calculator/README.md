@@ -8,6 +8,7 @@
 - 用 `.flex(weight)` 权重构成严格对齐的键盘网格，以及“0”键如何精确横跨两列
 - 用枚举替代字符串标签：按键行为的 `match` 穷尽，新增按键时编译器强制补全 `press` 分支
 - `EventHandler` 把键盘输入翻译成与鼠标点击完全相同的动作
+- 用 `State` 保存显示值和待定运算，保证按钮回调产生的结果在同一帧重建并绘制
 - 除零、`Int64` 溢出、错误态恢复三类数值保护的写法
 
 ## 文件结构
@@ -20,6 +21,7 @@
 | [views.cj](src/views.cj) | 视图：显示屏、键盘行、键面角色与样式的集中映射 |
 | [keyboard.cj](src/keyboard.cj) | 键盘映射：文本输入/Enter/Backspace 到 `CalcKey` |
 | [theme.cj](src/theme.cj) | 深色主题与三类键面 `SurfaceStyle` |
+| [interaction_test.cj](src/interaction_test.cj) | 点击后可视状态在同一帧重建的回归测试 |
 
 ## 关键实现
 
@@ -64,8 +66,9 @@ app.run {
 - 除零：`abs(rhs) < Limit.DIVIDE_EPSILON` 时进入 ERROR 态而非产生 Inf。
 - 整数显示溢出：仅当 `abs(value) < 1.0e15` 才尝试 `Int64` 转换，超出范围保持浮点显示，
   避免 `9999999999²` 这类结果触发转换异常。
-- 错误态恢复：每条输入路径先调用 `recoverFromError`，ERROR 只冻结一帧交互，
-  任何后续按键都从干净状态继续。
+- 错误态恢复：每条输入路径先调用 `recoverFromError`，ERROR 保持到下一次交互，任何后续按键都从干净状态继续。
+- 响应刷新：显示值与待定运算使用 `State`；写入会使当前事件事务失效，DesktopApp 在本帧绘制前重建一次视图，
+  因此不会出现显示内容滞后一拍。
 
 ## 运行
 

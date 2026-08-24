@@ -49,7 +49,7 @@ main(): Unit {
 
 | 成员 | 说明 |
 |---|---|
-| [`measure(_: UiContext, available: Size)`](#measure) | 报告段数 × 96 逻辑像素、至多可用宽度的期望宽度，高度固定 38（[`Widget`](../core/Widget.md) 协议）。 |
+| [`measure(ctx: UiContext, available: Size)`](#measure) | 按最长标签测量等宽段的自然宽度并限制到可用宽度，高度固定 38（[`Widget`](../core/Widget.md) 协议）。 |
 | [`layout(_: UiContext, rect: Rect)`](#layout) | 记录分配的矩形作为整个控件的命中与绘制区域（[`Widget`](../core/Widget.md) 协议）。 |
 | [`draw(ctx: UiContext)`](#draw) | 绘制字段底面、滑动选中块与各段标签，键盘聚焦时叠加焦点环（[`Widget`](../core/Widget.md) 协议）。 |
 | [`handle(ctx: UiContext, event: UiEvent)`](#handle) | 左键按下选中命中段并获得焦点，聚焦后 Left/Right 步进选中（[`Widget`](../core/Widget.md) 协议）。 |
@@ -79,14 +79,16 @@ public init(items: Array<String>, selected: Bindable<Int64>, key!: ?String = Non
 
 ### measure
 
-报告段数 × 96 逻辑像素、至多可用宽度的期望宽度，高度固定 38（[`Widget`](../core/Widget.md) 协议）。空 `items` 仍按一段（96）计。
+每段自然宽度取 96 逻辑像素与“最长标签实际文字宽度 + 两侧各 12 像素留白”中的较大值；控件宽度为等宽段
+总和，但不超过父级可用宽度，高度固定 38（[`Widget`](../core/Widget.md) 协议）。空 `items` 仍按一段 96 计。
 
 ```cangjie
-public func measure(_: UiContext, available: Size): Size
+public func measure(ctx: UiContext, available: Size): Size
 ```
 
 **参数**
 
+- `ctx`: [`UiContext`](../core/UiContext.md) — 用当前字体后端测量标签。
 - `available`: `Size` — 父级提供的可用尺寸（逻辑像素）。
 
 **返回值** `Size` — 期望尺寸。
@@ -105,7 +107,9 @@ public func layout(_: UiContext, rect: Rect): Unit
 
 ### draw
 
-绘制字段底面、滑动选中块与各段标签，键盘聚焦时叠加焦点环（[`Widget`](../core/Widget.md) 协议）。指示块所覆盖的那段标签用强调底上的文字色，其余用普通文字色；`items` 为空时不绘制任何内容。
+绘制字段底面、滑动选中块与各段标签，键盘聚焦时叠加焦点环（[`Widget`](../core/Widget.md) 协议）。指示块所覆盖
+的那段标签用强调底上的文字色，其余用普通文字色。父级分配小于自然宽度时，每个标签在自己的单元格内独立
+省略并裁剪，绝不会与相邻段叠画；`items` 为空时不绘制任何内容。
 
 ```cangjie
 public func draw(ctx: UiContext): Unit

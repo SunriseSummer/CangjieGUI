@@ -4,7 +4,7 @@
 
 `cui.desktop` 包中的 public class
 
-桌面应用对象：拥有 SDL 窗口并运行帧循环——每帧从 [`run`](#run) 的界面构建函数重建组件树、布局、分发输入、绘制。闲置帧被跳过：只有输入、[`State`](../core/State.md) 写入、窗口缩放或组件的 `ctx.requestFrame()` 才触发渲染，时间驱动的动画必须请求帧否则冻结。
+桌面应用对象：拥有 SDL 窗口并运行按需帧循环。输入、应用内 [`State`](../core/State.md) 失效、窗口缩放、DPI/设备重置、立即续帧或定时截止触发渲染；空闲时以最长 250 ms 的有界原生等待阻塞。输入造成的状态变化会在同一帧绘制前重新构建/布局，避免混合新旧状态。
 
 ## 声明
 
@@ -14,7 +14,13 @@ public class DesktopApp
 
 ## 说明
 
-帧循环统一处理焦点、悬停、连续点击和指针事件。事件先交给已打开的浮层，再进入普通组件树，因此弹出菜单和对话框不会把点击漏给下层控件；提示和浮层也绘制在普通内容之上。Tab 按组件构建顺序移动焦点，Shift+Tab 反向移动，且不会把 Tab 交给文本框。经 [`manage`](#manage) 注册的资源会在退出时按注册的相反顺序关闭，然后关闭窗口；即使组件抛出异常离开帧循环，`finally` 也会执行这套清理。内置命令行开关：`--snapshot <path.bmp>` 在界面稳定后截图并退出，供视觉测试和文档配图使用；`--profile` 输出各阶段的帧耗时。IME 候选窗会跟随聚焦文本控件报告的光标矩形。
+帧循环统一处理焦点、悬停、连续点击和指针事件。事件先交给稳定布局登记的浮层，再进入普通组件树。除 [`post`](#post) 明确用于跨线程投递外，`DesktopApp` 的资源、窗口、对话框、批处理和 `run` API 都封闭在首次使用它们的 UI 线程；错误线程调用抛出 `IllegalStateException`。一次输入或 `post` 动作内的多次写由 [`batch`](#batch) 同类事务合并；布局若持续写状态，最多稳定化三轮并把后续工作留给下一帧，避免无限循环。开启 vsync 时呈现本身节奏控制，不再叠加固定延时。`--profile` 输出阶段均值、P50/P90/P95/P99/最大值、稳定化次数、触发来源、实际局部 damage 帧数和文本探针，并附一条可采集的 `@@FRAME_PROFILE` 键值记录。
+
+纯 State 驱动、无交互/浮层/Frame 订阅的安全帧会消费 retained scope 的布局范围，在持久超采样目标上局部清理并
+只重放相交 display list。输入、计时/动画、窗口变化、root 阶段 State、damage 过大或渲染器拒绝时自动全帧；
+`lastFrameUsedPartialDamage` 报告后端实际选择。测试工具可传 `--cui-force-full-retained` 关闭所有 retained 命中，
+以便与默认增量截图做正确性差分；`--cui-disable-retained-damage` 只关闭局部 damage、保留构建和命令缓存。
+两个诊断开关都是排障/对照逃生口，不应作为常规性能配置。
 
 ## 示例
 
@@ -55,6 +61,10 @@ main(): Unit {
 | [`manage(...)`](#manage) | 注册退出时自动关闭的资源（逆序关闭）。 |
 | [`setMinimumSize(...)`](#setminimumsize) | 阻止窗口被缩小到给定逻辑尺寸以下。 |
 | [`useBaseCursor(...)`](#usebasecursor) | 设置窗口的基础光标——没有控件申请其它形状时显示的形状（如绘图画布上的十字线）。 |
+| [`batch(...)`](#batch) | 在 UI 线程把多次状态写合并为一次视觉失效。 |
+| [`retainedDiagnostics()`](#retaineddiagnostics) | 获取最近一次已提交 retained 执行图的结构化诊断快照。 |
+| [`lastFrameUsedPartialDamage()`](#lastframeusedpartialdamage) | 查询当前/最近一帧是否被后端实际接受为局部 damage。 |
+| [`post(...)`](#post) | 从任意线程投递短动作，并唤醒 UI 事件等待。 |
 | [`clearRememberedState()`](#clearrememberedstate) | 在下一次重建前丢弃全部 `rememberState` 局部值。 |
 | [`openFileDialog(...)`](#openfiledialog) | 发起系统"打开文件"对话框，返回可轮询的请求。 |
 | [`saveFileDialog(...)`](#savefiledialog) | 发起系统"保存文件"对话框。 |
@@ -82,7 +92,7 @@ public init(
 
 - `spec`: `WindowSpec` — 标题、逻辑尺寸、DPI/垂直同步/超采样等一次性窗口选项（sdl 模块）。
 - `theme!`: [`Theme`](../core/Theme.md) — 语义调色板；默认值为 `Theme.light()`。
-- `frameDelay!`: `UInt32` — 每帧轮询后的等待毫秒数（帧节奏）；默认值为 `UInt32(16)`。
+- `frameDelay!`: `UInt32` — 关闭垂直同步时立即续帧的最小帧间隔；vsync 开启时由呈现阻塞控制节奏，不再叠加该延时。默认 `16`。
 - `fontScale!`: `Float32` — 应用到 `fp` 长度的用户字体缩放；下限 0.1。默认 `1.0`。
 - `metadata!`: `?AppMetadata` — 应用名/版本等元数据（sdl.system）。默认 `None`。
 - `hints!`: `Array<SdlHintSetting>` — 建窗前应用的 SDL hint。默认空。
@@ -95,7 +105,7 @@ public init(
 
 ### manage
 
-注册退出时自动关闭的资源（逆序关闭）。
+注册退出时自动关闭的资源（逆序关闭）。某个资源关闭失败不会阻止其余资源和窗口继续清理；全部清理完成后重新抛出首个清理异常。应用停止后调用会抛出 `IllegalStateException`。
 
 ```cangjie
 public func manage(resource: Resource): Unit
@@ -140,6 +150,42 @@ public func useBaseCursor(kind: SystemCursor): Unit
 ```cangjie
 public func clearRememberedState(): Unit
 ```
+
+### batch
+
+```cangjie
+public func batch(action: () -> Unit): Unit
+```
+
+在 UI 线程执行动作；其中的多次 `State` 写入只推进一次应用失效代数。跨线程调用会快速失败，后台结果
+应使用 `post`。
+
+### retainedDiagnostics
+
+```cangjie
+public func retainedDiagnostics(): RetainedGraphDiagnostics
+```
+
+返回最近一次已提交 retained 图的稳定结构、dirty 原因、分相依赖/命中和 effect 计数。应从 `FrameHandler`、
+事件回调或 `post` 动作调用；构建尚未提交时调用抛 `IllegalStateException`，跨 UI 线程调用同样被拒绝。
+
+### lastFrameUsedPartialDamage
+
+```cangjie
+public func lastFrameUsedPartialDamage(): Bool
+```
+
+返回当前或最近完成绘制的帧是否**实际**采用自动 retained 局部 damage。框架计划了区域但 Renderer 因没有兼容
+持久目标等原因回退全帧时返回 `false`。应从 UI 线程的 widget draw、事件或 `post` 动作读取；跨线程调用被拒绝。
+此值用于剖析和 E2E 断言，不应改变业务 UI。
+
+### post
+
+```cangjie
+public func post(action: () -> Unit): Bool
+```
+
+把动作加入线程安全队列并推送 SDL 唤醒事件。动作稍后在 UI 线程事务中执行。运行中若 SDL 拒绝极少见的唤醒事件，返回 `false`，但动作仍由最长 250 ms 的有界事件等待兜底取出；应用停止后返回 `false` 且不再接收动作，已接受但尚未执行的动作会在关闭时丢弃。应用负责在退出前取消或 join 自己的工作任务。
 
 ### openFileDialog
 
@@ -197,7 +243,7 @@ public func openFolderDialog(options!: FileDialogOptions = FileDialogOptions()):
 
 ### run
 
-进入帧循环直到窗口关闭；`body` 每渲染帧重建视图树。`body` 内可用 [`rememberState`](../core/functions.md#rememberstate) 保留键控局部状态；退出时（含异常路径）先逆序关闭受管资源、再关窗口。
+进入帧循环直到窗口关闭；`body` 每渲染帧重建视图树。`body` 内可用 [`rememberState`](../core/functions.md#rememberstate) 保留键控局部状态；退出时（含异常路径）先逆序尝试关闭全部受管资源、再关窗口。一个实例只能调用一次 `run`，再次调用抛出 `IllegalStateException`；停止后其它窗口/状态操作同样拒绝执行。
 
 ```cangjie
 public func run(body: () -> Unit): Unit

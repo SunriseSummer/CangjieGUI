@@ -8,22 +8,20 @@ import sdl.{Rect, Size, UiEvent}
  * so rows sized to their own content (chat bubbles, comments, cards with wrapped text) still cost only a
  * screenful to build, lay out and draw.
  *
- * Row offsets are a running sum of the heights, and the visible window is found by binary search over
- * them, so only the visible rows are built while the offset pass is a cheap walk of the height values.
- * `heightOf` must therefore be O(1) — a stored or estimated height, not a fresh text measurement — and
- * must match the height the row actually draws to, or rows would overlap or leave gaps. The scroll
- * offset, `key` and `id` behave as in `LazyColumn`.
+ * Row offsets live in a Fenwick extent index, so prefix lookup and mutable point updates are O(log N).
+ * The compatibility `heightOf` form rescans all heights unless a stable `revision` is supplied; with a
+ * revision it rescans only when that revision changes. High-frequency changes should use
+ * `LazyListExtents.update`. Heights must be stored/estimated values rather than fresh text measurement
+ * and must match the drawn slot. Scroll, stable keys, anchoring, controller and pixel overscan behave
+ * as in `LazyColumn`.
  */
 public class LazyList <: Widget {
-    private let id: String
     private let count: Int64
-    private let heightOf: (Int64) -> Float32
+    private let extents: LazyExtentIndex
     private let scrollStateValue: State<Float32>
-    private let viewportHeightState: State<Float32>
+    private let keyForIndex: (Int64) -> String
+    private let viewportMemory: LazyViewportMemory
     private let scrollBar: ScrollBar
-    // Running row tops: rowTops[i] is the top of row i in content space; rowTops[count] is the total
-    // content height (spacing sits only between rows, not after the last).
-    private let rowTops: Array<Float32>
     private let visibleItems: Array<(Int64, Widget)>
     private let frameScroll: Float32
     private var frame = Rect.zero()
@@ -32,7 +30,8 @@ public class LazyList <: Widget {
      * The index form: `count` rows whose heights come from `heightOf(index)`. `id` is the optional
      * container identity (auto-derived by build order when omitted). `key` optionally gives each row a
      * stable identity string (so its per-row state follows the item across inserts/reorders); when
-     * omitted, rows are keyed by index — see `LazyList.of` for the data-driven form.
+     * omitted, rows are keyed by index. `revision` versions the height/key snapshot; `None` preserves
+     * compatibility by rescanning every build. See `LazyList.of` for the data-driven form.
      */
     public init(
         count: Int64,
@@ -41,24 +40,92 @@ public class LazyList <: Widget {
         scroll!: ?State<Float32> = None,
         key!: ?((Int64) -> String) = None,
         id!: ?String = None,
+        revision!: ?UInt64 = None,
+        controller!: ?LazyViewportController = None,
+        overscan!: Float32 = LAZY_DEFAULT_OVERSCAN_PIXELS,
+        item!: (Int64) -> Unit
+    ) {
+        this(count, heightOf, spacing: spacing, scroll: scroll, key: key, id: id, revision: revision,
+            controller: controller, overscan: overscan, extentModel: None, item: item)
+    }
+
+    /**
+     * The mutable-extent form. Point updates through `extents.update` are O(log N), automatically
+     * schedule a frame and preserve the top visible stable key. Spacing belongs to the extent model.
+     */
+    public init(
+        extents: LazyListExtents,
+        scroll!: ?State<Float32> = None,
+        key!: ?((Int64) -> String) = None,
+        id!: ?String = None,
+        controller!: ?LazyViewportController = None,
+        overscan!: Float32 = LAZY_DEFAULT_OVERSCAN_PIXELS,
+        item!: (Int64) -> Unit
+    ) {
+        this(extents.count, {row => extents.heightAt(row)}, scroll: scroll, key: key, id: id, revision: None,
+            controller: controller, overscan: overscan, extentModel: Some(extents), item: item)
+    }
+
+    private init(
+        count: Int64,
+        heightOf: (Int64) -> Float32,
+        spacing!: Float32 = 0.0,
+        scroll!: ?State<Float32> = None,
+        key!: ?((Int64) -> String) = None,
+        id!: ?String = None,
+        revision!: ?UInt64 = None,
+        controller!: ?LazyViewportController = None,
+        overscan!: Float32 = LAZY_DEFAULT_OVERSCAN_PIXELS,
+        extentModel!: ?LazyListExtents,
         item!: (Int64) -> Unit
     ) {
         let ident = resolveControlKey(id, "LazyList")
-        this.id = ident
-        this.count = max(0, count)
-        this.heightOf = heightOf
-        this.scrollStateValue = match (scroll) {
-            case Some(value) => value
-            case None => localState<Float32>("LazyList:${ident}:scroll") {0.0}
+        if (scroll.isSome() && controller.isSome()) {
+            throw IllegalArgumentException("LazyList accepts either scroll or controller, not both")
         }
-        this.viewportHeightState = localState<Float32>("LazyList:${ident}:viewportH") {LAZY_DEFAULT_VIEWPORT}
+        this.count = max(0, count)
+        this.scrollStateValue = match (controller) {
+            case Some(value) => value.state()
+            case None => match (scroll) {
+                case Some(value) => value
+                case None => localState<Float32>("LazyList:${ident}:scroll") {0.0}
+            }
+        }
+        let resolvedKey = lazyKeyOrIndex(key)
+        this.keyForIndex = resolvedKey
+        let effectiveRevision = match (extentModel) {
+            case Some(model) => model.revision()
+            case None => match (revision) {
+                case Some(value) => value
+                case None => UInt64(0)
+            }
+        }
+        let structuralRevision = match (extentModel) {
+            case Some(model) => model.structuralRevision()
+            case None => effectiveRevision
+        }
+        this.viewportMemory = localState<LazyViewportMemory>("LazyList:${ident}:viewport") {
+            LazyViewportMemory(effectiveRevision)
+        }.value
         this.scrollBar = ScrollBar("LazyList:${ident}:thumb")
-        this.rowTops = lazyListRowTops(this.count, heightOf, max(0.0, spacing))
-        let content = this.rowTops[this.count]
-        this.frameScroll = clampScrollOffset(this.scrollStateValue.value, content, this.viewportHeightState.value)
-        let (first, last) = lazyListVisibleRange(this.rowTops, this.frameScroll, this.viewportHeightState.value,
-            LAZY_OVERSCAN)
-        this.visibleItems = buildLazyChildren("LazyList:${ident}", first, last, lazyKeyOrIndex(key), item)
+        let resolvedExtents = match (extentModel) {
+            case Some(model) => model.currentIndex()
+            case None =>
+                let cache = localState<LazyExtentCache>("LazyList:${ident}:extentCache") {LazyExtentCache()}.value
+                cache.prepare(this.count, heightOf, max(0.0, spacing), revision)
+        }
+        this.extents = resolvedExtents
+        let content = resolvedExtents.contentExtent()
+        let current = clampScrollOffset(this.scrollStateValue.value, content, this.viewportMemory.viewportExtent)
+        let geometry = LazyItemGeometry(this.count, resolvedKey, {index => resolvedExtents.topOf(index)},
+            {index => resolvedExtents.heightAt(index)}, content)
+        let anchored = lazyResolveAnchoredScroll(this.viewportMemory, effectiveRevision, structuralRevision, current,
+            geometry)
+        this.frameScroll = lazyResolveControllerScroll(controller, this.viewportMemory, anchored, geometry)
+        let insets = lazyAdaptiveOverscan(overscan, this.frameScroll, this.viewportMemory.previousScroll,
+            this.viewportMemory.viewportExtent)
+        let (first, last) = resolvedExtents.visibleRange(this.frameScroll, this.viewportMemory.viewportExtent, insets)
+        this.visibleItems = buildLazyChildren("LazyList:${ident}", first, last, resolvedKey, item)
         emit(this)
     }
 
@@ -70,20 +137,47 @@ public class LazyList <: Widget {
      * LazyList.of(model.messages, {m => m.height}, key: {m => m.id}) { msg => bubble(msg) }
      * ```
      */
-    public static func of<T>(
+    public static func of<T>( // cjcheck-ignore: param-count # declarative factory keeps named optional controls at the call site; a config wrapper would add ceremony
         data: Array<T>,
         heightOf: (T) -> Float32,
         spacing!: Float32 = 0.0,
         scroll!: ?State<Float32> = None,
         key!: ?((T) -> String) = None,
         id!: ?String = None,
+        revision!: ?UInt64 = None,
+        controller!: ?LazyViewportController = None,
+        overscan!: Float32 = LAZY_DEFAULT_OVERSCAN_PIXELS,
         item!: (T) -> Unit
     ): LazyList {
         let itemKey: ?((Int64) -> String) = match (key) {
             case Some(k) => Some({index => k(data[index])})
             case None => None
         }
-        LazyList(data.size, {index => heightOf(data[index])}, spacing: spacing, scroll: scroll, key: itemKey, id: id) {
+        LazyList(data.size, {index => heightOf(data[index])}, spacing: spacing, scroll: scroll, key: itemKey, id: id,
+            revision: revision, controller: controller, overscan: overscan) {
+            index => item(data[index])
+        }
+    }
+
+    /** Data-driven mutable-extent form; `data.size` must match `extents.count`. */
+    public static func ofExtents<T>( // cjcheck-ignore: param-count # declarative factory uses named optional controls; a config object would make the common call less legible
+        data: Array<T>,
+        extents: LazyListExtents,
+        scroll!: ?State<Float32> = None,
+        key!: ?((T) -> String) = None,
+        id!: ?String = None,
+        controller!: ?LazyViewportController = None,
+        overscan!: Float32 = LAZY_DEFAULT_OVERSCAN_PIXELS,
+        item!: (T) -> Unit
+    ): LazyList {
+        if (data.size != extents.count) {
+            throw IllegalArgumentException("LazyList data and extent counts must match")
+        }
+        let itemKey: ?((Int64) -> String) = match (key) {
+            case Some(k) => Some({index => k(data[index])})
+            case None => None
+        }
+        LazyList(extents, scroll: scroll, key: itemKey, id: id, controller: controller, overscan: overscan) {
             index => item(data[index])
         }
     }
@@ -94,11 +188,10 @@ public class LazyList <: Widget {
 
     public func layout(ctx: UiContext, rect: Rect): Unit {
         frame = rect
-        let _ = viewportHeightState.setIfChanged(rect.h) // cjcheck-ignore: ignore-result # write-on-change only; whether it changed is irrelevant here
-        let content = rowTops[count]
-        let clamped = clampScrollOffset(scrollStateValue.value, content, rect.h)
-        if (clamped != scrollStateValue.value) {
-            scrollStateValue.value = clamped
+        viewportMemory.viewportExtent = rect.h
+        let content = extents.contentExtent()
+        if (lazyFloatChanged(frameScroll, scrollStateValue.value)) {
+            scrollStateValue.value = frameScroll
         }
         let contentWidth = if (content > rect.h) {
             max(0.0, rect.w - scrollBarGutter())
@@ -107,13 +200,15 @@ public class LazyList <: Widget {
         }
         for (pair in visibleItems) {
             let (index, widget) = pair
-            let y = rect.y - frameScroll + rowTops[index]
-            widget.layout(ctx, Rect(rect.x, y, contentWidth, max(0.0, heightOf(index))))
+            let y = rect.y - frameScroll + extents.topOf(index)
+            widget.layout(ctx, Rect(rect.x, y, contentWidth, extents.heightAt(index)))
         }
+        lazyRememberAnchor(viewportMemory, frameScroll, count, {offset => extents.rowAt(offset)}, keyForIndex,
+            {index => extents.topOf(index)})
     }
 
     public func draw(ctx: UiContext): Unit {
-        let content = rowTops[count]
+        let content = extents.contentExtent()
         // Exact on the scroll axis, shadow clearance on the cross axis (see CUI_SHADOW_CLEARANCE).
         ctx.renderer.pushClip(Rect(frame.x - CUI_SHADOW_CLEARANCE, frame.y, frame.w + 2.0 * CUI_SHADOW_CLEARANCE,
             frame.h))
@@ -121,7 +216,7 @@ public class LazyList <: Widget {
             let (index, widget) = pair
             // Row clip widened by the shadow clearance so a card row's halo stays rounded; gross
             // overflow beyond the clearance is still truncated (intersected with the viewport).
-            let rowRect = Rect(frame.x, frame.y - frameScroll + rowTops[index], frame.w, max(0.0, heightOf(index)))
+            let rowRect = Rect(frame.x, frame.y - frameScroll + extents.topOf(index), frame.w, extents.heightAt(index))
             ctx.renderer.pushClip(rowRect.inset(-CUI_SHADOW_CLEARANCE))
             widget.draw(ctx)
             ctx.renderer.popClip()
@@ -131,7 +226,7 @@ public class LazyList <: Widget {
     }
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
-        let content = rowTops[count]
+        let content = extents.contentExtent()
         let viewportH = frame.h
         match (event) {
             case UiEvent.Frame(_) =>
@@ -184,70 +279,4 @@ public class LazyList <: Widget {
     public func focusableIds(): Array<String> {
         collectLazyFocusableIds(visibleItems)
     }
-}
-
-/*
- * The running row tops for `count` rows of the given heights and inter-row `spacing`: entry i is the top
- * of row i in content space, and the final entry (index count) is the total content height. Spacing sits
- * only between rows, never after the last, so the total matches what the rows actually occupy.
- */
-internal func lazyListRowTops(count: Int64, heightOf: (Int64) -> Float32, spacing: Float32): Array<Float32> {
-    let tops = Array<Float32>(count + 1, {_ => Float32(0.0)})
-    var acc: Float32 = 0.0
-    for (i in 0..count) {
-        tops[i] = acc
-        acc += max(0.0, heightOf(i))
-        if (i < count - 1) {
-            acc += spacing
-        }
-    }
-    tops[count] = acc
-    tops
-}
-
-/*
- * The inclusive [first, last] row range visible for a viewport at `scroll`, widened by `overscan` rows
- * each side. `tops` is the running-tops array (length count+1). Returns an empty range (first > last)
- * when there is nothing to show.
- */
-internal func lazyListVisibleRange(
-    tops: Array<Float32>,
-    scroll: Float32,
-    viewportH: Float32,
-    overscan: Int64
-): (Int64, Int64) {
-    let count = tops.size - 1
-    if (count <= 0) {
-        return (0, -1)
-    }
-    let top = max(0.0, scroll)
-    let bottom = top + max(0.0, viewportH)
-    var first = lazyListLastRowAtOrBefore(tops, top, count)
-    if (first < 0) {
-        first = 0
-    }
-    var last = lazyListLastRowAtOrBefore(tops, bottom, count)
-    if (last < 0) {
-        last = 0
-    }
-    first = max(0, first - overscan)
-    last = min(count - 1, last + overscan)
-    (first, last)
-}
-
-// Largest row index in [0, count-1] whose top is at or before `value`, by binary search; -1 if none.
-private func lazyListLastRowAtOrBefore(tops: Array<Float32>, value: Float32, count: Int64): Int64 {
-    var lo = 0
-    var hi = count - 1
-    var answer = -1
-    while (lo <= hi) {
-        let mid = (lo + hi) / 2
-        if (tops[mid] <= value) {
-            answer = mid
-            lo = mid + 1
-        } else {
-            hi = mid - 1
-        }
-    }
-    answer
 }

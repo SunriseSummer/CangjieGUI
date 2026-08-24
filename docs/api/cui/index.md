@@ -23,6 +23,7 @@ import cui.*
 | [`Binding`](core/Binding.md) | 指向另一个可绑定值中某个字段的双向绑定，用 Bindable.project 创建。 |
 | [`Button`](core/Button.md) | 带按主题显示的背景与边框与居中标题的按压按钮，在按钮内部按下并松开时触发 `onClick`。 |
 | [`ButtonRole`](core/ButtonRole.md) | 按钮的语义角色：常规、主要或危险，决定主题为按钮生成的表面配色。 |
+| [`broadcastEvent`](core/functions.md#broadcastevent) | 派发不可消费的广播阶段并有意丢弃组件返回值；普通输入不得使用。 |
 | [`claimHoverIfInside`](core/functions.md#claimhoverifinside) | 当 MouseMove 落在 `frame` 内时，为 `id` 申请悬停状态和指定的指针形状。 |
 | [`Corners`](core/Corners.md) | 背景四角的独立圆角半径，即 CSS 四值 `border-radius` 模型，按左上、右上、右下、左下排列。 |
 | [`CrossAxisAlignment`](core/CrossAxisAlignment.md) | 栈在交叉轴上放置子组件的策略：靠端、居中或拉伸填满。 |
@@ -32,6 +33,7 @@ import cui.*
 | [`Divider`](core/Divider.md) | 分隔内容的 1 逻辑像素发丝线，走向由 `axis` 指定、长度由父栈拉伸铺满。 |
 | [`drawFocusRing`](core/functions.md#drawfocusring) | 绘制键盘焦点环：贴着控件的强调色圆角描边，画在边界外 2 像素处，读作独立于控件自身边缘的光晕。 |
 | [`Easing`](core/Easing.md) | 把 `[0, 1]` 内的动画进度映射为缓动后进度的时序曲线。 |
+| [`EffectCleanup`](core/EffectCleanup.md) | 把 cleanup 闭包适配为可重试、幂等的 effect Resource。 |
 | [`emit`](core/functions.md#emit) | 把新构造的组件注册进最内层打开的构建块。 |
 | [`EventHandler`](core/EventHandler.md) | 在子树收到事件之前先把每个事件交给回调的透明包装组件，回调返回 `true` 即消费该事件。 |
 | [`Flexible`](core/Flexible.md) | 把内容纳入所在栈空间分配的包装组件：按权重分得剩余空间，而非按内容收缩。 |
@@ -51,20 +53,31 @@ import cui.*
 | [`LazyColumn`](core/LazyColumn.md) | 只构建视口附近行的定行高垂直滚动列表，构建、布局与绘制均为 O(可见) 而非 O(行数)。 |
 | [`LazyGrid`](core/functions.md#lazygrid) | 垂直滚动的虚拟化网格：`data` 排成 `columns` 等宽列并按行开窗，海量均匀单元格（照片墙、卡片网格）只花一屏的成本。 |
 | [`LazyList`](core/LazyList.md) | 行高由 `heightOf` 逐行给定的惰性垂直滚动列表，是 `LazyColumn` 的变高对应物。 |
+| [`LazyListExtents`](core/LazyListExtents.md) | Fenwick 可变行高模型，支持 O(log N) 单行更新。 |
 | [`LazyRow`](core/LazyRow.md) | 只构建视口附近列的定列宽水平滚动条带，是 `LazyColumn` 的水平对应物。 |
+| [`LazyScrollAlignment`](core/LazyScrollAlignment.md) | 惰性视口按 key 定位的对齐方式。 |
+| [`LazyViewportController`](core/LazyViewportController.md) | 按稳定 key 控制惰性视口滚动。 |
 | [`Length`](core/Length.md) | 带显式单位的一维尺寸，写作 `100.px`、`24.vp` 或 `15.fp`。 |
 | [`LengthInsets`](core/LengthInsets.md) | 四边各自携带单位的间距，供 padding 类 API 使用，布局时解析为逻辑像素的 `Insets`。 |
 | [`LengthUnit`](core/LengthUnit.md) | 长度值的单位：物理像素 `Px`、虚拟像素 `Vp` 或随用户字体缩放的字体像素 `Fp`。 |
 | [`LengthUnits`](core/LengthUnits.md) | 为数值字面量提供 `.px`/`.vp`/`.fp` 长度后缀的接口。 |
 | [`MainAxisAlignment`](core/MainAxisAlignment.md) | 栈沿主轴分配剩余空间的策略：靠端、居中或三种等分间隔。 |
 | [`Motion`](core/Motion.md) | 动效令牌：三档标准动画时长（毫秒）与四条角色化缓动曲线，与 Animator、Spring 搭配使用。 |
+| [`mountEffect`](core/functions.md#mounteffect) | 在当前声明身份成功提交后挂载一次 Resource。 |
 | [`Observable`](core/Observable.md) | 可读、可观察值的抽象：读取当前值、暴露修订号、订阅变更，并可 map 出派生状态。 |
 | [`Overlay`](core/Overlay.md) | 浮在整棵组件树之上的交互浮层：下拉弹出面板、菜单或对话框。 |
 | [`Panel`](core/Panel.md) | 带主题表面与内容内边距的卡片式容器，是划分界面区块的基础构件。 |
+| [`ParagraphCacheStats`](core/ParagraphCacheStats.md) | 跨即时树重建的段落布局 LRU 命中、容量与淘汰诊断。 |
 | [`Pulse`](core/Pulse.md) | 永动的循环时间线——骨架屏微光、呼吸状态点、加载脉冲。 |
 | [`Radii`](core/Radii.md) | 圆角半径尺度，虚拟像素：小档给标签与输入框、中档给卡片、大档给醒目表面，pill 收成全圆头。 |
+| [`lifecycleEffect`](core/functions.md#lifecycleeffect) | 按显式 revision 事务替换和清理 Resource effect。 |
 | [`rememberState`](core/functions.md#rememberstate) | 返回由活动 `DesktopApp` 构建保留的局部状态。 |
+| [`subscribeFrame`](core/functions.md#subscribeframe) | 为自定义 Widget 显式登记逐帧回调。 |
 | [`Reveal`](core/Reveal.md) | 在零与内容自然高度之间缓动过渡的展开/收起容器，切换 `shown` 即让内容滑入滑出。 |
+| [`RetainedGraphDiagnostics`](core/RetainedGraphDiagnostics.md) | 已提交 retained 执行图、effect 和失败 cleanup 的确定性诊断快照。 |
+| [`RetainedScopeDiagnostics`](core/RetainedScopeDiagnostics.md) | 一个 retained scope 的身份、直接所有权、dirty 原因和分相统计。 |
+| [`RetainedSubtree`](core/RetainedSubtree.md) | 自动跟踪 build/measure/layout/缓存 paint 的 State 读取，复用稳定子树和可选透明绘制命令。 |
+| [`RetainedSubtreeStats`](core/RetainedSubtreeStats.md) | 保留边界累计的分相依赖/命中、自动失效、命令数和估算字节。 |
 | [`ScrollBar`](core/ScrollBar.md) | 供滚动容器内部复用的垂直滚动条拖拽控制器，把命中滚动条的按下与移动转发给它，即得一致的滑块拖拽与轨道分页行为。 |
 | [`ScrollView`](core/ScrollView.md) | 裁剪显示、支持滚轮与拖动滚动条的垂直滚动视口，滚动位置按稳定标识跨帧保留。 |
 | [`Shadow`](core/Shadow.md) | 可配置的组件阴影，包含水平/垂直偏移、模糊、扩散和颜色，作用类似 CSS `box-shadow`。 |
@@ -152,13 +165,22 @@ import cui.*
 
 | 符号 | 说明 |
 |---|---|
-| [`DesktopApp`](desktop/DesktopApp.md) | 桌面应用对象：拥有 SDL 窗口并运行帧循环——每帧从 `run` 的界面构建函数重建组件树、布局、分发输入、绘制。 |
+| [`DesktopApp`](desktop/DesktopApp.md) | 桌面应用对象：拥有 SDL 窗口并运行按需帧循环；分相 State 依赖与 retained scope 可跳过未变构建、布局和绘制命令。 |
+
+**来自 [`cui.testing`](testing/index.md)**
+
+| 符号 | 说明 |
+|---|---|
+| [`RetainedTestMode`](testing/RetainedTestMode.md) | 测试宿主的增量或强制全量 retained 执行模式。 |
+| [`WidgetTestHost`](testing/WidgetTestHost.md) | 按桌面帧事务运行构建、布局、指针/焦点事件、一致性重建与绘制的确定性无窗口宿主。 |
+| [`TestFrameResult`](testing/TestFrameResult.md) | 一帧产生的稳定组件树、指标与下一帧计划。 |
+| [`TestFrameMetrics`](testing/TestFrameMetrics.md) | 构建/布局/事件/绘制耗时、稳定化、文本和浮层探针。 |
 
 ## 再导出（外部模块 sdl）
 
 以下符号定义于 **sdl 模块**（本文档范围之外），由伞包再导出以便应用单一导入。每个分组标题都链接到同版本 SDL API 的包索引；在这里按符号确认可直接导入的名称，再从对应包索引进入类型页查看精确声明和成员。本节不计入 CUI 手册的覆盖率。
 
-**来自 [`sdl`](../../../sdl/api/sdl/index.md)**
+**来自 [`sdl`](https://github.com/SunriseSummer/CangjieSDL/blob/main/docs/api/sdl/index.md)**
 
 | 符号 | 说明 |
 |---|---|
@@ -166,6 +188,7 @@ import cui.*
 | `Color` | 8 位通道的 RGBA 颜色。 |
 | `SdlException` | 本模块统一抛出的异常类型：SDL 调用失败、参数非法或资源已关闭时携带描述信息抛出。 |
 | `drawIcon` | 在给定矩形内以圆头粗描边绘制一枚内置矢量图标。 |
+| `EventKeyModifiers` | 随键盘事件复制的修饰键快照，延迟派发仍保持事件发生时语义。 |
 | `Fonts` | 进程级注册表，把应用字体名映射到字体文件路径，类似 CSS 的 `@font-face` 表。 |
 | `FontSizes` | 渲染器与应用共用的标准字号常量集合（点值）。 |
 | `FontStyle` | 叠加在基础 UI 字体上的文本样式：字重、倾斜与两种线条修饰。 |
@@ -174,32 +197,42 @@ import cui.*
 | `ImageFileFormat` | `Surface` 能读写的图像文件格式。 |
 | `imageFormatFromPath` | 按扩展名推断图像文件格式：`.png` / `.PNG` 为 PNG，其余一律为 BMP。 |
 | `Insets` | 逻辑像素下的四边间距——内边距、外边距、留白。 |
-| `Key` | 从 SDL 扫描码解码出的键盘按键——物理按键，与键盘布局无关。 |
+| `Key` | 解码后的键盘按键：字母/数字优先采用布局相关逻辑 keycode，导航/功能键按物理 scancode 回退。 |
 | `MouseButton` | 解码后的鼠标按键；左/中/右之外的按键以 `RawCode` 携带 SDL 的按键码到达。 |
 | `Pen` | 一次描边的描述：线条/轮廓的宽度与颜色。 |
 | `Point` | 逻辑像素坐标系中的一个位置——布局、事件与绘制共用的坐标空间。 |
 | `Rect` | 逻辑像素下的轴对齐矩形——原点 `x`/`y` 加宽高 `w`/`h`，用于布局框、命中测试与裁剪。 |
+| `RenderCommandBuffer` | Renderer 录制的不可变透明绘制命令，可校验资源/epoch 后按原 z 序重放。 |
+| `RenderCommandBufferStats` | 命令缓冲的命令、clip、资源、估算内存与重放次数诊断。 |
+| `RenderPass` | 异常安全、幂等关闭的场景资源，确保恢复 render target、scale 与 clip。 |
 | `Renderer` | 窗口的二维绘制入口：绘制图形、文字和图片，并设置绘制区域与裁剪范围。 |
 | `sdlRevision` | 返回 SDL 构建的修订串；SDL 未提供时为空串。 |
 | `sdlVersion` | 返回链接到的 SDL 版本号（SDL_GetVersion 的数值编码）。 |
 | `SdlWindow` | 与自己的渲染器成对创建、成对关闭的 SDL 窗口。 |
+| `SdlEventPump` | 多窗口进程级单一事件消费者，按事件 window id 使用目标窗口尺度并路由。 |
 | `Size` | 逻辑像素下的宽高尺寸，用于窗口尺寸查询与布局测量的返回值。 |
 | `Surface` | CPU 侧的 RGBA 像素缓冲，包装 SDL_Surface：可新建、从 BMP/PNG 文件加载、逐像素写入并存回 BMP 文件。 |
 | `SurfaceStyle` | 一块圆角面板的外观描述：填充色、边框色与宽度、圆角半径、阴影色与垂直偏移。 |
+| `TextFitResult` | 文本前缀适配的逻辑宽度与 UTF-8 字节长度。 |
+| `TextHitResult` | shaping cluster 命中的 UTF-8 插入边界与几何快照。 |
+| `TextMeasureSession` | 为同一字符串复用 UTF-8 缓冲与字体的范围/前缀测量资源。 |
 | `Texture` | GPU 侧图像资源，由渲染器创建（`loadTexture` / `textureFromSurface`），经 `Renderer.texture` / `textureRotated` / `texturedStrip` 绘制。 |
 | `TextureBlendMode` | 纹理绘制时与目标像素的混合方式，对应 SDL 的 SDL_BLENDMODE_*。 |
 | `TextureFlip` | 旋转绘制纹理时的镜像方式，作为 `TextureRenderOptions` 的一项传入 `Renderer.textureRotated`。 |
 | `TextureRenderOptions` | `Renderer.textureRotated` 的可选项集合：源区域裁剪、旋转中心与镜像方式。 |
 | `UiEvent` | 解码后的 SDL 输入事件，按到达顺序交给应用处理。 |
+| `UiEventMetadata` | SDL 事件的时间戳、窗口 id、物理/逻辑键和事件时修饰键快照。 |
+| `UiEventRecord` | 一个 UiEvent 及其稳定事件时元数据。 |
 | `WindowAspectRatio` | 窗口宽高比约束的上下界，由 `SdlWindow.aspectRatio` 返回。 |
 | `WindowBorderSize` | 窗口装饰（标题栏与边框）在四个方向占用的像素数，由 `SdlWindow.borderSize` 返回。 |
 | `WindowFlags` | 窗口状态标志位快照：把 SDL 的 64 位标志掩码展开为逐项布尔字段，同时保留原始掩码。 |
 | `WindowFlash` | 任务栏/窗口闪烁请求的方式，传给 `SdlWindow.flash`。 |
+| `WindowDisplayMetrics` | 内容缩放、像素密度、总渲染尺度与 SDL 显示缩放的动态快照。 |
 | `WindowPosition` | 窗口左上角在屏幕坐标系中的位置，由 `SdlWindow.position` 返回。 |
 | `WindowProgressState` | 原生任务栏进度指示的状态（Windows 任务栏按钮的进度条），经 `SdlWindow.setProgressState` 设置。 |
 | `WindowSpec` | 创建窗口时的一次性选项：标题、逻辑尺寸、DPI 与缩放行为、垂直同步和渲染器的超采样倍数。 |
 
-**来自 [`sdl.dialogs`](../../../sdl/api/sdl/dialogs/index.md)**
+**来自 [`sdl.dialogs`](https://github.com/SunriseSummer/CangjieSDL/blob/main/docs/api/sdl/dialogs/index.md)**
 
 | 符号 | 说明 |
 |---|---|
@@ -217,7 +250,7 @@ import cui.*
 | `showMessageBox` | 按 `MessageBoxOptions` 弹出自定义按钮的原生消息框，返回用户点击的按钮编号。 |
 | `showSimpleMessageBox` | 弹出只有一个"确定"按钮的原生消息框，用户关闭后返回。 |
 
-**来自 [`sdl.displays`](../../../sdl/api/sdl/displays/index.md)**
+**来自 [`sdl.displays`](https://github.com/SunriseSummer/CangjieSDL/blob/main/docs/api/sdl/displays/index.md)**
 
 | 符号 | 说明 |
 |---|---|
@@ -237,7 +270,7 @@ import cui.*
 | `FullscreenModeRequest` | 查找最接近的全屏显示模式时的期望参数：目标分辨率、刷新率与是否考虑高像素密度模式。 |
 | `primaryDisplayInfo` | 返回主显示器的聚合信息。 |
 
-**来自 [`sdl.input`](../../../sdl/api/sdl/input/index.md)**
+**来自 [`sdl.input`](https://github.com/SunriseSummer/CangjieSDL/blob/main/docs/api/sdl/input/index.md)**
 
 | 符号 | 说明 |
 |---|---|
@@ -250,7 +283,7 @@ import cui.*
 | `MouseState` | 某一时刻的鼠标快照：指针位置（已按窗口缩放折算为逻辑像素）、左中右三键的按下状态与原始按键掩码。 |
 | `SystemCursor` | 操作系统内置的光标形状，交给 `Cursor.system` 创建对应的原生光标。 |
 
-**来自 [`sdl.system`](../../../sdl/api/sdl/system/index.md)**
+**来自 [`sdl.system`](https://github.com/SunriseSummer/CangjieSDL/blob/main/docs/api/sdl/system/index.md)**
 
 | 符号 | 说明 |
 |---|---|

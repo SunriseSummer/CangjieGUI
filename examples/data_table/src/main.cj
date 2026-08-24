@@ -10,7 +10,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = FleetModel()
-    let app = DesktopApp(WindowSpec("CUI 机群监控", 800, 620, scale: 1.5), theme: fleetTheme())
+    let app = DesktopApp(WindowSpec("CUI 机群监控", 800, 620, scale: 1.0), theme: fleetTheme())
     app.setMinimumSize(680, 480)
     app.run {
         fleetView(model)

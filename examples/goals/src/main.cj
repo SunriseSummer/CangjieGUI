@@ -11,7 +11,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = GoalsModel()
-    let app = DesktopApp(WindowSpec("CUI 每日目标", 600, 680, scale: 1.5), theme: goalsTheme())
+    let app = DesktopApp(WindowSpec("CUI 每日目标", 600, 680, scale: 1.0), theme: goalsTheme())
     app.setMinimumSize(480, 520)
     app.run {
         goalsView(model)

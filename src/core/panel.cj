@@ -20,7 +20,7 @@ public class Panel <: Widget {
         flexible!: Bool = true,
         body!: () -> Unit
     ) {
-        child = buildChild(body)
+        child = buildChild("Panel", body)
         this.panelInsets = padding
         this.customStyle = style
         this.isFlexiblePanel = flexible

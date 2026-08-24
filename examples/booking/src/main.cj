@@ -11,7 +11,7 @@ import cui.{CalendarDate, DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = BookingModel(CalendarDate.today())
-    let app = DesktopApp(WindowSpec("CUI 酒店预订", 720, 560, scale: 1.5), theme: bookingTheme())
+    let app = DesktopApp(WindowSpec("CUI 酒店预订", 720, 560, scale: 1.0), theme: bookingTheme())
     app.setMinimumSize(560, 460)
     app.run {
         bookingView(model)

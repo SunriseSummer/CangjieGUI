@@ -4,7 +4,7 @@
 
 `cui.core` 包中的 public interface
 
-所有组件共同实现的立即模式契约：每帧参与测量、布局、绘制与事件处理，并自带尺寸、内边距、表面、阴影、弹性、可见性等整套链式修饰器。全部内置容器与控件都实现此接口；自定义组件实现 `measure`/`layout`/`draw`/`handle` 四个必选方法，即可与内置组件平起平坐地参与布局与焦点遍历。
+所有组件共同实现的声明式值契约：按宿主选中的更新阶段参与测量、布局、绘制与事件处理，并自带尺寸、内边距、表面、阴影、弹性、可见性等整套链式修饰器。全部内置容器与控件都实现此接口；自定义组件实现 `measure`/`layout`/`draw`/`handle` 四个必选方法，即可与内置组件平起平坐地参与布局与焦点遍历。
 
 ## 声明
 
@@ -14,7 +14,7 @@ public interface Widget
 
 ## 说明
 
-**每帧协议。**组件树每帧从应用代码重建，实例不保留跨帧场景——需要在重建后仍然存活的数据放进 [`State`](State.md)（控件内部经 [`rememberState`](functions.md#rememberstate) 按标识保留）。每个渲染帧，宿主对树依次调用 [`measure`](#measure)（在可用空间内报告首选尺寸）、[`layout`](#layout)（下发最终框架）与 [`draw`](#draw)；每条输入事件调用一次 [`handle`](#handle)，返回 `true` 即事件已消费、不再继续派发。
+**更新协议。**需要呈现时，普通 builder 只重建受 `State` 影响的声明路径；空闲窗口不构建。实例默认不承载跨帧业务状态——需要存活的数据放进 [`State`](State.md)（控件内部经 [`rememberState`](functions.md#rememberstate) 按标识保留）。框架会选择性持久化复杂单根作用域，按 Measure/Layout/Paint 的真实 State 读取独立失效，并在收益足够时自动缓存有界显示列表；[`RetainedSubtree`](RetainedSubtree.md) 只是显式高级/兼容边界。宿主只对本帧需要执行的阶段调用 [`measure`](#measure)、[`layout`](#layout) 与 [`draw`](#draw)；每条输入事件调用一次 [`handle`](#handle)，返回 `true` 即事件已消费、不再继续派发。合成帧时钟不再遍历 `handle`，用 [`FrameHandler`](FrameHandler.md) 或 [`subscribeFrame`](functions.md#subscribeframe) 显式订阅。
 
 **声明收集。**具体组件的构造函数调用 [`emit`](functions.md#emit) 把自己登记进最内层打开的构建块——`VStack { Label("标题") }` 因此无需数组便收集到子组件，顺序即声明顺序。在块外构造组件时 `emit` 是无操作，组件保持普通值语义，可先存进变量、再到块内用 `emit(已存组件)` 显式放置。
 

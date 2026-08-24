@@ -12,7 +12,7 @@ import cui.{DesktopApp, EventHandler, WindowSpec}
 
 main(): Int64 {
     let model = CalcModel()
-    let app = DesktopApp(WindowSpec("CUI 计算器", 480, 600, resizable: false, scale: 1.5), theme: calculatorTheme())
+    let app = DesktopApp(WindowSpec("CUI 计算器", 480, 600, scale: 1.0, resizable: false), theme: calculatorTheme())
     app.run {
         EventHandler(onEvent: {event => handleCalculatorEvent(model, event)}) {
             calculatorView(model)

@@ -11,7 +11,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = EditorModel()
-    let app = DesktopApp(WindowSpec("CUI 编辑器", 760, 560, scale: 1.5), theme: editorTheme())
+    let app = DesktopApp(WindowSpec("CUI 编辑器", 760, 560, scale: 1.0), theme: editorTheme())
     app.setMinimumSize(560, 420)
     app.run {
         editorView(model)

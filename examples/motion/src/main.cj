@@ -11,7 +11,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = MotionModel()
-    let app = DesktopApp(WindowSpec("CUI 缓动实验室", 640, 560, scale: 1.5), theme: motionTheme())
+    let app = DesktopApp(WindowSpec("CUI 缓动实验室", 640, 560, scale: 1.0), theme: motionTheme())
     app.setMinimumSize(520, 460)
     app.run {
         motionView(model)

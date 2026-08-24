@@ -1,10 +1,10 @@
 package cui.text
 
 import sdl.{FontSizes, Key, MouseButton, Point, Rect, Size, UiEvent}
-import sdl.input.{Clipboard, Keyboard}
-import cui.core.{Bindable, CUI_SMALL_H, CursorShape, ScrollBar, maxScrollOffset, State, UiContext, Widget, claimHoverIfInside,
-    clampScrollOffset, drawSurface, drawVerticalScrollBar, emit, localState, registerFocusable, resolveControlKey,
-    scrollLineIndex, scrollLineRemainder, scrollOffsetAfterWheel}
+import sdl.input.Clipboard
+import cui.core.{Bindable, CUI_SMALL_H, CursorShape, ScrollBar, maxScrollOffset, State, UiContext, Widget,
+    claimHoverIfInside, clampScrollOffset, drawSurface, drawVerticalScrollBar, emit, localState, registerFocusable,
+    resolveControlKey, registerFrameSubscriber, scrollLineIndex, scrollLineRemainder, scrollOffsetAfterWheel}
 
 // SDL reports letter keys as their uppercase ASCII code (see the Ctrl+letter shortcuts).
 private let AREA_LETTER_A: UInt8 = 65
@@ -100,6 +100,7 @@ public class TextArea <: Widget {
     /** Claims keyboard focus the first time an editable area appears (e.g. a compose box). */
     public func autofocus(): TextArea {
         autofocusRequested = true
+        registerFrameSubscriber({ctx, _ => applyAutofocus(ctx)})
         this
     }
 
@@ -132,14 +133,13 @@ public class TextArea <: Widget {
         let docLines = lines()
         // Clamp writes only on change: draw runs every frame, and the offset may be an
         // externally owned state whose observers should not fire for no-op writes.
-        let clampedScroll = clampScrollOffset(scrollStateValue.value, textContentHeight(docLines),
-            textViewport(frame).h)
+        let clampedScroll = clampScrollOffset(scrollStateValue.value, textContentHeight(docLines), textViewport(frame).h)
         if (clampedScroll != scrollStateValue.value) {
             scrollStateValue.value = clampedScroll
         }
         let content = TextAreaContent(text.value, cursorStateValue.value, scrollStateValue.value)
-        drawTextAreaBox(ctx, frame, id, content, docLines,
-            selection: (edit.selectionStart(), edit.selectionEnd()), barActive: scrollBar.dragging(ctx))
+        drawTextAreaBox(ctx, frame, id, content, docLines, selection: (edit.selectionStart(), edit.selectionEnd()),
+            barActive: scrollBar.dragging(ctx))
     }
 
     public func handle(ctx: UiContext, event: UiEvent): Bool { // cjcheck-ignore: long-function # flat single-match event table; each arm is one editing interaction in the desktop convention order
@@ -150,14 +150,13 @@ public class TextArea <: Widget {
         let edit = editState()
         match (event) {
             case UiEvent.MouseDown(MouseButton.Left, x, y) =>
-                if (scrollBar.press(ctx, frame, scrollStateValue, textContentHeight(lines()),
-                    textViewport(frame).h, x, y)) {
+                if (scrollBar.press(ctx, frame, scrollStateValue, textContentHeight(lines()), textViewport(frame).h, x,
+                    y)) {
                     return true
                 }
                 return pressAt(ctx, edit, x, y)
             case UiEvent.MouseMove(x, y) =>
-                if (scrollBar.drag(ctx, frame, scrollStateValue, textContentHeight(lines()),
-                    textViewport(frame).h, y)) {
+                if (scrollBar.drag(ctx, frame, scrollStateValue, textContentHeight(lines()), textViewport(frame).h, y)) {
                     return true
                 }
                 if (ctx.isDragging(id) && ctx.leftMouseDown) {
@@ -172,14 +171,27 @@ public class TextArea <: Widget {
                     scrollStateValue.value = scrollOffsetAfterWheel(scrollStateValue.value, wheelY, contentH, viewportH)
                     return true
                 }
-            case UiEvent.TextInput(value) => return recordedEdit(ctx, {=> edit.insert(value)})
+            case UiEvent.TextEditing(value, start, length) =>
+                if (ctx.hasFocus(id) && isEditable) {
+                    ctx.setImeComposition(id, value, start, length)
+                    return true
+                }
+            case UiEvent.TextEditingCandidates(values, selected, horizontal) =>
+                if (ctx.hasFocus(id) && isEditable) {
+                    ctx.setImeCandidates(id, values, selected, horizontal)
+                    return true
+                }
+            case UiEvent.TextInput(value) =>
+                ctx.clearImeComposition()
+                return recordedEdit(ctx, {=> edit.insert(value)})
             case UiEvent.KeyDown(Key.Enter, _) => return recordedEdit(ctx, {=> edit.insert("\n")})
             case UiEvent.KeyDown(Key.Backspace, _) => return recordedEdit(ctx, {=> edit.backspace()})
             case UiEvent.KeyDown(Key.Delete, _) => return recordedEdit(ctx, {=> edit.deleteForward()})
             case UiEvent.KeyDown(Key.Left, _) => return navigate(ctx, {=> edit.moveLeft()}, {=> edit.extendLeft()})
             case UiEvent.KeyDown(Key.Right, _) => return navigate(ctx, {=> edit.moveRight()}, {=> edit.extendRight()})
             case UiEvent.KeyDown(Key.Up, _) => return navigate(ctx, {=> edit.moveLineUp()}, {=> edit.extendLineUp()})
-            case UiEvent.KeyDown(Key.Down, _) => return navigate(ctx, {=> edit.moveLineDown()}, {=> edit.extendLineDown()})
+            case UiEvent.KeyDown(Key.Down, _) => return navigate(ctx, {=> edit.moveLineDown()},
+                {=> edit.extendLineDown()})
             case UiEvent.KeyDown(Key.Home, _) => return navigate(ctx, {=> edit.moveToLineStart()},
                 {=> edit.extendToLineStart()})
             case UiEvent.KeyDown(Key.End, _) => return navigate(ctx, {=> edit.moveToLineEnd()},
@@ -188,10 +200,7 @@ public class TextArea <: Widget {
             case UiEvent.Frame(_) =>
                 // One-time initial focus for an editable area, applied after the frame's pointer
                 // events so a stray startup click cannot cancel it; mirrors TextField.
-                if (autofocusRequested && isEditable && !autofocusDone.value) {
-                    ctx.focus(id, viaKeyboard: true)
-                    autofocusDone.value = true
-                }
+                applyAutofocus(ctx)
             case _ => ()
         }
         false
@@ -212,6 +221,13 @@ public class TextArea <: Widget {
 
     private func editState(): TextEditState {
         TextEditState(text, cursor: Some(cursorStateValue), anchor: Some(anchorStateValue))
+    }
+
+    private func applyAutofocus(ctx: UiContext): Unit {
+        if (autofocusRequested && isEditable && !autofocusDone.value) {
+            ctx.focus(id, viaKeyboard: true)
+            autofocusDone.value = true
+        }
     }
 
     // Runs a mutating action while focused and editable, recording it for undo. The
@@ -293,7 +309,7 @@ public class TextArea <: Widget {
         if (!ctx.hasFocus(id)) {
             return false
         }
-        if (Keyboard.modifiers().shift) {
+        if (ctx.eventModifiers().shift) {
             growSelection()
         } else {
             moveCaret()
@@ -304,7 +320,7 @@ public class TextArea <: Widget {
     }
 
     private func shortcut(ctx: UiContext, edit: TextEditState, code: UInt8): Bool {
-        if (!ctx.hasFocus(id) || !Keyboard.modifiers().command) {
+        if (!ctx.hasFocus(id) || !ctx.eventModifiers().command) {
             return false
         }
         if (code == AREA_LETTER_A) {
@@ -315,9 +331,11 @@ public class TextArea <: Widget {
             return true
         } else if (code == AREA_LETTER_X) {
             if (isEditable) {
-                return recordedEdit(ctx, {=> if (copyEditSelection(edit)) {
-                    let _ = edit.deleteSelection() // cjcheck-ignore: ignore-result # cut always has a selection here; copySelection just confirmed it
-                }})
+                return recordedEdit(ctx, {
+                    => if (copyEditSelection(edit)) {
+                        let _ = edit.deleteSelection() // cjcheck-ignore: ignore-result # cut always has a selection here; copySelection just confirmed it
+                    }
+                })
             }
             let _ = copyEditSelection(edit) // cjcheck-ignore: ignore-result # read-only cut degrades to copy; a failed platform copy has no in-UI recovery
             return true
@@ -328,7 +346,7 @@ public class TextArea <: Widget {
             return true
         } else if (code == AREA_LETTER_Z) {
             if (isEditable) {
-                if (Keyboard.modifiers().shift) {
+                if (ctx.eventModifiers().shift) {
                     redo()
                 } else {
                     undo()
@@ -378,7 +396,9 @@ private func drawTextAreaBox(
         drawTextAreaSelection(ctx, viewport, content, selStart, selEnd)
     }
     drawLines(ctx, viewport, lines, content.scroll)
-    drawTextAreaCursor(ctx, viewport, id, content)
+    if (!drawTextAreaComposition(ctx, viewport, id, content)) {
+        drawTextAreaCursor(ctx, viewport, id, content)
+    }
     ctx.renderer.popClip()
     drawVerticalScrollBar(ctx, frame, content.scroll, textContentHeight(lines), viewport.h, active: barActive)
 }

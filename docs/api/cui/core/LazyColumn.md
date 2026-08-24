@@ -18,7 +18,9 @@ LazyColumn <: [`Widget`](Widget.md)
 
 ## 说明
 
-树每帧重建，可见窗口在构建期由上一帧保留的滚动偏移与视口高度决定（首帧假定 720 逻辑像素的视口，布局立即校正），同一快照贯穿本帧的布局与绘制；视口上下各多建 2 行，滚动一帧内不露白边。只有可见行真实存在：行内局部状态（`rememberState` / [`Keyed`](Keyed.md)）随行滚出销毁，需要跨滚动存活的状态请上提到应用模型；给 `key` 一个稳定的数据标识可让行状态跟随条目而非槽位（插入/重排时不串行）。滚动偏移可经 `scroll` 由外部持有以便联动或动画；`id` 界定保留的滚动与行内状态的作用域。内容溢出时右缘保留滚动条车道（行宽相应让出），滚轮一格滚 72 逻辑像素，内容不足一屏时滚轮让给外层滚动容器。
+树每帧重建，可见窗口在构建期由上一帧保留的滚动偏移与视口高度决定（首帧假定 720 逻辑像素的视口，布局立即校正），同一快照贯穿本帧的布局与绘制。预取按像素计算，静止时默认前后各 144px，快速滚动时只沿前进方向扩展、最多再扩一屏；不会因行很短而过量构建，也不会因行很高而露白。
+
+只有视口和预取范围内的行真实存在：行内局部状态（`rememberState` / [`Keyed`](Keyed.md)）随行滚出销毁，需要跨滚动存活的状态请上提到应用模型。`key` 应返回稳定业务标识；数据插入或重排时同步递增 `revision`，列表会把原顶部 key 锚定在原像素位置。滚动可由 `scroll` 或 [`LazyViewportController`](LazyViewportController.md) 二选一持有；控制器支持按 key 定位。`id` 界定内部状态作用域。内容溢出时右缘保留滚动条车道，内容不足一屏时滚轮让给外层。
 
 ## 示例
 
@@ -73,6 +75,9 @@ public init(
     scroll!: ?State<Float32> = None,
     key!: ?((Int64) -> String) = None,
     id!: ?String = None,
+    revision!: UInt64 = UInt64(0),
+    controller!: ?LazyViewportController = None,
+    overscan!: Float32 = 144.0,
     item!: (Int64) -> Unit
 )
 ```
@@ -85,11 +90,14 @@ public init(
 - `scroll!`: `?`[`State`](State.md)`<Float32>` — 外部持有的滚动偏移；默认 `None`，由列表按 `id` 自持。
 - `key!`: `?((Int64) -> String)` — 行的稳定标识函数，让行内状态跟随条目跨插入/重排；默认 `None`，按索引键控。
 - `id!`: `?String` — 容器标识，界定保留的滚动与行内状态；默认 `None` 按构建顺序自动推导，显式给出时须非空。
+- `revision!`: `UInt64` — 数据 key 顺序的版本；插入、删除或重排时递增，使顶部稳定 key 保持像素锚定。
+- `controller!`: `?`[`LazyViewportController`](LazyViewportController.md) — 外部控制器；与 `scroll` 二选一。
+- `overscan!`: `Float32` — 静止时前后预取的逻辑像素；负值按 0，滚动时沿前进方向自适应扩展。
 - `item!`: `(Int64) -> Unit` — 行构建器，收到行索引；只对视口附近的行调用。
 
 **异常**
 
-- `IllegalArgumentException` — `id` 显式给出且为空字符串时。
+- `IllegalArgumentException` — `id` 为空，或同时给出 `scroll` 与 `controller`。
 
 ## 方法
 
@@ -105,6 +113,9 @@ public static func of<T>(
     scroll!: ?State<Float32> = None,
     key!: ?((T) -> String) = None,
     id!: ?String = None,
+    revision!: UInt64 = UInt64(0),
+    controller!: ?LazyViewportController = None,
+    overscan!: Float32 = 144.0,
     item!: (T) -> Unit
 ): LazyColumn
 ```
@@ -117,6 +128,9 @@ public static func of<T>(
 - `scroll!`: `?`[`State`](State.md)`<Float32>` — 外部滚动偏移；默认 `None`。
 - `key!`: `?((T) -> String)` — 条目的稳定标识函数；默认 `None` 按索引键控。
 - `id!`: `?String` — 容器标识；默认 `None` 自动推导。
+- `revision!`: `UInt64` — 数据 key 顺序版本；结构变化时递增。
+- `controller!`: `?`[`LazyViewportController`](LazyViewportController.md) — 按 key 定位或持有滚动；与 `scroll` 二选一。
+- `overscan!`: `Float32` — 静止预取像素；默认 `144.0`。
 - `item!`: `(T) -> Unit` — 行构建器，直接收到条目。
 
 **返回值** `LazyColumn` — 配置好的列表。

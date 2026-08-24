@@ -12,7 +12,7 @@ import cui.{DesktopApp, FileSystem, Fonts, WindowSpec}
 main(): Int64 {
     registerFonts()
     let model = FontsModel()
-    let app = DesktopApp(WindowSpec("CUI 字体加载", 660, 720, scale: 1.5), theme: fontsTheme())
+    let app = DesktopApp(WindowSpec("CUI 字体加载", 660, 720, scale: 1.0), theme: fontsTheme())
     app.setMinimumSize(540, 560)
     app.run {
         fontsView(model)

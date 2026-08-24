@@ -12,7 +12,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = PlannerModel()
-    let app = DesktopApp(WindowSpec("CUI 专注规划台", 1120, 720, scale: 1.5), theme: plannerTheme())
+    let app = DesktopApp(WindowSpec("CUI 专注规划台", 1120, 720, scale: 1.0), theme: plannerTheme())
     app.setMinimumSize(760, 560)
     app.run {
         plannerView(model)

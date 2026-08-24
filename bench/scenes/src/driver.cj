@@ -2,10 +2,10 @@
  * A self-terminating, self-instrumenting driver for the display benchmarks. Because the widget tree
  * is rebuilt every frame, a driver's own fields would reset each frame — so the accumulator that
  * counts frames and totals timings lives in a BenchAccumulator created once in main and captured
- * across frames, while the per-frame BenchDriver widget merely forwards each Frame to it.
+ * across frames, while the per-frame BenchDriver registers an explicit frame subscription.
  *
- * Placed as a sibling in the tree, the driver receives every frame (containers fan Frame out to all
- * children). On each frame it advances an optional scroll offset, times the interval with the
+ * Placed as a sibling in the tree, the driver subscribes during every successful build. On each
+ * frame it advances an optional scroll offset, times the interval with the
  * high-resolution clock, and after a fixed number of measured frames prints the aggregate and asks
  * the app to close. That removes the need for a human to read a meter and close the window: the
  * benchmark runs a bounded workload, prints a machine-readable @@RESULT|display line, and exits.
@@ -14,8 +14,10 @@
  */
 package bench_scenes
 
-import cui.{PerformanceClock, Rect, Size, State, UiContext, UiEvent, Widget, emit}
-import bench_harness.{BenchResult, ScrollSweep, formatDuration, report}
+import std.collection.ArrayList
+import cui.{PerformanceClock, Rect, Size, State, UiContext, UiEvent, Widget, emit, subscribeFrame}
+import bench_harness.{BenchResult, ScrollSweep, formatDuration, frameDistribution, report, reportBenchmarkEnvironment,
+    reportCount, reportFrameDistribution}
 
 /** Persistent benchmark state: created once, survives the per-frame rebuild via capture. */
 public class BenchAccumulator {
@@ -31,6 +33,7 @@ public class BenchAccumulator {
     private var sumNs: UInt64 = 0
     private var minNs: UInt64 = UInt64.Max
     private var maxNs: UInt64 = 0
+    private let samples = ArrayList<UInt64>()
     private var done: Bool = false
 
     public init(
@@ -38,7 +41,7 @@ public class BenchAccumulator {
         name!: String,
         scroll!: ?State<Float32> = None,
         sweep!: ?ScrollSweep = None,
-        warmup!: Int64 = 20,
+        warmup!: Int64 = 60,
         frames!: Int64 = 150
     ) {
         this.group = group
@@ -77,6 +80,7 @@ public class BenchAccumulator {
         // Discard warm-up frames (first paint, glyph priming, window settling) before sampling.
         if (frame > warmup + 1) {
             sumNs += delta
+            samples.add(delta)
             if (delta < minNs) {
                 minNs = delta
             }
@@ -102,11 +106,31 @@ public class BenchAccumulator {
         } else {
             UInt64(0)
         }
-        println("[bench] ${group} / ${name}: avg ${formatDuration(avg)}/frame (~${fps} fps), min ${formatDuration(minNs)}, max ${formatDuration(maxNs)} over ${measured} frames")
+        println(
+            "[bench] ${group} / ${name}: avg ${formatDuration(avg)}/frame (~${fps} fps), min ${formatDuration(minNs)}, max ${formatDuration(maxNs)} over ${measured} frames")
         // The shaped-text cache working: draws grow with the frame count, shapes (TTF_CreateText
         // misses) stay near the working-set size no matter how long the run.
-        println("[bench]   文本：${ctx.renderer.textDrawCount()} 次绘制 / ${ctx.renderer.textShapeCount()} 次成形（成形越少＝复用越充分）")
+        println(
+            "[bench]   文本：${ctx.renderer.textDrawCount()} 次绘制 / ${ctx.renderer.textShapeCount()} 次成形（成形越少＝复用越充分）")
+        reportCount(group, "${name} text measures", ctx.renderer.textMeasureCount())
+        reportCount(group, "${name} text computes", ctx.renderer.textComputeCount())
+        reportCount(group, "${name} text shapes", ctx.renderer.textShapeCount())
+        reportCount(group, "${name} text draws", ctx.renderer.textDrawCount())
+        let paragraph = ctx.paragraphCacheStats()
+        println(
+            "[bench]   段落缓存：${paragraph.hits} 命中 / ${paragraph.misses} 未命中，${paragraph.entries} 项，${paragraph.bytes} B，${paragraph.evictions} 淘汰")
         report("display", group, BenchResult(name, measured, sumNs, 0))
+        reportCount(group, "${name} paragraph hits", paragraph.hits)
+        reportCount(group, "${name} paragraph misses", paragraph.misses)
+        reportCount(group, "${name} paragraph evictions", paragraph.evictions)
+        reportFrameDistribution(group, name, frameDistribution(samples.toArray()))
+        reportBenchmarkEnvironment(
+            group,
+            name,
+            ctx.renderer.driverName(),
+            ctx.renderer.supersampleFactor(),
+            ctx.renderer.vsync()
+        )
         ctx.requestClose()
     }
 }
@@ -117,14 +141,19 @@ public class BenchDriver <: Widget {
 
     public init(accumulator: BenchAccumulator) {
         this.accumulator = accumulator
+        subscribeFrame(
+            {
+                ctx, _ =>
+                    accumulator.onFrame(ctx)
+                    // A raw subscription is one-shot unless it schedules more work. Benchmarks are
+                    // intentionally continuous until the bounded accumulator closes the window.
+                    ctx.requestFrame()
+            }
+        )
         emit(this)
     }
 
-    public func handle(ctx: UiContext, event: UiEvent): Bool {
-        match (event) {
-            case UiEvent.Frame(_) => accumulator.onFrame(ctx)
-            case _ => ()
-        }
+    public func handle(_: UiContext, _: UiEvent): Bool {
         false
     }
 

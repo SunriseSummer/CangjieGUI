@@ -3,9 +3,6 @@ package cui.core
 import std.collection.ArrayList
 import sdl.{Rect, Size, UiEvent}
 
-// Extra rows built above and below the viewport so a one-frame scroll never reveals a blank edge.
-let LAZY_OVERSCAN: Int64 = 2
-
 // The viewport height assumed on the very first frame, before layout has measured the real one — a
 // full-ish screen, so the first frame is populated rather than blank. Layout corrects it at once.
 let LAZY_DEFAULT_VIEWPORT: Float32 = 720.0
@@ -18,21 +15,22 @@ let LAZY_DEFAULT_VIEWPORT: Float32 = 720.0
  *
  * Because only visible rows are built, per-row local state (`rememberState` / `Keyed`) lives only
  * while a row is on screen and is dropped when it scrolls off; hoist any state that must outlive
- * scrolling into the application model. The scroll offset may be owned externally (via `scroll`) for
- * coordination or animation. The `id` scopes the retained scroll and per-row state, like other
- * scrollable controls.
+ * scrolling into the application model. The scroll offset may be owned externally (via `scroll`) or
+ * by a `LazyViewportController`; the controller can reveal a stable key. `revision` tells the list
+ * when keys moved so the top visible key remains anchored across inserts and reorders.
  *
  * Immediate-mode note: the tree is rebuilt every frame, so the visible window is chosen during the
  * build pass from the scroll offset and viewport height retained from the previous frame, then that
- * same snapshot drives layout and draw. A wheel or drag updates the live offset for the next frame;
- * the overscan rows keep the edges filled across that one-frame settle.
+ * same snapshot drives layout and draw. A wheel or drag updates the live offset for the next frame.
+ * Overscan is pixel-based and expands in the travel direction, independent of row height.
  */
 public class LazyColumn <: Widget {
     private let count: Int64
     private let itemHeight: Float32
     private let spacing: Float32
     private let scrollStateValue: State<Float32>
-    private let viewportHeightState: State<Float32>
+    private let keyForIndex: (Int64) -> String
+    private let viewportMemory: LazyViewportMemory
     private let scrollBar: ScrollBar
     // Rows materialized this frame, each paired with its absolute index for positioning and events.
     private let visibleItems: Array<(Int64, Widget)>
@@ -45,7 +43,8 @@ public class LazyColumn <: Widget {
      * (auto-derived by build order when omitted; an explicit one must be non-empty). Row height is in
      * logical pixels. `key` optionally gives each row a stable identity string (so its per-row state
      * follows the item across inserts/reorders); when omitted, rows are keyed by index — see
-     * `LazyColumn.of` for the data-driven form.
+     * `LazyColumn.of` for the data-driven form. Increment `revision` when keys insert/reorder;
+     * `overscan` is the idle pixel margin and adapts to scroll motion.
      */
     public init(
         count: Int64,
@@ -54,25 +53,44 @@ public class LazyColumn <: Widget {
         scroll!: ?State<Float32> = None,
         key!: ?((Int64) -> String) = None,
         id!: ?String = None,
+        revision!: UInt64 = UInt64(0),
+        controller!: ?LazyViewportController = None,
+        overscan!: Float32 = LAZY_DEFAULT_OVERSCAN_PIXELS,
         item!: (Int64) -> Unit
     ) {
         let ident = resolveControlKey(id, "LazyColumn")
+        let resolvedItemHeight = max(1.0, itemHeight)
+        let resolvedSpacing = max(0.0, spacing)
         this.count = max(0, count)
-        this.itemHeight = max(1.0, itemHeight)
-        this.spacing = max(0.0, spacing)
-        this.scrollStateValue = match (scroll) {
-            case Some(value) => value
-            case None => localState<Float32>("LazyColumn:${ident}:scroll") {0.0}
+        this.itemHeight = resolvedItemHeight
+        this.spacing = resolvedSpacing
+        if (scroll.isSome() && controller.isSome()) {
+            throw IllegalArgumentException("LazyColumn accepts either scroll or controller, not both")
         }
-        // Retained so the build pass (which has no layout rect yet) knows how tall the viewport was
-        // last frame and thus which rows to materialize; layout updates it for the next frame.
-        this.viewportHeightState = localState<Float32>("LazyColumn:${ident}:viewportH") {LAZY_DEFAULT_VIEWPORT}
+        this.scrollStateValue = match (controller) {
+            case Some(value) => value.state()
+            case None => match (scroll) {
+                case Some(value) => value
+                case None => localState<Float32>("LazyColumn:${ident}:scroll") {0.0}
+            }
+        }
+        let resolvedKey = lazyKeyOrIndex(key)
+        this.keyForIndex = resolvedKey
+        this.viewportMemory = localState<LazyViewportMemory>("LazyColumn:${ident}:viewport") {
+            LazyViewportMemory(revision)
+        }.value
         this.scrollBar = ScrollBar("LazyColumn:${ident}:thumb")
-        let content = lazyContentHeight(this.count, this.itemHeight, this.spacing)
-        this.frameScroll = clampScrollOffset(this.scrollStateValue.value, content, this.viewportHeightState.value)
-        let (first, last) = lazyVisibleRange(this.frameScroll, this.viewportHeightState.value, this.itemHeight,
-            this.spacing, this.count, LAZY_OVERSCAN)
-        this.visibleItems = buildLazyChildren("LazyColumn:${ident}", first, last, lazyKeyOrIndex(key), item)
+        let content = lazyContentHeight(this.count, resolvedItemHeight, resolvedSpacing)
+        let current = clampScrollOffset(this.scrollStateValue.value, content, this.viewportMemory.viewportExtent)
+        let geometry = LazyItemGeometry(this.count, resolvedKey,
+            {index => lazyFixedItemTop(index, resolvedItemHeight, resolvedSpacing)}, {_ => resolvedItemHeight}, content)
+        let anchored = lazyResolveAnchoredScroll(this.viewportMemory, revision, revision, current, geometry)
+        this.frameScroll = lazyResolveControllerScroll(controller, this.viewportMemory, anchored, geometry)
+        let insets = lazyAdaptiveOverscan(overscan, this.frameScroll, this.viewportMemory.previousScroll,
+            this.viewportMemory.viewportExtent)
+        let (first, last) = lazyFixedVisibleRange(this.frameScroll, this.viewportMemory.viewportExtent,
+            resolvedItemHeight, resolvedSpacing, this.count, insets)
+        this.visibleItems = buildLazyChildren("LazyColumn:${ident}", first, last, resolvedKey, item)
         emit(this)
     }
 
@@ -87,20 +105,24 @@ public class LazyColumn <: Widget {
      * LazyColumn.of(model.notes, 72.0, key: {n => n.id}) { note => noteRow(note) }
      * ```
      */
-    public static func of<T>(
+    public static func of<T>( // cjcheck-ignore: param-count # declarative factory keeps named optional controls at the call site; a config wrapper would add ceremony
         data: Array<T>,
         itemHeight: Float32,
         spacing!: Float32 = 0.0,
         scroll!: ?State<Float32> = None,
         key!: ?((T) -> String) = None,
         id!: ?String = None,
+        revision!: UInt64 = UInt64(0),
+        controller!: ?LazyViewportController = None,
+        overscan!: Float32 = LAZY_DEFAULT_OVERSCAN_PIXELS,
         item!: (T) -> Unit
     ): LazyColumn {
         let rowKey: ?((Int64) -> String) = match (key) {
             case Some(k) => Some({index => k(data[index])})
             case None => None
         }
-        LazyColumn(data.size, itemHeight, spacing: spacing, scroll: scroll, key: rowKey, id: id) {
+        LazyColumn(data.size, itemHeight, spacing: spacing, scroll: scroll, key: rowKey, id: id, revision: revision,
+            controller: controller, overscan: overscan) {
             index => item(data[index])
         }
     }
@@ -111,13 +133,12 @@ public class LazyColumn <: Widget {
 
     public func layout(ctx: UiContext, rect: Rect): Unit {
         frame = rect
-        // Record the viewport height for the next frame's build; write-on-change to avoid churn.
-        let _ = viewportHeightState.setIfChanged(rect.h) // cjcheck-ignore: ignore-result # write-on-change only; whether it changed is irrelevant here
+        viewportMemory.viewportExtent = rect.h
         let content = lazyContentHeight(count, itemHeight, spacing)
-        // Correct the live offset for the next frame in case the content shrank.
-        let clamped = clampScrollOffset(scrollStateValue.value, content, rect.h)
-        if (clamped != scrollStateValue.value) {
-            scrollStateValue.value = clamped
+        // Commit a clamp, anchor correction or controller request after this frame's snapshot has
+        // already selected its rows. The following rebuild sees the same value and is stable.
+        if (lazyFloatChanged(frameScroll, scrollStateValue.value)) {
+            scrollStateValue.value = frameScroll
         }
         let stride = itemHeight + spacing
         let contentWidth = if (content > rect.h) {
@@ -130,6 +151,8 @@ public class LazyColumn <: Widget {
             let y = rect.y - frameScroll + Float32(index) * stride
             widget.layout(ctx, Rect(rect.x, y, contentWidth, itemHeight))
         }
+        lazyRememberAnchor(viewportMemory, frameScroll, count, {offset => Int64(max(0.0, offset) / stride)}, keyForIndex,
+            {index => lazyFixedItemTop(index, itemHeight, spacing)})
     }
 
     public func draw(ctx: UiContext): Unit {
@@ -210,40 +233,16 @@ public class LazyColumn <: Widget {
     }
 }
 
+internal func lazyFixedItemTop(index: Int64, itemExtent: Float32, spacing: Float32): Float32 {
+    Float32(index) * (itemExtent + spacing)
+}
+
 /** The total scrollable height of `count` fixed-height rows separated by `spacing`. */
 internal func lazyContentHeight(count: Int64, itemHeight: Float32, spacing: Float32): Float32 {
     if (count <= 0) {
         return 0.0
     }
     Float32(count) * (itemHeight + spacing) - spacing
-}
-
-/*
- * The inclusive [first, last] row range to materialize for a viewport at `scroll`, widened by
- * `overscan` rows each side. Returns an empty range (first > last) when there is nothing to show.
- */
-internal func lazyVisibleRange(
-    scroll: Float32,
-    viewportH: Float32,
-    itemHeight: Float32,
-    spacing: Float32,
-    count: Int64,
-    overscan: Int64
-): (Int64, Int64) {
-    if (count <= 0 || itemHeight <= 0.0) {
-        return (0, -1)
-    }
-    let stride = itemHeight + spacing
-    let top = max(0.0, scroll)
-    var first = Int64(top / stride) - overscan
-    if (first < 0) {
-        first = 0
-    }
-    var last = Int64((top + max(0.0, viewportH)) / stride) + overscan
-    if (last > count - 1) {
-        last = count - 1
-    }
-    (first, last)
 }
 
 // Materializes the visible items in `[first, last]` during the build pass, each scoped by
@@ -305,8 +304,7 @@ public func LazyGrid<T>( // cjcheck-ignore: param-count # public fluent factory:
     let count = data.size
     let rowCount = (count + cols - 1) / cols
     LazyColumn(rowCount, itemHeight, spacing: spacing, scroll: scroll, id: id) {
-        rowIndex =>
-        Grid(cols) {
+        rowIndex => Grid(cols) {
             var c = 0
             while (c < cols) {
                 let dataIndex = rowIndex * cols + c

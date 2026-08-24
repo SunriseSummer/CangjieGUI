@@ -2,8 +2,8 @@ package cui.controls
 
 import std.collection.ArrayList
 import sdl.{FontSizes, Key, MouseButton, Rect, Size, UiEvent, clampF32}
-import cui.core.{CursorShape, Overlay, State, UiContext, Widget, claimHoverIfInside, drawFocusRing,
-    emit, focusableControlIdentity, localState, requireControlId}
+import cui.core.{CursorShape, Overlay, State, UiContext, Widget, claimHoverIfInside, drawFocusRing, emit,
+    focusableControlIdentity, localState, requireControlId}
 
 private let MENU_BAR_HEIGHT: Float32 = 34.0
 private let MENU_BAR_INSET: Float32 = 4.0
@@ -63,8 +63,14 @@ public class MenuBar <: Widget {
         Size(available.w, MENU_BAR_HEIGHT)
     }
 
-    public func layout(_: UiContext, rect: Rect): Unit {
+    public func layout(ctx: UiContext, rect: Rect): Unit {
         frame = Rect(rect.x, rect.y, rect.w, MENU_BAR_HEIGHT)
+        if (isOpen()) {
+            ctx.setOverlay(
+                Overlay(handleEvent: {c, e => handleOverlay(c, e)},
+                    render: {c => drawMenuPopup(c, currentPopup(c), currentItems(), highlight.value)},
+                    owner: overlayOwner))
+        }
     }
 
     public func draw(ctx: UiContext): Unit {
@@ -73,8 +79,10 @@ public class MenuBar <: Widget {
             drawTitle(ctx, titles[i], i)
         }
         if (isOpen()) {
-            ctx.setOverlay(Overlay(handleEvent: {c, e => handleOverlay(c, e)},
-                render: {c => drawMenuPopup(c, currentPopup(c), currentItems(), highlight.value)}, owner: overlayOwner))
+            ctx.setOverlay(
+                Overlay(handleEvent: {c, e => handleOverlay(c, e)},
+                    render: {c => drawMenuPopup(c, currentPopup(c), currentItems(), highlight.value)},
+                    owner: overlayOwner))
         }
     }
 

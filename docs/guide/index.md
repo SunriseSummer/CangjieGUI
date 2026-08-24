@@ -44,9 +44,9 @@ CUI 是运行在 SDL3 上的仓颉声明式桌面界面框架。你在构建函�
 
 [文件与后台任务](how-to/desktop-files-and-background.md) → [快照与性能记录](how-to/snapshot-and-profile.md) → [通用排障](troubleshooting/common-problems.md) → [打包桌面应用](how-to/package-desktop-app.md)。约 70 分钟；结束时能安全回收后台结果、区分验证证据，并在干净目录启动交付物。
 
-### 6. 组件进阶：媒体到动画自绘
+### 6. 组件进阶：媒体、动画与性能边界
 
-[资源与媒体](concepts/resources-and-media.md) → [媒体预览面板](tutorials/media-dashboard.md) → [自绘控件](how-to/custom-canvas.md) → [动画与帧预算](concepts/animation-and-frame-budget.md) → [逐帧动画](how-to/animate-with-frames.md) → [快照与性能记录](how-to/snapshot-and-profile.md) → [媒体性能排障](troubleshooting/media-performance.md)。约 110 分钟；适合组件作者，结束时能解释资源所有权、事件边界、续帧停止条件和性能证据。
+[资源与媒体](concepts/resources-and-media.md) → [媒体预览面板](tutorials/media-dashboard.md) → [自绘控件](how-to/custom-canvas.md) → [动画与帧预算](concepts/animation-and-frame-budget.md) → [逐帧动画](how-to/animate-with-frames.md) → [保留子树与帧级测试](how-to/retain-and-test.md) → [快照与性能记录](how-to/snapshot-and-profile.md) → [媒体性能排障](troubleshooting/media-performance.md)。约 125 分钟；适合组件作者，结束时能解释资源所有权、事件边界、续帧停止条件、保留缓存契约和性能证据。
 
 ## 按任务查找
 
@@ -97,6 +97,7 @@ CUI 是运行在 SDL3 上的仓颉声明式桌面界面框架。你在构建函�
 | 判断图片缓存与资源所有权 | [资源与媒体](concepts/resources-and-media.md) | 同一路径复用缓存；托管资源随控件释放；临时资源在退出前显式清理 |
 | 编写不会吞掉相邻事件的画布 | [自绘控件](how-to/custom-canvas.md) | 画布范围内的指针事件被消费，范围外的事件继续交给相邻控件 |
 | 驱动并停止动画续帧 | [逐帧动画](how-to/animate-with-frames.md) | 动画到达目标后 `settled()` 返回真，后续帧不再调用 `animate` |
+| 跳过昂贵静态区的重复构建/布局 | [保留子树与帧级测试](how-to/retain-and-test.md) | revision 命中时缓存计数增加，输入变化时准确失效；同帧事件状态可由无头宿主断言 |
 | 生成 BMP 并读取帧证据 | [快照与性能记录](how-to/snapshot-and-profile.md) | BMP 文件可打开，并能把视觉结果、交互状态和各阶段耗时分开记录 |
 | 打包可在干净目录启动的应用 | [打包桌面应用](how-to/package-desktop-app.md) | 仅复制可执行文件、SDL 运行库和资源到干净目录后，应用仍能启动并完成冒烟操作 |
 | 排查启动、状态、布局和浮层 | [通用排障](troubleshooting/common-problems.md) | 每个症状都能经过“复现—观察—修复—确认”走到一个可观察的通过条件 |

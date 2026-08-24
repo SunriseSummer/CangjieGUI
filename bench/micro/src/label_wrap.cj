@@ -7,22 +7,50 @@
 package bench_micro
 
 import cui.{Label, Size}
-import bench_harness.{printSection, report, timeit}
+import bench_harness.{printSection, report, reportCount, timeit}
 
 public func runLabelWrapBench(): Unit {
     printSection("长文换行（Label.wrap）")
     measureWrap("2000 字", 2000, 120)
     measureWrap("20000 字", 20000, 24)
+    measureMixedUnicodeWrap()
 }
 
 private func measureWrap(name: String, chars: Int64, frames: Int64): Unit {
-    let ctx = headlessContext()
     let text = makeLongText(chars)
+    measureColdAndWarm(name, text, frames)
+}
+
+private func measureMixedUnicodeWrap(): Unit {
+    let unit = "Cafe\u{0301} 👩‍💻 🇨🇳 中文（标点） a\u{00A0}b — paragraph。"
+    let builder = StringBuilder()
+    for (_ in 0..200) {
+        builder.append(unit)
+    }
+    measureColdAndWarm("混合 Unicode", builder.toString(), 40)
+}
+
+private func measureColdAndWarm(name: String, text: String, frames: Int64): Unit {
+    let coldFrames = max(Int64(3), min(Int64(12), frames / 4))
+    report("frame", "长文换行（冷）", timeit(name, coldFrames, {=>
+        let cold = headlessContext()
+        let label = Label(text).wrap()
+        let size = label.measure(cold, Size(320.0, 1000000.0))
+        Int64(size.h)
+    }))
+
+    let ctx = headlessContext()
+    let warmup = Label(text).wrap()
+    let _ = warmup.measure(ctx, Size(320.0, 1000000.0))
+    ctx.resetParagraphCacheStats()
     report("frame", "长文换行", timeit(name, frames, {=>
         let label = Label(text).wrap()
         let size = label.measure(ctx, Size(320.0, 1000000.0))
         Int64(size.h)
     }))
+    let stats = ctx.paragraphCacheStats()
+    reportCount("段落缓存", "${name} 命中", stats.hits)
+    reportCount("段落缓存", "${name} 未命中", stats.misses)
 }
 
 // 以固定字符盘循环生成 n 字中文文本；相邻行内容不同，贴近真实段落的前缀分布。

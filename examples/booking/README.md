@@ -11,7 +11,8 @@
 - 晚数取 `checkOut.compareTo(checkIn)`——`compareTo` 返回两日相差的天数，恰是晚数；据此“退房须晚于入住”
   退化为“晚数为正”，无需另写日期比较
 - 房型 `SegmentedControl`、人数 `Stepper` 与日期一起，经 `derive` 派生晚数、单价、合计与 `isValid`
-- 无效（退房不晚于入住）时摘要转为警示、确认按钮禁用；确认写入回执，任一字段再编辑即用 `observe` 作废回执
+- 无效（退房不晚于入住）时摘要转为警示、确认按钮禁用；确认写入回执，任一字段再编辑即作废回执
+- `mountEffect` 将四个 `State.observe` 句柄交给视图声明周期管理：构建成功后安装，卸载时自动取消
 - 今日日期在入口 `main` 读取后传入模型（而非模型内部读时钟），使模型逻辑可用固定日期确定性地测试
 
 ## 文件结构
@@ -51,12 +52,17 @@ let model = BookingModel(CalendarDate.today())
 
 ### 回执随编辑作废
 
-确认后写入一段回执文案；为避免它与随后的新选择不一致，模型在初始化时用 `State.observe` 监听四个输入，
-任一改变即清空回执：
+确认后写入一段回执文案；为避免它与随后的新选择不一致，视图用 `State.observe`
+监听四个输入，任一改变即清空回执。观察句柄是需要关闭的 `Resource`，所以由
+`mountEffect` 在根构建成功后安装并随视图卸载自动取消：
 
 ```cangjie
-let _ = this.checkIn.observe({_, _ => this.invalidateConfirmation()})
+mountEffect("invalidate-receipt/check-in", {=>
+    model.checkIn.observe({_, _ => model.invalidateConfirmation()})
+})
 ```
+
+这避免了丢弃 `observe` 返回值造成的隐式泄漏，也使模型不会在 UI 离场后继续被陈旧回调修改。
 
 ## 运行
 

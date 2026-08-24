@@ -66,7 +66,8 @@ main() {
 - 使用有顺序语义的链式修饰器配置尺寸、约束、内边距、表面、圆角、边框、阴影、渐变背景、弹性、可见性和可用性，支持 `.px`，`.vp`，`.fp` 尺寸单位表达。
 - 以 `Observable`/`Bindable` 实现状态管理：可写 `State<T>`，带缓存的派生只读 `DerivedState`
   （`derive`/`map`），双向投影 `Binding`（`project`），控件按读写需要接受对应抽象。
-- 以 `Keyed`、`rememberState`、`ForEach` 明确复杂嵌套树与列表中的局部状态身份，控件交互身份按构建顺序自动唯一。
+- 以 `Keyed`、`rememberState`、`ForEach` 明确复杂嵌套树与列表中的局部状态身份；普通 builder 自动跟踪 State 读取、裁剪脏路径、选择性晋升复杂渲染边界，并自动管理 measure/layout 缓存、透明显示列表和局部 damage。`RetainedSubtree` 仅保留为显式高级/兼容边界。
+- 用 `mountEffect` / `lifecycleEffect` 在成功提交后挂载可清理 Resource，避免 builder 的执行或跳过次数泄漏为副作用语义；`retainedDiagnostics()` 可导出 scope、dirty 原因、依赖和 effect 状态。
 - 支持主轴/交叉轴排列、权重布局、内容自适应、流式换行、裁剪滚动和可复用组件组合。
 - 使用 GPU 几何图元和超采样渲染圆角、描边、图标、阴影及抗锯齿图形。
 - 提供动画原语：物理弹簧 `Spring`、时长驱动可选缓动曲线与延迟的补间 `Animator`，以及永不静止的重复时间线 `Pulse`，
@@ -74,7 +75,7 @@ main() {
 - 提供设计令牌尺度：间距 `Spacing`、圆角 `Radii`、动效 `Motion`，与颜色 `Theme`、字号 `FontSizes`、
   高度 `Shadow.elevation` 一起构成一致的设计系统。
 - 提供文件对话框、消息框、剪贴板、光标、显示器、文件系统、时间、系统信息等平台能力接口。
-- 已实现图元缓存、惰性渲染、脏帧检测/按需刷新等性能优化机制。
+- 已实现每应用事务式失效、事件后同帧一致性重建、截止时间续帧、有界事件等待/跨线程唤醒、图元与文本缓存、惰性渲染、自动组合/渲染边界、32 MiB 有界 LRU 显示列表与保守局部 damage；`WidgetTestHost` 同构指针/焦点事件并支持真实 Renderer/damage 对照，阶段剖析、命令规模诊断、基准报告和 examples E2E 工具用于精细验证。
 
 扩展阅读：[现代 GUI 核心范式洞察辨析：函数式/对象式，立即模式/保留模式](docs/modern-GUI-insights-and-analysis.md)
 

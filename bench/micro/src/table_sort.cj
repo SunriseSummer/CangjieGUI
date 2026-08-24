@@ -34,17 +34,27 @@ public func runTableSortBench(rowCount: Int64, frames: Int64): Unit {
     let rows = makeTableRows(rowCount)
     let group = "表格排序 ${rowCount} 行"
     let (textTable, textCtx) = sortedTable(rows, 20.0) // Host column (text, x in [0, 180))
-    report("frame", group, timeit("文本列", frames, {=> textTable.draw(textCtx); 0}))
     let (numericTable, numericCtx) = sortedTable(rows, 220.0) // Score column (numeric, x in [180, 280))
+    // Populate both sort caches and warm the same draw path before either timed loop. Previously the
+    // text variant always paid process/caches cold-start while numeric always ran second, which could
+    // invert their relative movement across otherwise identical multi-sample runs.
+    textTable.draw(textCtx)
+    numericTable.draw(numericCtx)
+    textTable.draw(textCtx)
+    numericTable.draw(numericCtx)
+    report("frame", group, timeit("文本列", frames, {=> textTable.draw(textCtx); 0}))
     report("frame", group, timeit("数值列", frames, {=> numericTable.draw(numericCtx); 0}))
 }
 
 public func runTableEdgeBench(): Unit {
     printSection("表格排序边界")
     let (empty, emptyCtx) = sortedTable(makeTableRows(0), 20.0)
+    empty.draw(emptyCtx)
     report("frame", "表格排序边界", timeit("空表", 200, {=> empty.draw(emptyCtx); 0}))
     let (single, singleCtx) = sortedTable(makeTableRows(1), 20.0)
+    single.draw(singleCtx)
     report("frame", "表格排序边界", timeit("单行", 200, {=> single.draw(singleCtx); 0}))
     let (equal, equalCtx) = sortedTable(makeEqualKeyRows(2000), 220.0)
+    equal.draw(equalCtx)
     report("frame", "表格排序边界", timeit("2000 行等键值", 60, {=> equal.draw(equalCtx); 0}))
 }

@@ -1,9 +1,9 @@
 package cui.text
 
 import sdl.{FontSizes, Key, MouseButton, Rect, Size, UiEvent}
-import sdl.input.{Clipboard, Keyboard}
+import sdl.input.Clipboard
 import cui.core.{Bindable, CUI_CONTROL_H, CursorShape, State, UiContext, Widget, claimHoverIfInside, emit, localState,
-    registerFocusable, resolveControlKey}
+    registerFocusable, registerFrameSubscriber, resolveControlKey}
 
 // SDL reports letter keys as their uppercase ASCII code, so the editing shortcuts read as
 // the familiar Ctrl+letter table.
@@ -73,6 +73,7 @@ public class TextField <: Widget {
     /** Claims keyboard focus the first time the field appears (e.g. a search box or dialog). */
     public func autofocus(): TextField {
         autofocusRequested = true
+        registerFrameSubscriber({ctx, _ => applyAutofocus(ctx)})
         this
     }
 
@@ -106,7 +107,9 @@ public class TextField <: Widget {
             drawTextFieldSelection(ctx, frame, text.value, edit.selectionStart(), edit.selectionEnd(), xShift: shift)
         }
         drawTextFieldText(ctx, frame, text.value, shift)
-        drawTextFieldCursor(ctx, frame, id, text.value, cursorStateValue.value, xShift: shift)
+        if (!drawTextFieldComposition(ctx, frame, id, text.value, cursorStateValue.value, xShift: shift)) {
+            drawTextFieldCursor(ctx, frame, id, text.value, cursorStateValue.value, xShift: shift)
+        }
         ctx.renderer.popClip()
     }
 
@@ -146,7 +149,19 @@ public class TextField <: Widget {
                     edit.extendTo(textFieldCursorForPoint(ctx, frame, text.value, x, xShift: xOffset.value))
                     return true
                 }
-            case UiEvent.TextInput(value) => return recordedEdit(ctx, {=> edit.insert(value)})
+            case UiEvent.TextEditing(value, start, length) =>
+                if (ctx.hasFocus(id) && isEditable) {
+                    ctx.setImeComposition(id, value, start, length)
+                    return true
+                }
+            case UiEvent.TextEditingCandidates(values, selected, horizontal) =>
+                if (ctx.hasFocus(id) && isEditable) {
+                    ctx.setImeCandidates(id, values, selected, horizontal)
+                    return true
+                }
+            case UiEvent.TextInput(value) =>
+                ctx.clearImeComposition()
+                return recordedEdit(ctx, {=> edit.insert(value)})
             case UiEvent.KeyDown(Key.Backspace, _) => return recordedEdit(ctx, {=> edit.backspace()})
             case UiEvent.KeyDown(Key.Delete, _) => return recordedEdit(ctx, {=> edit.deleteForward()})
             case UiEvent.KeyDown(Key.Left, _) => return navigate(ctx, {=> edit.moveLeft()}, {=> edit.extendLeft()})
@@ -157,10 +172,7 @@ public class TextField <: Widget {
             case UiEvent.Frame(_) =>
                 // One-time initial focus, applied after the frame's pointer events so a stray
                 // startup click cannot cancel it; later frames leave focus to the user.
-                if (autofocusRequested && !autofocusDone.value) {
-                    ctx.focus(id, viaKeyboard: true) // autofocus expects typing, so show the ring
-                    autofocusDone.value = true
-                }
+                applyAutofocus(ctx)
             case _ => ()
         }
         false
@@ -172,6 +184,13 @@ public class TextField <: Widget {
 
     private func editState(): TextEditState {
         TextEditState(text, cursor: Some(cursorStateValue), anchor: Some(anchorStateValue))
+    }
+
+    private func applyAutofocus(ctx: UiContext): Unit {
+        if (autofocusRequested && !autofocusDone.value) {
+            ctx.focus(id, viaKeyboard: true) // autofocus expects typing, so show the ring
+            autofocusDone.value = true
+        }
     }
 
     private func pressAt(ctx: UiContext, edit: TextEditState, x: Float32, y: Float32): Bool {
@@ -221,7 +240,7 @@ public class TextField <: Widget {
         if (!ctx.hasFocus(id)) {
             return false
         }
-        if (Keyboard.modifiers().shift) {
+        if (ctx.eventModifiers().shift) {
             growSelection()
         } else {
             moveCaret()
@@ -231,7 +250,7 @@ public class TextField <: Widget {
     }
 
     private func shortcut(ctx: UiContext, edit: TextEditState, code: UInt8): Bool {
-        if (!ctx.hasFocus(id) || !Keyboard.modifiers().command) {
+        if (!ctx.hasFocus(id) || !ctx.eventModifiers().command) {
             return false
         }
         if (code == LETTER_A) {
@@ -241,13 +260,15 @@ public class TextField <: Widget {
             let _ = copyEditSelection(edit) // cjcheck-ignore: ignore-result # a failed platform copy has no in-UI recovery; the shortcut is still consumed
             return true
         } else if (code == LETTER_X) {
-            return recordedEdit(ctx, {=> if (copyEditSelection(edit)) {
-                let _ = edit.deleteSelection() // cjcheck-ignore: ignore-result # cut always has a selection here; copySelection just confirmed it
-            }})
+            return recordedEdit(ctx, {
+                => if (copyEditSelection(edit)) {
+                    let _ = edit.deleteSelection() // cjcheck-ignore: ignore-result # cut always has a selection here; copySelection just confirmed it
+                }
+            })
         } else if (code == LETTER_V) {
             return recordedEdit(ctx, {=> pasteClipboard(edit)})
         } else if (code == LETTER_Z) {
-            if (Keyboard.modifiers().shift) {
+            if (ctx.eventModifiers().shift) {
                 redo()
             } else {
                 undo()

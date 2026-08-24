@@ -12,6 +12,7 @@ package cui
  * Both layers are re-exported here so applications only need `import cui.*`.
  */
 public import sdl.Color
+public import sdl.EventKeyModifiers
 public import sdl.SdlException
 public import sdl.FontSizes
 public import sdl.FontStyle
@@ -26,6 +27,8 @@ public import sdl.Pen
 public import sdl.Point
 public import sdl.Rect
 public import sdl.Renderer
+public import sdl.RenderCommandBuffer
+public import sdl.RenderCommandBufferStats
 public import sdl.SdlWindow
 public import sdl.Size
 public import sdl.Surface
@@ -34,7 +37,11 @@ public import sdl.Texture
 public import sdl.TextureBlendMode
 public import sdl.TextureFlip
 public import sdl.TextureRenderOptions
+public import sdl.TextFitResult
+public import sdl.TextMeasureSession
 public import sdl.UiEvent
+public import sdl.UiEventMetadata
+public import sdl.UiEventRecord
 public import sdl.WindowAspectRatio
 public import sdl.WindowBorderSize
 public import sdl.WindowFlash
@@ -59,6 +66,7 @@ public import cui.core.CursorShape
 public import cui.core.DerivedState
 public import cui.core.Divider
 public import cui.core.Easing
+public import cui.core.EffectCleanup
 public import cui.core.EventHandler
 public import cui.core.Flexible
 public import cui.core.FlowRow
@@ -78,7 +86,10 @@ public import cui.core.Label
 public import cui.core.LazyColumn
 public import cui.core.LazyGrid
 public import cui.core.LazyList
+public import cui.core.LazyListExtents
 public import cui.core.LazyRow
+public import cui.core.LazyScrollAlignment
+public import cui.core.LazyViewportController
 public import cui.core.Length
 public import cui.core.LengthInsets
 public import cui.core.LengthUnit
@@ -88,8 +99,13 @@ public import cui.core.Motion
 public import cui.core.Observable
 public import cui.core.Overlay
 public import cui.core.Panel
+public import cui.core.ParagraphCacheStats
 public import cui.core.Radii
 public import cui.core.Reveal
+public import cui.core.RetainedSubtree
+public import cui.core.RetainedSubtreeStats
+public import cui.core.RetainedGraphDiagnostics
+public import cui.core.RetainedScopeDiagnostics
 public import cui.core.ScrollBar
 public import cui.core.ScrollView
 public import cui.core.Shadow
@@ -111,7 +127,10 @@ public import cui.core.derive
 public import cui.core.drawFocusRing
 public import cui.core.emit
 public import cui.core.focusableControlIdentity
+public import cui.core.lifecycleEffect
+public import cui.core.mountEffect
 public import cui.core.rememberState
+public import cui.core.subscribeFrame
 public import cui.controls.Accordion
 public import cui.controls.AccordionSection
 public import cui.controls.Badge
@@ -164,6 +183,10 @@ public import cui.text.ComboBox
 public import cui.text.TextArea
 public import cui.text.TextEditState
 public import cui.text.TextField
+public import cui.testing.RetainedTestMode
+public import cui.testing.TestFrameMetrics
+public import cui.testing.TestFrameResult
+public import cui.testing.WidgetTestHost
 public import sdl.dialogs.FileDialogFilter
 public import sdl.dialogs.FileDialogOptions
 public import sdl.dialogs.FileDialogRequest

@@ -11,7 +11,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = SchedulerModel()
-    let app = DesktopApp(WindowSpec("CUI 会议排期", 680, 660, scale: 1.5), theme: schedulerTheme())
+    let app = DesktopApp(WindowSpec("CUI 会议排期", 680, 660, scale: 1.0), theme: schedulerTheme())
     app.setMinimumSize(560, 520)
     app.run {
         schedulerView(model)

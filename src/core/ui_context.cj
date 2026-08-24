@@ -1,7 +1,7 @@
 package cui.core
 
 import std.collection.ArrayList
-import sdl.{FrameInfo, Insets, Rect, Renderer, UiEvent}
+import sdl.{FrameInfo, Insets, Rect, Renderer, UiEvent, UiEventMetadata}
 
 // A second press within this window and distance of the previous one continues a multi-click.
 private let MULTI_CLICK_MS: UInt64 = 400
@@ -45,10 +45,18 @@ public class UiContext {
     // draws each layer's content, so a popup opened inside a dialog registers — and
     // paints — above it. Events walk the stack top-down (see `dispatchOverlay`).
     private let overlays = ArrayList<Overlay>()
+    // Layout replay must capture registrations, not just growth of `overlays`: registering an
+    // existing owner replaces in place and leaves the stack size unchanged.
+    private let overlayRegistrations = ArrayList<Overlay>()
     /** Physical pixels per virtual pixel; set from the window content scale. */
     public var displayScale: Float32 = 1.0
     /** User font scale applied to `fp` lengths; `1.0` keeps `fp` equal to `vp`. */
     public var fontScale: Float32 = 1.0
+    let paragraphCache = ParagraphLayoutCache()
+    var currentEventMetadata = UiEventMetadata()
+    var compositionOwner = ""
+    var compositionValue: ?ImeComposition = None
+    var candidateValue: ?ImeCandidates = None
 
     public init(renderer: Renderer, theme: Theme) {
         this.renderer = renderer
@@ -88,26 +96,22 @@ public class UiContext {
         shouldClose = true
     }
 
-    // Set by a widget during handle or draw when it needs the next frame rendered even without any
-    // input event or state change — a blinking caret, a tooltip counting down its reveal delay, a
-    // per-frame FrameHandler. The desktop loop reads and clears it each rendered frame (takeFrameRequest)
-    // so these animations stay alive while the loop otherwise skips idle frames (档 0).
-    private var continuousFrameRequested = false
+    // Immediate animation work and the earliest timer deadline requested in this frame. Keeping the
+    // deadline lets the desktop loop sleep until a caret/tooltip actually changes instead of burning
+    // all intervening refreshes.
+    internal var immediateFrameRequested = false
+    internal var frameDeadlineMs: ?UInt64 = None
+    // One entry per nested retained-paint recording. Dynamic frame/interaction reads mark every
+    // active ancestor so no parent display list can accidentally freeze a live child protocol.
+    internal let retainedPaintDynamicReasons = ArrayList<?String>()
+    internal var retainedDamage: ?Rect = None
 
-    /**
-     * Requests that the next frame be rendered even if no input arrived and no state changed. Call this
-     * from a widget that animates on the frame clock (a caret, a spinner, a countdown); without it the
-     * desktop loop may skip rendering while the screen is otherwise idle.
-     */
-    public func requestFrame(): Unit {
-        continuousFrameRequested = true
-    }
-
-    /** Reads and clears the continuous-frame request. The desktop loop calls this once per rendered frame. */
-    protected func takeFrameRequest(): Bool {
-        let requested = continuousFrameRequested
-        continuousFrameRequested = false
-        requested
+    internal func markRetainedPaintDynamic(reason: String): Unit {
+        for (index in 0..retainedPaintDynamicReasons.size) {
+            if (retainedPaintDynamicReasons[index].isNone()) {
+                retainedPaintDynamicReasons[index] = Some(reason)
+            }
+        }
     }
 
     /*
@@ -148,7 +152,11 @@ public class UiContext {
             }
         }
         let next = if (current < 0) {
-            if (step > 0) { 0 } else { count - 1 }
+            if (step > 0) {
+                0
+            } else {
+                count - 1
+            }
         } else {
             (((current + step) % count) + count) % count
         }
@@ -158,6 +166,7 @@ public class UiContext {
 
     /** Whether `id` currently owns keyboard focus. */
     public func hasFocus(id: String): Bool {
+        markRetainedPaintDynamic("focus read during paint")
         focusId == id
     }
 
@@ -167,6 +176,7 @@ public class UiContext {
      * convention that a click should not leave a keyboard-style outline.
      */
     public func showFocusRing(id: String): Bool {
+        markRetainedPaintDynamic("focus ring read during paint")
         focusId == id && focusRingVisible
     }
 
@@ -175,6 +185,9 @@ public class UiContext {
      * (Tab, autofocus) versus a pointer press; it drives whether a ring shows, not focus itself.
      */
     public func focus(id: String, viaKeyboard!: Bool = false): Unit {
+        if (!compositionOwner.isEmpty() && compositionOwner != id) {
+            resetImeState()
+        }
         focusId = id
         focusClaimedInPress = true
         focusRingVisible = viaKeyboard
@@ -182,8 +195,15 @@ public class UiContext {
 
     /** Removes keyboard focus from every control. */
     public func clearFocus(): Unit {
+        resetImeState()
         focusId = ""
         focusRingVisible = false
+    }
+
+    private func resetImeState(): Unit {
+        compositionOwner = ""
+        compositionValue = None
+        candidateValue = None
     }
 
     /*
@@ -261,11 +281,13 @@ public class UiContext {
 
     /** Returns whether `id` is the control currently under the pointer. */
     public func isHovered(id: String): Bool {
+        markRetainedPaintDynamic("hover read during paint")
         hoverId == id
     }
 
     /** Registers a tooltip to paint above the tree this frame, anchored to `rect`. */
     public func showTooltip(text: String, rect: Rect): Unit {
+        markRetainedPaintDynamic("tooltip registered during paint")
         tooltipText = text
         tooltipAnchor = rect
     }
@@ -283,6 +305,7 @@ public class UiContext {
 
     /** Reports the focused caret rectangle this frame, anchoring the IME candidate window. */
     public func setTextInputAnchor(rect: Rect): Unit {
+        markRetainedPaintDynamic("IME anchor registered during paint")
         textInputAnchor = Some(rect)
     }
 
@@ -302,6 +325,8 @@ public class UiContext {
      * that entry in place, keeping its z position.
      */
     public func setOverlay(overlay: Overlay): Unit {
+        markRetainedPaintDynamic("overlay registered during paint")
+        overlayRegistrations.add(overlay)
         if (!overlay.owner.isEmpty()) {
             for (i in 0..overlays.size) {
                 if (overlays[i].owner == overlay.owner) {
@@ -333,16 +358,32 @@ public class UiContext {
     /** Removes every open overlay — the shell calls this each frame before the tree re-registers. */
     public func clearActiveOverlay(): Unit {
         overlays.clear()
+        overlayRegistrations.clear()
     }
 
     /** Whether any interactive overlay is currently open. */
     public func hasOverlay(): Bool {
+        markRetainedPaintDynamic("overlay state read during paint")
         !overlays.isEmpty()
     }
 
     /** How many interactive overlays are currently open (a dialog plus its popup counts two). */
     public func overlayCount(): Int64 {
         overlays.size
+    }
+
+    /** Number of overlay registration calls made in this layout pass. */
+    func overlayRegistrationCount(): Int64 {
+        overlayRegistrations.size
+    }
+
+    /** Overlay registration calls made since `start`, used by retained-layout replay. */
+    func overlayRegistrationsFrom(start: Int64): Array<Overlay> {
+        if (start >= overlayRegistrations.size) {
+            return []
+        }
+        let from = max(0, start)
+        Array<Overlay>(overlayRegistrations.size - from, {i => overlayRegistrations[from + i]})
     }
 
     /**
@@ -382,6 +423,7 @@ public class UiContext {
      * and paints them above, within the same frame.
      */
     public func drawActiveOverlay(): Unit {
+        markRetainedPaintDynamic("overlay draw requested during retained paint")
         var i = 0
         while (i < overlays.size) {
             overlays[i].render(this)
@@ -411,11 +453,13 @@ public class UiContext {
 
     /** The grab-point offset recorded by `beginDrag`; meaningful only while that drag is active. */
     public func dragGrab(): Float32 {
+        markRetainedPaintDynamic("drag state read during paint")
         dragGrabOffset
     }
 
     /** Whether `id` owns the active pointer drag started by `beginDrag`. */
     public func isDragging(id: String): Bool {
+        markRetainedPaintDynamic("drag state read during paint")
         dragId == id
     }
 
@@ -432,6 +476,7 @@ public class UiContext {
 
     /** Returns whether `id` owns the active primary-pointer press. */
     public func isPressed(id: String): Bool {
+        markRetainedPaintDynamic("press state read during paint")
         pressedId == id
     }
 

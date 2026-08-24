@@ -4,7 +4,7 @@
 
 `cui.core` 包中的 public class
 
-可写的单一数据源可观察状态：对 `value` 赋值会推进修订号，并在调用线程上同步通知全部观察者。只读展示走 [`Observable`](Observable.md) 抽象，双向输入走 [`Bindable`](Bindable.md)，因此一个 `State` 能同时驱动两类控件。UI 状态应在桌面 UI 线程上修改。
+可写的单一数据源可观察状态：对 `value` 赋值会推进修订号，并在调用线程上同步通知全部观察者。只读展示走 [`Observable`](Observable.md) 抽象，双向输入走 [`Bindable`](Bindable.md)，因此一个 `State` 能同时驱动两类控件。`State` 是线程封闭对象，不是并发容器。
 
 ## 声明
 
@@ -18,7 +18,7 @@ public class State<T> <: Bindable<T>
 
 ## 说明
 
-赋相等的值同样推进修订号并触发通知；要跳过空写，用扩展方法 [`setIfChanged`](#setifchanged)（要求 `T <: Equatable<T>`）。通知遍历监听者快照：在回调中取消观察或注册新观察都是安全的，回调中新注册的观察者只会看到之后的赋值。每次赋值还会推进进程级写入代号（见 [`currentStateGeneration`](functions.md#currentstategeneration)），桌面循环靠它跳过无变化的帧。
+赋相等的值同样推进修订号并触发通知；要跳过空写，用扩展方法 [`setIfChanged`](#setifchanged)（要求 `T <: Equatable<T>`）。通知遍历监听者快照：在回调中取消观察或注册新观察都是安全的，回调中新注册的观察者只会看到之后的赋值。状态可以先在工作线程构造和顺序准备，再移交 UI；不可由多个线程并发访问。它进入运行中的界面后会绑定该应用的 UI 调度器，错误线程上的读取、写入、`update`、观察注册或取消都会抛出 `IllegalStateException`，应改用 [`DesktopApp.post`](../desktop/DesktopApp.md#post)。应用循环按自己的原子失效代数跳过无变化帧；进程级 [`currentStateGeneration`](functions.md#currentstategeneration) 仅保留为兼容诊断。
 
 ## 示例
 
@@ -102,7 +102,7 @@ public mut prop value: T
 
 ### update
 
-用 `transform` 的结果替换当前值。等价于 `state.value = transform(state.value)` 的一次读-改-写。
+用 `transform` 的结果替换当前值。等价于 `state.value = transform(state.value)` 的一次读-改-写。线程归属检查发生在调用 `transform` 之前，错误线程不会读取旧值或执行用户代码。
 
 ```cangjie
 public func update(transform: (T) -> T): Unit
@@ -114,7 +114,7 @@ public func update(transform: (T) -> T): Unit
 
 ### observe
 
-观察后续变更，返回可取消的观察句柄。回调收到 `(旧值, 新值)`，注册时不会立即调用。
+观察后续变更，返回可取消的观察句柄。回调收到 `(旧值, 新值)`，注册时不会立即调用。状态绑定应用后，注册和句柄 `close()` 都必须在所属 UI 线程执行；取消被拒绝时句柄仍保持打开，可回到 UI 线程重试。
 
 ```cangjie
 public func observe(callback: (T, T) -> Unit): StateObservation<T>

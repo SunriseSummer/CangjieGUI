@@ -11,7 +11,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = TrackerModel()
-    let app = DesktopApp(WindowSpec("CUI 问题追踪", 680, 620, scale: 1.5), theme: trackerTheme())
+    let app = DesktopApp(WindowSpec("CUI 问题追踪", 680, 620, scale: 1.0), theme: trackerTheme())
     app.setMinimumSize(560, 500)
     app.run {
         trackerView(model)

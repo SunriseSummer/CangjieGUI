@@ -18,7 +18,7 @@ public class CanvasWidget <: Widget
 
 ## 说明
 
-两个回调都跑在每帧重建的新实例上——需要保留的绘图状态放 [`State`](../core/State.md)，不要放字段。适合图表、示波器、自绘小游戏等一切直接用渲染器 API 的场景。
+普通路径中的 CanvasWidget 值会随构建更新，`RetainedSubtree` 又可能复用它；无论哪条路径，需要驱动可见结果和失效的绘图事实都应放 [`State`](../core/State.md) 或显式 revision，不要依赖实例字段的偶然寿命。适合图表、示波器、自绘小游戏等一切直接用渲染器 API 的场景。
 
 ## 示例
 

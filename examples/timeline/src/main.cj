@@ -11,7 +11,7 @@ import cui.{CalendarDate, DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = TimelineModel(CalendarDate.today())
-    let app = DesktopApp(WindowSpec("CUI 时间轴", 820, 520, scale: 1.5), theme: timelineTheme())
+    let app = DesktopApp(WindowSpec("CUI 时间轴", 820, 520, scale: 1.0), theme: timelineTheme())
     app.setMinimumSize(620, 420)
     app.run {
         timelineView(model)

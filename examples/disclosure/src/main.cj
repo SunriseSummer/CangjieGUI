@@ -11,7 +11,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = DisclosureModel()
-    let app = DesktopApp(WindowSpec("CUI 折叠问答", 620, 640, scale: 1.5), theme: disclosureTheme())
+    let app = DesktopApp(WindowSpec("CUI 折叠问答", 620, 640, scale: 1.0), theme: disclosureTheme())
     app.setMinimumSize(520, 520)
     app.run {
         disclosureView(model)

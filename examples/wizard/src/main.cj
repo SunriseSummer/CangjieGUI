@@ -10,7 +10,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = WizardModel()
-    let app = DesktopApp(WindowSpec("CUI 向导", 640, 540, scale: 1.5), theme: wizardTheme())
+    let app = DesktopApp(WindowSpec("CUI 向导", 640, 540, scale: 1.0), theme: wizardTheme())
     app.setMinimumSize(520, 460)
     app.run {
         wizardView(model)

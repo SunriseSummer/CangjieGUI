@@ -19,6 +19,7 @@
 | [main.cj](src/main.cj) | 入口 |
 | [model.cj](src/model.cj) | `ProcessModel`、刷新节奏常量、派生的占比/字节数/刷新时长文案 |
 | [worker.cj](src/worker.cj) | `RefreshWorker` 邮箱、帧调度 `tick`、`tasklist` 执行与解码 |
+| [snapshot_fixture.cj](src/snapshot_fixture.cj) | 快照 E2E 使用的确定性进程输入；仍经后台 worker/邮箱交付 |
 | [views.cj](src/views.cj) | 工具栏、进程表格页、概览页 |
 | [system_info.cj](src/system_info.cj) | CPU/显示器/电源信息的格式化（含空数组防御） |
 | [theme.cj](src/theme.cj) | 深色主题、应用元数据与 SDL 提示 |

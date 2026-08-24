@@ -10,7 +10,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = ExplorerModel()
-    let app = DesktopApp(WindowSpec("CUI 文件浏览器", 900, 640, scale: 1.5), theme: explorerTheme())
+    let app = DesktopApp(WindowSpec("CUI 文件浏览器", 900, 640, scale: 1.0), theme: explorerTheme())
     app.setMinimumSize(680, 480)
     app.run {
         explorerView(model)

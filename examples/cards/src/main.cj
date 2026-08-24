@@ -11,7 +11,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = CardsModel()
-    let app = DesktopApp(WindowSpec("CUI 样式卡片", 640, 640, scale: 1.5), theme: cardsTheme())
+    let app = DesktopApp(WindowSpec("CUI 样式卡片", 640, 640, scale: 1.0), theme: cardsTheme())
     app.setMinimumSize(560, 560)
     app.run {
         cardsView(model)

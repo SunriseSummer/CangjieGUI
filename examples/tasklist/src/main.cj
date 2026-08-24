@@ -10,7 +10,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = TaskModel()
-    let app = DesktopApp(WindowSpec("CUI 任务优先级", 560, 620, scale: 1.5), theme: tasklistTheme())
+    let app = DesktopApp(WindowSpec("CUI 任务优先级", 560, 620, scale: 1.0), theme: tasklistTheme())
     app.setMinimumSize(440, 480)
     app.run {
         tasklistView(model)

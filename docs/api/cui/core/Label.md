@@ -18,7 +18,9 @@ Label <: [`Widget`](Widget.md)
 
 ## 说明
 
-粗体、斜体、下划线与删除线经 sdl 的 `FontStyle` 在文本渲染层实时合成，对字体覆盖的所有文字（拉丁与中日韩皆同）生效；`fontFamily` 切换到 `Fonts.register` 注册过的应用字体（语义权威：sdl 模块文档）。显式的 `foregroundColor` 优先于 `muted`。换行与宽度结果按"宽度 + 字号"缓存并在测量与绘制间共享；更改测量输入的构建器（样式、字族、行数上限）会丢弃缓存，重新折行。
+粗体、斜体、下划线与删除线经 sdl 的 `FontStyle` 在文本渲染层实时合成，对字体覆盖的所有文字（拉丁与中日韩皆同）生效；`fontFamily` 切换到 `Fonts.register` 注册过的应用字体（语义权威：sdl 模块文档）。显式的 `foregroundColor` 优先于 `muted`。
+
+多行排版把字形宽度、Unicode 字素簇和合法断行机会分开处理：组合附加符、ZWJ emoji、旗帜区域指示符与常见 Indic/Hangul 序列不会被截断；硬换行、NBSP/WJ 和 CJK 开闭标点遵循 UAX #14 风格禁则，实在放不下时只在完整字素簇边界紧急换行。冷布局通过 SDL_ttf 有界前缀测量避免反复塑形整段余串；结果进入 `UiContext` 共享、4 MiB 字节预算的真 LRU，因此每帧重建同一 Label 仍可命中。Label 实例自身还在 measure/draw 间复用结果；更改样式、字族或行数上限会重新查询完整键。
 
 ## 示例
 

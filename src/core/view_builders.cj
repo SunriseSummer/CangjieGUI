@@ -16,7 +16,7 @@ public class VStack <: Widget {
         flexible!: Bool = true,
         body!: () -> Unit
     ) {
-        stack = Stack(Axis.Vertical, buildChildren(body), spacing: spacing, padding: padding, flexible: flexible)
+        stack = Stack(Axis.Vertical, buildChildren("VStack", body), spacing: spacing, padding: padding, flexible: flexible)
         emit(this)
     }
 
@@ -98,7 +98,7 @@ public class HStack <: Widget {
         flexible!: Bool = true,
         body!: () -> Unit
     ) {
-        stack = Stack(Axis.Horizontal, buildChildren(body), spacing: spacing, padding: padding, flexible: flexible)
+        stack = Stack(Axis.Horizontal, buildChildren("HStack", body), spacing: spacing, padding: padding, flexible: flexible)
         emit(this)
     }
 
@@ -185,7 +185,7 @@ public class Flexible <: Widget {
     private let weight: Float32
 
     public init(weight!: Float32 = 1.0, body!: () -> Unit) {
-        this.child = buildChild(body)
+        this.child = buildChild("Flexible", body)
         this.weight = max(0.0, weight)
         emit(this)
     }

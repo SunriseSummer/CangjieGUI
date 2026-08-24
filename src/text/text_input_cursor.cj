@@ -32,6 +32,11 @@ internal func textCursorVisible(ctx: UiContext): Bool {
     (ctx.frame.elapsedMs / TEXT_CURSOR_BLINK_MS) % UInt64(2) == UInt64(0)
 }
 
+private func requestNextCursorBlink(ctx: UiContext): Unit {
+    let phase = ctx.frame.elapsedMs / TEXT_CURSOR_BLINK_MS
+    ctx.requestFrameAt((phase + UInt64(1)) * TEXT_CURSOR_BLINK_MS)
+}
+
 /*
  * Byte offset for a click at `targetX` (relative to where the line's text starts).
  * Prefix widths use the same renderer measurement as drawing, so the hit position is
@@ -45,24 +50,21 @@ private func textCursorForOffset(
     lineEnd: Int64,
     targetX: Float32
 ): Int64 {
-    var current = lineStart
-    var previousWidth: Float32 = 0.0
-    while (current < lineEnd) {
-        let next = nextTextBoundary(text, current)
-        let nextWidth = ctx.renderer.textWidth(text[lineStart..next], pointSize: FontSizes.BODY)
-        if (targetX < (previousWidth + nextWidth) / 2.0) {
-            return current
-        }
-        previousWidth = nextWidth
-        current = next
+    if (lineStart >= lineEnd) {
+        return lineStart
     }
-    lineEnd
+    let line = text[lineStart..lineEnd]
+    let session = ctx.renderer.textMeasureSession(line, pointSize: FontSizes.BODY)
+    var result = lineStart
+    try (resource = session) {
+        result = lineStart + resource.hitTest(targetX).byteOffset
+    }
+    result
 }
 
 // `xShift` is the field's horizontal follow offset: the text window slides left by this many
 // pixels when the caret runs past the inner width, so hit-testing adds it back.
-internal func textFieldCursorForPoint(ctx: UiContext, frame: Rect, text: String, x: Float32,
-    xShift!: Float32 = 0.0): Int64 {
+internal func textFieldCursorForPoint(ctx: UiContext, frame: Rect, text: String, x: Float32, xShift!: Float32 = 0.0): Int64 {
     let lineEnd = lineEndAfterOrAt(text, 0)
     textCursorForOffset(ctx, text, 0, lineEnd, x - frame.x - TEXT_FIELD_PAD_X + xShift)
 }
@@ -97,8 +99,10 @@ internal func drawTextFieldSelection(ctx: UiContext, frame: Rect, text: String, 
     let lineHeight = ctx.renderer.textHeight(pointSize: FontSizes.BODY)
     // Opaque enough to read as a selection over the focused field's tinted surface, still
     // translucent so the glyphs drawn on top stay legible.
-    ctx.renderer.fill(Rect(xStart, frame.centerY() - lineHeight / 2.0, xEnd - xStart, lineHeight),
-        ctx.theme.accent.withAlpha(115))
+    ctx
+        .renderer
+        .fill(Rect(xStart, frame.centerY() - lineHeight / 2.0, xEnd - xStart, lineHeight),
+            ctx.theme.accent.withAlpha(115))
 }
 
 internal func drawTextFieldCursor(ctx: UiContext, frame: Rect, id: String, text: String, cursor: Int64,
@@ -106,9 +110,8 @@ internal func drawTextFieldCursor(ctx: UiContext, frame: Rect, id: String, text:
     if (!ctx.hasFocus(id)) {
         return
     }
-    // A focused field blinks its caret on the frame clock, so keep frames flowing even while the
-    // screen is otherwise idle; without this the dirty-frame loop (档 0) would freeze the blink.
-    ctx.requestFrame()
+    // Redraw only at the next visibility transition; intervening refreshes cannot change the caret.
+    requestNextCursorBlink(ctx)
     let position = normalizedTextCursor(text, cursor)
     let prefixW = ctx.renderer.textWidth(text[0..position], pointSize: FontSizes.BODY)
     let x = frame.x + TEXT_FIELD_PAD_X - xShift + prefixW
@@ -123,6 +126,25 @@ internal func drawTextFieldCursor(ctx: UiContext, frame: Rect, id: String, text:
         return
     }
     ctx.renderer.fill(caret, ctx.theme.accent)
+}
+
+/** Draws non-committed IME text at the caret and anchors the OS candidate UI at its end. */
+internal func drawTextFieldComposition(ctx: UiContext, frame: Rect, id: String, text: String, cursor: Int64,
+    xShift!: Float32 = 0.0): Bool {
+    match (ctx.imeComposition(id)) {
+        case Some(composition) =>
+            let position = normalizedTextCursor(text, cursor)
+            let prefixW = ctx.renderer.textWidth(text[0..position], pointSize: FontSizes.BODY)
+            let x = frame.x + TEXT_FIELD_PAD_X - xShift + prefixW
+            let lineHeight = ctx.renderer.textHeight(pointSize: FontSizes.BODY)
+            let y = frame.centerY() - lineHeight / 2.0
+            let width = ctx.renderer.textWidth(composition.text, pointSize: FontSizes.BODY)
+            ctx.renderer.text(composition.text, x, y, ctx.theme.text, pointSize: FontSizes.BODY)
+            ctx.renderer.line(x, y + lineHeight, x + max(TEXT_CURSOR_W, width), y + lineHeight, ctx.theme.accent)
+            ctx.setTextInputAnchor(Rect(x + width, y, TEXT_CURSOR_W, lineHeight))
+            true
+        case None => false
+    }
 }
 
 /*
@@ -178,9 +200,7 @@ internal func drawTextAreaCursor(
     if (!ctx.hasFocus(id)) {
         return
     }
-    // A focused area blinks its caret on the frame clock; keep frames flowing so the dirty-frame
-    // loop (档 0) does not freeze the blink even when nothing else changes.
-    ctx.requestFrame()
+    requestNextCursorBlink(ctx)
     let position = normalizedTextCursor(content.text, content.cursor)
     let line = textCursorLineIndex(content.text, position)
     let lineStart = lineStartBeforeOrAt(content.text, position)
@@ -200,4 +220,26 @@ internal func drawTextAreaCursor(
         return
     }
     ctx.renderer.fill(caret, ctx.theme.accent)
+}
+
+/** Multi-line counterpart of `drawTextFieldComposition`; pre-edit itself remains one IME run. */
+internal func drawTextAreaComposition(ctx: UiContext, viewport: Rect, id: String, content: TextAreaContent): Bool {
+    match (ctx.imeComposition(id)) {
+        case Some(composition) =>
+            let position = normalizedTextCursor(content.text, content.cursor)
+            let line = textCursorLineIndex(content.text, position)
+            let lineStart = lineStartBeforeOrAt(content.text, position)
+            let x = viewport.x + ctx.renderer.textWidth(content.text[lineStart..position], pointSize: FontSizes.BODY)
+            let y = viewport.y + Float32(line) * CUI_SMALL_H - content.scroll
+            if (y + CUI_SMALL_H < viewport.y || y > viewport.bottom()) {
+                return true
+            }
+            let lineHeight = ctx.renderer.textHeight(pointSize: FontSizes.BODY)
+            let width = ctx.renderer.textWidth(composition.text, pointSize: FontSizes.BODY)
+            ctx.renderer.text(composition.text, x, y, ctx.theme.text, pointSize: FontSizes.BODY)
+            ctx.renderer.line(x, y + lineHeight, x + max(TEXT_CURSOR_W, width), y + lineHeight, ctx.theme.accent)
+            ctx.setTextInputAnchor(Rect(x + width, y, TEXT_CURSOR_W, min(lineHeight, CUI_SMALL_H)))
+            true
+        case None => false
+    }
 }

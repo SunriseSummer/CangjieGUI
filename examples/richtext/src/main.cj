@@ -7,7 +7,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Unit {
     let model = RichTextModel()
-    let app = DesktopApp(WindowSpec("CUI 发布说明", 680, 760, scale: 1.5), theme: richtextTheme())
+    let app = DesktopApp(WindowSpec("CUI 发布说明", 680, 760, scale: 1.0), theme: richtextTheme())
     app.run {
         richtextView(model)
     }

@@ -11,7 +11,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = ContactsModel()
-    let app = DesktopApp(WindowSpec("CUI 通讯录", 820, 640, scale: 1.5), theme: contactsTheme())
+    let app = DesktopApp(WindowSpec("CUI 通讯录", 820, 640, scale: 1.0), theme: contactsTheme())
     app.setMinimumSize(680, 520)
     app.run {
         contactsView(model)

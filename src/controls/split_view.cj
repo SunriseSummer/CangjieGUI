@@ -75,9 +75,9 @@ public class SplitView <: Widget {
         this.grabOffset = localState<Float32>("SplitView:${ident}:grab") {0.0}
         // Build the first pane, then register the divider, then the second pane, so the divider
         // takes its natural place between the panes in Tab order.
-        this.first = buildChild(first)
+        this.first = buildChild("SplitView.first", first)
         registerFocusable(this.dividerId)
-        this.second = buildChild(second)
+        this.second = buildChild("SplitView.second", second)
         emit(this)
     }
 

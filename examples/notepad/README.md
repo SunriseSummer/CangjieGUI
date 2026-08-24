@@ -9,7 +9,8 @@
 - “新建”确认为何不用系统弹窗，而是状态驱动的应用内确认条
 - `map` 派生文档统计（“| N 行 | M 字节 | UTF-8”），状态栏与内容始终同步
 - 长路径在状态栏中用 `Flexible` 与自动省略号安全展示
-- 文件级 Ctrl 快捷键分发；`Ctrl+A/C/X/V` 下放给聚焦的 `TextArea`，由框架内建的多行选区
+- `EventHandler` 从 `UiContext.eventModifiers()` 读取事件时刻快照并分发文件级 Ctrl/Cmd 快捷键；
+  `Ctrl+A/C/X/V` 下放给聚焦的 `TextArea`，由框架内建的多行选区
   剪贴板处理（选区复制与剪切、光标处粘贴、全选），工具栏“复制”按钮则显式复制全文
 - `Ctrl+Z` 撤销、`Ctrl+Y`/`Ctrl+Shift+Z` 重做：由 `TextArea` 内建的时间合并撤销历史提供，
   连续键入整组回退，无需应用维护任何编辑历史

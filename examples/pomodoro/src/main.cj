@@ -10,7 +10,7 @@ import cui.{DesktopApp, FrameHandler, WindowSpec}
 
 main(): Unit {
     let model = newPomodoroModel()
-    let app = DesktopApp(WindowSpec("CUI 番茄钟", 560, 660, scale: 1.5), theme: pomodoroTheme())
+    let app = DesktopApp(WindowSpec("CUI 番茄钟", 560, 660, scale: 1.0), theme: pomodoroTheme())
     app.run {
         if (model.running.value) {
             FrameHandler(onFrame: {info => model.tick(Int64(info.deltaMs))}, body: {=> pomodoroView(model)})

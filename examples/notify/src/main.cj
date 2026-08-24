@@ -10,7 +10,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = NotifyModel()
-    let app = DesktopApp(WindowSpec("CUI 通知", 620, 480, scale: 1.5), theme: notifyTheme())
+    let app = DesktopApp(WindowSpec("CUI 通知", 620, 480, scale: 1.0), theme: notifyTheme())
     app.setMinimumSize(480, 380)
     app.run {
         notifyView(model)

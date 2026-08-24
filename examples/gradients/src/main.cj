@@ -11,7 +11,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = GradientsModel()
-    let app = DesktopApp(WindowSpec("CUI 线性渐变", 640, 660, scale: 1.5), theme: gradientsTheme())
+    let app = DesktopApp(WindowSpec("CUI 线性渐变", 640, 660, scale: 1.0), theme: gradientsTheme())
     app.setMinimumSize(540, 560)
     app.run {
         gradientsView(model)

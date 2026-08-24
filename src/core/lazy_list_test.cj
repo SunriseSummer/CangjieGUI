@@ -2,36 +2,47 @@ package cui.core
 
 import sdl.{Rect, UiEvent}
 
+private class HeightReadCounter {
+    var count: Int64 = 0
+
+    func height(_: Int64): Float32 {
+        count += 1
+        50.0
+    }
+}
+
 @Test
 func lazyListRowTopsAccumulateHeightsAndSpacing(): Unit {
     let heights: Array<Float32> = [10.0, 20.0, 30.0]
-    let tops = lazyListRowTops(3, {i => heights[i]}, 5.0)
-    @Expect(tops.size, 4)
-    @Expect(tops[0], Float32(0.0))
-    @Expect(tops[1], Float32(15.0)) // 10 + spacing
-    @Expect(tops[2], Float32(40.0)) // 15 + 20 + spacing
+    let extents = LazyExtentIndex()
+    extents.reset(3, {i => heights[i]}, 5.0)
+    @Expect(extents.topOf(0), Float32(0.0))
+    @Expect(extents.topOf(1), Float32(15.0)) // 10 + spacing
+    @Expect(extents.topOf(2), Float32(40.0)) // 15 + 20 + spacing
     // Content excludes trailing spacing after the last row: 10+20+30 + 2*5 = 70.
-    @Expect(tops[3], Float32(70.0))
+    @Expect(extents.contentExtent(), Float32(70.0))
 }
 
 @Test
 func lazyListRowTopsHandlesEmpty(): Unit {
-    let tops = lazyListRowTops(0, {_ => 50.0}, 4.0)
-    @Expect(tops.size, 1)
-    @Expect(tops[0], Float32(0.0))
-    let (first, last) = lazyListVisibleRange(tops, 0.0, 200.0, 2)
+    let extents = LazyExtentIndex()
+    extents.reset(0, {_ => 50.0}, 4.0)
+    @Expect(extents.contentExtent(), Float32(0.0))
+    let (first, last) = extents.visibleRange(0.0, 200.0, LazyOverscanInsets(100.0, 100.0))
     @Expect(first > last, true) // empty range
 }
 
 @Test
 func lazyListVisibleRangeWindowsUniformRows(): Unit {
-    let tops = lazyListRowTops(100, {_ => 50.0}, 0.0) // tops[i] = 50*i, content 5000
-    // Top of the list: rows 0..4 fit a 200px viewport, widened by 2 of overscan.
-    let (first0, last0) = lazyListVisibleRange(tops, 0.0, 200.0, 2)
+    let extents = LazyExtentIndex()
+    extents.reset(100, {_ => 50.0}, 0.0)
+    // Top of the list: rows 0..4 fit a 200px viewport, widened by 100px of overscan.
+    let overscan = LazyOverscanInsets(100.0, 100.0)
+    let (first0, last0) = extents.visibleRange(0.0, 200.0, overscan)
     @Expect(first0, 0)
     @Expect(last0, 6)
     // Scrolled to row 20: window recentres with overscan both sides.
-    let (first1, last1) = lazyListVisibleRange(tops, 1000.0, 200.0, 2)
+    let (first1, last1) = extents.visibleRange(1000.0, 200.0, overscan)
     @Expect(first1, 18)
     @Expect(last1, 26)
 }
@@ -39,11 +50,72 @@ func lazyListVisibleRangeWindowsUniformRows(): Unit {
 @Test
 func lazyListVisibleRangeWindowsVariableRows(): Unit {
     let heights: Array<Float32> = [100.0, 50.0, 200.0, 50.0, 100.0]
-    let tops = lazyListRowTops(5, {i => heights[i]}, 0.0) // tops = [0,100,150,350,400,500]
-    // A 100px viewport at offset 160 sits inside row 2; overscan 1 widens to rows 1..3.
-    let (first, last) = lazyListVisibleRange(tops, 160.0, 100.0, 1)
+    let extents = LazyExtentIndex()
+    extents.reset(5, {i => heights[i]}, 0.0)
+    // A 100px viewport at offset 160 sits inside row 2; pixel overscan widens to rows 1..3.
+    let (first, last) = extents.visibleRange(160.0, 100.0, LazyOverscanInsets(60.0, 90.0))
     @Expect(first, 1)
     @Expect(last, 3)
+}
+
+@Test
+func lazyListExtentsPointUpdateAdjustsFenwickPrefixes(): Unit {
+    let model = LazyListExtents([10.0, 20.0, 30.0], spacing: 5.0)
+    let before = model.currentIndex()
+    @Expect(before.topOf(1), Float32(15.0))
+    @Expect(before.topOf(2), Float32(40.0))
+    @Expect(before.contentExtent(), Float32(70.0))
+
+    @Expect(model.update(0, 30.0))
+    @Expect(!model.update(0, 30.0))
+    let after = model.currentIndex()
+    @Expect(after.topOf(1), Float32(35.0))
+    @Expect(after.topOf(2), Float32(60.0))
+    @Expect(after.contentExtent(), Float32(90.0))
+    @Expect(after.rowAt(59.0), Int64(1))
+    @Expect(after.rowAt(60.0), Int64(2))
+}
+
+@Test
+func lazyListRevisionSkipsFullHeightRescanUntilContentChanges(): Unit {
+    let store = StateStore()
+    let counter = HeightReadCounter()
+    let revision = State<UInt64>(1)
+    let body: () -> Unit = {
+        => LazyList(1000, {index => counter.height(index)}, revision: Some(revision.value), id: "cached.extents") {
+            _ => emit(Spacer())
+        }
+    }
+    let _ = buildRoot(body, store)
+    @Expect(counter.count, Int64(1000))
+    let _ = buildRoot(body, store)
+    @Expect(counter.count, Int64(1000))
+    revision.value += UInt64(1)
+    let _ = buildRoot(body, store)
+    @Expect(counter.count, Int64(2000))
+}
+
+@Test
+func lazyListMutableExtentUpdateKeepsTopStableKeyAnchored(): Unit {
+    let store = StateStore()
+    let controller = LazyViewportController()
+    let model = LazyListExtents([40.0, 40.0, 40.0, 40.0, 40.0, 40.0])
+    let body: () -> Unit = {
+        => LazyList(model, key: {index => "row.${index}"}, id: "mutable.extents", controller: controller) {
+            _ => emit(Spacer())
+        }
+    }
+    let first = buildRoot(body, store)
+    first.layout(testContext(), Rect(0.0, 0.0, 200.0, 80.0))
+    controller.scrollToKey("row.3", alignment: LazyScrollAlignment.Start)
+    let revealed = buildRoot(body, store)
+    revealed.layout(testContext(), Rect(0.0, 0.0, 200.0, 80.0))
+    @Expect(controller.offset, Float32(120.0))
+
+    @Expect(model.update(0, 60.0))
+    let resized = buildRoot(body, store)
+    resized.layout(testContext(), Rect(0.0, 0.0, 200.0, 80.0))
+    @Expect(controller.offset, Float32(140.0))
 }
 
 @Test

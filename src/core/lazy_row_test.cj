@@ -30,6 +30,7 @@ func lazyRowBuildsWindowAroundExternalScroll(): Unit {
     @Expect(built.low <= 500, true)
     @Expect(built.high >= 505, true)
     @Expect(built.high < 520, true)
+    @Expect(row.isFlexible(), true)
 }
 
 @Test

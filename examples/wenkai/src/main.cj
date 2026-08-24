@@ -13,7 +13,7 @@ main(): Int64 {
     let dir = resolveFontsDir(FONT_DIR_CANDIDATES, {p => FileSystem.exists(p)})
     let registered = registerWeights(dir, {name, path => Fonts.register(name, path)})
     let model = WenkaiModel(registered)
-    let app = DesktopApp(WindowSpec("CUI 本地字体样本册", 640, 640, scale: 1.5), theme: wenkaiTheme())
+    let app = DesktopApp(WindowSpec("CUI 本地字体样本册", 640, 640, scale: 1.0), theme: wenkaiTheme())
     app.setMinimumSize(520, 480)
     app.run {
         wenkaiView(model)

@@ -242,16 +242,12 @@ public class Label <: Widget {
         match (cachedLines) {
             case Some(lines) where cachedLinesWidth == width && cachedLinesPointSize == ps => lines // cjcheck-ignore: float-equal # cache-key identity; miss only costs a re-wrap
             case _ =>
-                let lines = wrapText(ctx, text, width, ps, lineLimit, style: textStyle, font: fontFace)
-                var widest: Float32 = 0.0
-                for (line in lines) {
-                    widest = max(widest, ctx.renderer.textWidth(line, pointSize: ps, style: textStyle, font: fontFace))
-                }
-                cachedLines = Some(lines)
+                let layout = layoutParagraph(ctx, text, width, ps, lineLimit, style: textStyle, font: fontFace)
+                cachedLines = Some(layout.lines)
                 cachedLinesWidth = width
                 cachedLinesPointSize = ps
-                cachedLinesWidest = widest
-                lines
+                cachedLinesWidest = layout.widest
+                layout.lines
         }
     }
 

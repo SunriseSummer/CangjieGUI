@@ -2,9 +2,9 @@ package cui.text
 
 import std.collection.ArrayList
 import sdl.{Color, FontSizes, Key, MouseButton, Rect, Size, SurfaceStyle, UiEvent}
-import cui.core.{drawFieldChevron, Bindable, CUI_CONTROL_H, CUI_SMALL_H, Overlay, ScrollBar, State, UiContext, Widget, resolveControlKey, buildChild,
-    clampItemIndex, clampScrollOffset, drawSurface, drawVerticalScrollBar, emit, localState, scrollBarGutter,
-    scrollOffsetAfterWheel}
+import cui.core.{drawFieldChevron, Bindable, CUI_CONTROL_H, CUI_SMALL_H, Overlay, ScrollBar, State, UiContext, Widget,
+    resolveControlKey, buildChild, clampItemIndex, clampScrollOffset, drawSurface, drawVerticalScrollBar, emit,
+    localState, scrollBarGutter, scrollOffsetAfterWheel}
 
 private let COMBO_POPUP_PAD: Float32 = 5.0
 private let COMBO_GAP: Float32 = 4.0
@@ -52,7 +52,7 @@ public class ComboBox <: Widget {
         this.anchorState = anchor
         // The embedded field shares this control's identity (so focus and state line up), passed as
         // its explicit key.
-        this.field = buildChild({=> TextField(text, key: ident, cursor: Some(cursor), anchor: Some(anchor))})
+        this.field = buildChild("ComboBox.field", {=> TextField(text, key: ident, cursor: Some(cursor), anchor: Some(anchor))})
         this.overlayOwner = "ComboBox:${ident}"
         this.open = localState<Bool>("ComboBox:${ident}:open") {false}
         this.highlight = localState<Int64>("ComboBox:${ident}:hl") {0}
@@ -68,6 +68,12 @@ public class ComboBox <: Widget {
     public func layout(ctx: UiContext, rect: Rect): Unit {
         frame = rect
         field.layout(ctx, rect)
+        if (open.value) {
+            let popup = popupRect(ctx, filteredOptions())
+            ctx.setOverlay(
+                Overlay(handleEvent: {c, e => handleOverlay(c, e, popup)}, render: {c => drawPopup(c, popup)},
+                    owner: overlayOwner))
+        }
     }
 
     public func draw(ctx: UiContext): Unit {
@@ -75,8 +81,9 @@ public class ComboBox <: Widget {
         drawFieldChevron(ctx, frame)
         if (open.value) {
             let popup = popupRect(ctx, filteredOptions())
-            ctx.setOverlay(Overlay(handleEvent: {c, e => handleOverlay(c, e, popup)},
-                render: {c => drawPopup(c, popup)}, owner: overlayOwner))
+            ctx.setOverlay(
+                Overlay(handleEvent: {c, e => handleOverlay(c, e, popup)}, render: {c => drawPopup(c, popup)},
+                    owner: overlayOwner))
         }
     }
 
@@ -149,8 +156,8 @@ public class ComboBox <: Widget {
         match (event) {
             case UiEvent.MouseDown(MouseButton.Left, x, y) =>
                 if (popup.contains(x, y)) {
-                    if (popupBar.press(ctx, listRect(popup), popupScroll, contentHeight(filtered),
-                        listHeight(popup), x, y)) {
+                    if (popupBar.press(ctx, listRect(popup), popupScroll, contentHeight(filtered), listHeight(popup), x,
+                        y)) {
                         return true // the press grabbed the scrollbar; the popup stays open
                     }
                     commit(ctx, filtered, itemIndexAt(popup, y))
@@ -162,7 +169,8 @@ public class ComboBox <: Widget {
                 chevronRect().contains(x, y)
             case UiEvent.MouseMove(_, y) =>
                 // While the thumb is grabbed the move scrolls the list; hover falls through.
-                popupBar.drag(ctx, listRect(popup), popupScroll, contentHeight(filtered), listHeight(popup), y)
+                popupBar.drag(ctx, listRect(popup), popupScroll, contentHeight(filtered),
+                listHeight(popup), y)
             case UiEvent.MouseWheel(_, wheelY, x, y) =>
                 if (popup.contains(x, y)) {
                     popupScroll.value = scrollOffsetAfterWheel(popupScroll.value, wheelY, contentHeight(filtered),

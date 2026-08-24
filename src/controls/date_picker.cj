@@ -1,8 +1,8 @@
 package cui.controls
 
 import sdl.{FontSizes, IconName, Key, MouseButton, Pen, Rect, Size, SurfaceStyle, UiEvent, clampF32, drawIcon}
-import cui.core.{Bindable, CUI_CONTROL_H, CursorShape, Overlay, State, UiContext, Widget,
-    resolveControlKey, claimHoverIfInside, drawSurface, emit, localState, registerFocusable}
+import cui.core.{Bindable, CUI_CONTROL_H, CursorShape, Overlay, State, UiContext, Widget, resolveControlKey,
+    claimHoverIfInside, drawSurface, emit, localState, registerFocusable, registerRectOverlayWhen}
 
 private let DP_FIELD_W: Float32 = 176.0
 private let DP_CELL_W: Float32 = 34.0
@@ -15,7 +15,6 @@ private let DP_MARGIN: Float32 = 4.0
 private let DP_GRID_ROWS: Int64 = 6
 private let DP_POPUP_W: Float32 = DP_CELL_W * 7.0 + DP_PAD * 2.0
 private let DP_POPUP_H: Float32 = DP_PAD * 2.0 + DP_HEADER_H + DP_WEEKDAY_H + DP_CELL_H * Float32(DP_GRID_ROWS)
-
 private let DP_WEEKDAYS: Array<String> = ["日", "一", "二", "三", "四", "五", "六"]
 
 /*
@@ -57,8 +56,10 @@ public class DatePicker <: Widget {
         Size(min(available.w, DP_FIELD_W), CUI_CONTROL_H)
     }
 
-    public func layout(_: UiContext, rect: Rect): Unit {
+    public func layout(ctx: UiContext, rect: Rect): Unit {
         frame = rect
+        registerRectOverlayWhen(ctx, open.value, {=> popupRect(ctx)}, {c, e, popup => handleOverlay(c, e, popup)},
+            {c, popup => drawPopup(c, popup)}, overlayOwner)
     }
 
     public func draw(ctx: UiContext): Unit {
@@ -73,19 +74,21 @@ public class DatePicker <: Widget {
 
         if (open.value) {
             let popup = popupRect(ctx)
-            ctx.setOverlay(Overlay(handleEvent: {c, e => handleOverlay(c, e, popup)}, render: {c => drawPopup(c, popup)},
-                owner: overlayOwner))
+            ctx.setOverlay(
+                Overlay(handleEvent: {c, e => handleOverlay(c, e, popup)}, render: {c => drawPopup(c, popup)},
+                    owner: overlayOwner))
         }
     }
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
         claimHoverIfInside(ctx, event, frame, id, CursorShape.Interactive)
         match (event) {
-            case UiEvent.MouseDown(MouseButton.Left, x, y) => if (frame.contains(x, y)) {
-                ctx.focus(id)
-                openPopup()
-                return true
-            }
+            case UiEvent.MouseDown(MouseButton.Left, x, y) =>
+                if (frame.contains(x, y)) {
+                    ctx.focus(id)
+                    openPopup()
+                    return true
+                }
             case UiEvent.KeyDown(Key.Enter, _) => return openIfFocused(ctx)
             case UiEvent.KeyDown(Key.Space, _) => return openIfFocused(ctx)
             case UiEvent.KeyDown(Key.Down, _) => return openIfFocused(ctx)

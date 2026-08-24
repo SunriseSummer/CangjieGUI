@@ -11,7 +11,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = WatchlistModel()
-    let app = DesktopApp(WindowSpec("CUI 观影清单", 560, 640, scale: 1.5), theme: watchlistTheme())
+    let app = DesktopApp(WindowSpec("CUI 观影清单", 560, 640, scale: 1.0), theme: watchlistTheme())
     app.setMinimumSize(460, 480)
     app.run {
         watchlistView(model)

@@ -11,7 +11,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = CatalogModel()
-    let app = DesktopApp(WindowSpec("CUI 商品目录", 720, 800, scale: 1.5), theme: catalogTheme())
+    let app = DesktopApp(WindowSpec("CUI 商品目录", 720, 800, scale: 1.0), theme: catalogTheme())
     app.setMinimumSize(560, 600)
     app.run {
         catalogView(model)

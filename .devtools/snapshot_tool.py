@@ -27,6 +27,8 @@ from pathlib import Path
 def read_bmp(path):
     """读取未压缩 24/32 位 BMP，返回 (width, height, rows)，rows 为自顶向下的 RGB 元组行。"""
     data = Path(path).read_bytes()
+    if len(data) < 54:
+        raise ValueError(f"{path}: BMP 文件过短（{len(data)} 字节）")
     if data[:2] != b"BM":
         raise ValueError(f"{path}: 不是 BMP 文件")
     pixel_offset = struct.unpack_from("<I", data, 10)[0]
@@ -36,12 +38,21 @@ def read_bmp(path):
     width, height = struct.unpack_from("<ii", data, 18)
     planes, bpp = struct.unpack_from("<HH", data, 26)
     compression = struct.unpack_from("<I", data, 30)[0]
-    if bpp not in (24, 32) or compression not in (0, 3):
+    if width <= 0 or height == 0:
+        raise ValueError(f"{path}: 非法 BMP 尺寸 {width}x{height}")
+    if planes != 1:
+        raise ValueError(f"{path}: 非法 BMP planes={planes}")
+    if bpp not in (24, 32) or compression not in (0, 3) or (bpp == 24 and compression != 0):
         raise ValueError(f"{path}: 仅支持未压缩 24/32 位 BMP（bpp={bpp}, compression={compression}）")
     top_down = height < 0
     height = abs(height)
     stride = (width * (bpp // 8) + 3) & ~3
     step = bpp // 8
+    if pixel_offset < 14 + header_size:
+        raise ValueError(f"{path}: 像素偏移 {pixel_offset} 落在 BMP 头内部")
+    required = pixel_offset + height * stride
+    if required > len(data):
+        raise ValueError(f"{path}: 像素数据被截断（需要 {required} 字节，实际 {len(data)}）")
     rows = []
     for row in range(height):
         src_row = row if top_down else height - 1 - row
@@ -57,6 +68,8 @@ def read_bmp(path):
 
 def write_png(path, width, height, rows):
     """把自顶向下的 RGB 行写成无滤波的 8 位 PNG。"""
+    if width <= 0 or height <= 0 or len(rows) != height or any(len(row) != width for row in rows):
+        raise ValueError("PNG 像素矩阵尺寸不一致")
     raw = bytearray()
     for line in rows:
         raw.append(0)
@@ -82,11 +95,15 @@ def load_image(path):
 
 def diff_images(a_path, b_path, out=None, tolerance=0):
     """对比两张快照；返回 (差异像素数, 最大通道差, 包围盒或 None)。尺寸不同视为完全差异。"""
+    if not 0 <= tolerance <= 255:
+        raise ValueError(f"容差必须在 0..255，实际为 {tolerance}")
     aw, ah, arows = load_image(a_path)
     bw, bh, brows = load_image(b_path)
     if (aw, ah) != (bw, bh):
         print(f"尺寸不同：{a_path} 为 {aw}x{ah}，{b_path} 为 {bw}x{bh}")
-        return aw * ah, 255, (0, 0, aw - 1, ah - 1)
+        width = max(aw, bw)
+        height = max(ah, bh)
+        return max(aw * ah, bw * bh), 255, (0, 0, width - 1, height - 1)
     differing = 0
     max_delta = 0
     bbox = None
@@ -158,6 +175,13 @@ def cmd_update(args):
     return 0
 
 
+def channel_tolerance(value):
+    parsed = int(value)
+    if not 0 <= parsed <= 255:
+        raise argparse.ArgumentTypeError("容差必须在 0..255")
+    return parsed
+
+
 def main():
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
@@ -173,13 +197,13 @@ def main():
     d.add_argument("a")
     d.add_argument("b")
     d.add_argument("--out", help="差异热图 PNG 输出路径")
-    d.add_argument("--tolerance", type=int, default=0)
+    d.add_argument("--tolerance", type=channel_tolerance, default=0)
     d.set_defaults(fn=cmd_diff)
 
     k = sub.add_parser("check", help="与基线目录对比")
     k.add_argument("shots", nargs="+")
     k.add_argument("--baseline", required=True)
-    k.add_argument("--tolerance", type=int, default=0)
+    k.add_argument("--tolerance", type=channel_tolerance, default=0)
     k.set_defaults(fn=cmd_check)
 
     u = sub.add_parser("update", help="把快照写入基线目录")

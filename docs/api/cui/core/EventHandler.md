@@ -18,7 +18,9 @@ EventHandler <: [`Widget`](Widget.md)
 
 ## 说明
 
-典型用法是处理应用级键盘快捷键：把整个界面包进 `EventHandler`，在回调里处理方向键、回车、Escape 等按键；回调不处理的事件继续交给子控件。`Frame` 是逐帧广播事件，回调与子控件都会收到，不能在这里拦截；需要每帧更新状态时改用 [`FrameHandler`](FrameHandler.md)。
+典型用法是处理应用级按键：把整个界面包进 `EventHandler`，在回调里处理回车、Escape、Delete 或 Ctrl/Cmd/Shift 组合键；回调不处理的事件继续交给子控件。`KeyDown` 的第二个载荷是 repeat `Bool`，不是修饰键。
+
+无需事件上下文时可使用单参数 `(UiEvent) -> Bool` 回调；组合键使用上下文感知的 `(UiContext, UiEvent) -> Bool` 重载，并从 [`UiContext.eventModifiers()`](UiContext.md#eventmetadata--eventmodifiers) 读取与当前事件一起采集的稳定快照。不要在延迟派发阶段查询全局 `Keyboard.modifiers()`，因为 SDL 队列可能已继续处理 KeyUp。构建时 `EventHandler` 会显式登记自己的 Frame 观察，子控件的帧订阅独立登记，回调不能拦截帧脉搏；需要每帧更新状态并自动续帧时改用 [`FrameHandler`](FrameHandler.md)。
 
 ## 示例
 
@@ -32,17 +34,21 @@ main(): Unit {
     app.run {
         let status = rememberState<String>("shortcut.status") {"等待按键"}
         EventHandler(onEvent: {
-            event => match (event) {
-                case UiEvent.KeyDown(Key.Escape, _) =>
-                    status.value = "已处理 Escape"
-                    true
+            ctx, event => match (event) {
+                case UiEvent.KeyDown(Key.Letter(code), _) =>
+                    if (code == UInt8(83) && ctx.eventModifiers().command) {
+                        status.value = "已处理 Ctrl/Cmd+S"
+                        true
+                    } else {
+                        false
+                    }
                 case _ => false
             }
         }) {
             VStack {
-                Label("按 Escape 触发应用快捷键")
+                Label("按 Ctrl/Cmd+S 触发应用快捷键")
                 Label(status.value)
-                // 运行时：按 Escape 后第二行变为“已处理 Escape”；其它按键继续交给子控件。
+                // 运行时：命中后第二行更新；普通 S 与其它按键继续交给子控件。
             }
         }
     }
@@ -56,6 +62,7 @@ main(): Unit {
 | 成员 | 说明 |
 |---|---|
 | [`init(onEvent!: (UiEvent) -> Bool, body!: () -> Unit)`](#init) | 以事件回调与界面构建函数块创建包装。 |
+| [`init(onEvent!: (UiContext, UiEvent) -> Bool, body!: () -> Unit)`](#init) | 创建可读取事件时元数据的包装。 |
 
 **方法**
 
@@ -80,11 +87,13 @@ main(): Unit {
 
 ```cangjie
 public init(onEvent!: (UiEvent) -> Bool, body!: () -> Unit)
+public init(onEvent!: (UiContext, UiEvent) -> Bool, body!: () -> Unit)
 ```
 
 **参数**
 
-- `onEvent!`: `(UiEvent) -> Bool` — 先于子树收到每个事件；返回 `true` 即消费，子树不再看到该事件。`Frame` 事件的返回值被忽略。
+- `onEvent!`: `(UiEvent) -> Bool` — 兼容的简洁回调，适合不需要事件上下文的判断。
+- `onEvent!`: `(UiContext, UiEvent) -> Bool` — 上下文感知回调；通过 `ctx.eventModifiers()` 读取当前事件的修饰键快照。两种回调均先于子树收到事件，返回 `true` 即消费；`Frame` 事件的返回值被忽略。
 - `body!`: `() -> Unit` — 界面构建函数块；块内声明多个组件时自动竖排为一个子树。
 
 ## 方法
@@ -212,3 +221,4 @@ public func focusableIds(): Array<String>
 
 - [FrameHandler](FrameHandler.md) — 按帧回调的姊妹包装，用于动画与帧内轮询。
 - [Widget](Widget.md) — 事件派发与消费语义的协议定义。
+- [UiContext](UiContext.md#eventmetadata--eventmodifiers) — 回调或自定义组件读取事件时刻修饰键与原始键元数据。

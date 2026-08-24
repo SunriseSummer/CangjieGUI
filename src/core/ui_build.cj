@@ -23,12 +23,12 @@ import sdl.{Rect, Size, UiEvent}
  *         if (expanded) { detailPanel() }
  *     }
  *
- * The stack of open blocks is module-private state. That is safe here: the UI runs on
- * a single thread and the whole tree is rebuilt top to bottom each frame, and every
- * block balances its push and pop through `buildChildren`.
+ * The stack of open blocks is process-private and allocation-reused. CUI's SDL UI/build protocol
+ * is single-threaded; workers hand results to that thread through DesktopApp.post. Every block
+ * balances its push and pop through `buildChildren`.
  */
-let openBlocks = ArrayList<ArrayList<Widget>>()
-var activeStateStore: ?StateStore = None // cjcheck-ignore: global-var # single-threaded build-scope state; set/restored by buildRoot (see file comment)
+private let openBlocks = ArrayList<ArrayList<Widget>>()
+var activeStateStore: ?StateStore = None // cjcheck-ignore: global-var # CUI builds on one SDL UI thread; workers use DesktopApp.post
 
 /*
  * Register a freshly constructed widget with the enclosing builder block. Every widget
@@ -74,7 +74,7 @@ protected func replaceLastEmission(original: Widget, replacement: Widget): Unit 
 /*
  * Run a builder block and return every widget it declares, in order.
  */
-protected func buildChildren(body: () -> Unit): Array<Widget> {
+private func buildChildrenRaw(body: () -> Unit): Array<Widget> {
     let block = ArrayList<Widget>()
     openBlocks.add(block)
     try {
@@ -85,17 +85,48 @@ protected func buildChildren(body: () -> Unit): Array<Widget> {
     block.toArray()
 }
 
-/*
- * Run a builder block that wraps a single child. No declaration yields an empty
- * placeholder; several are stacked vertically.
- */
-protected func buildChild(body: () -> Unit): Widget {
-    let children = buildChildren(body)
+private func buildChildRaw(body: () -> Unit): Widget {
+    let children = buildChildrenRaw(body)
     match (children.size) {
         case 0 => EmptyView()
         case 1 => children[0]
         case _ => Stack(Axis.Vertical, children)
     }
+}
+
+/*
+ * Builds one ordinary declarative body through the automatic composition graph. `kind` is part of
+ * positional identity, preventing unlike neighbouring container bodies from aliasing after a
+ * conditional branch changes. Keyed/ForEach adds the stable item identity around this scope.
+ */
+protected func buildChildren(kind: String, body: () -> Unit): Array<Widget> {
+    match (currentStateStoreIfActive()) {
+        case Some(store) => store.composeChildren(kind, {=> buildChildrenRaw(body)})
+        case None => buildChildrenRaw(body)
+    }
+}
+
+/* Compatibility path for application-defined widgets; built-in widgets pass a semantic kind. */
+protected func buildChildren(body: () -> Unit): Array<Widget> {
+    buildChildren("Body", body)
+}
+
+/*
+ * Run a builder block that wraps a single child. No declaration yields an empty
+ * placeholder; several are stacked vertically.
+ */
+protected func buildChild(kind: String, body: () -> Unit): Widget {
+    let children = buildChildren(kind, body)
+    match (children.size) {
+        case 0 => EmptyView()
+        case 1 => children[0]
+        case _ => Stack(Axis.Vertical, children)
+    }
+}
+
+/* Compatibility path for application-defined widgets; built-in widgets pass a semantic kind. */
+protected func buildChild(body: () -> Unit): Widget {
+    buildChild("Body", body)
 }
 
 /** Builds an application root while retaining and pruning its keyed local state. */
@@ -104,13 +135,30 @@ protected func buildRoot(body: () -> Unit, stateStore: StateStore): Widget {
     activeStateStore = Some(stateStore)
     stateStore.beginBuild()
     try {
-        try {
-            let root = buildChild(body)
-            stateStore.finishBuild()
-            root
+        let root = try {
+            buildChild("Root", body)
         } catch (error: Exception) {
-            stateStore.cancelBuild()
-            throw error
+            let rollbackFailure = stateStore.cancelBuild()
+            match (rollbackFailure) {
+                case Some(cleanup) => throw IllegalStateException(
+                    "UI build failed (${error.message}) and effect rollback cleanup also failed (${cleanup.message})")
+                case None => throw error
+            }
+        }
+        stateStore.finishBuildBody()
+        let cleanupFailure = try {
+            stateStore.finishBuild()
+        } catch (error: Exception) {
+            let rollbackFailure = stateStore.cancelBuild()
+            match (rollbackFailure) {
+                case Some(cleanup) => throw IllegalStateException(
+                    "UI commit failed (${error.message}) and effect rollback cleanup also failed (${cleanup.message})")
+                case None => throw error
+            }
+        }
+        match (cleanupFailure) {
+            case Some(error) => throw error
+            case None => root
         }
     } finally {
         activeStateStore = previous
@@ -119,29 +167,48 @@ protected func buildRoot(body: () -> Unit, stateStore: StateStore): Widget {
 
 /** Builds one identity scope without changing the normal widget collection rules. */
 protected func buildKeyedChild(key: String, body: () -> Unit): Widget {
-    match (activeStateStore) {
+    match (currentStateStoreIfActive()) {
         case Some(store) =>
             store.pushScope(key)
             try {
-                buildChild(body)
+                buildChild("Keyed", body)
             } finally {
                 store.popScope()
             }
-        case None => buildChild(body)
+        case None => buildChild("Keyed", body)
+    }
+}
+
+/** Builds or reuses one explicit retained subtree in the active StateStore. */
+func buildRetainedChild(key: String, revision: UInt64, cachePaint: Bool, body: () -> Unit): RetainedRecord {
+    match (currentStateStoreIfActive()) {
+        // RetainedSubtree is already an explicit restart boundary. Nesting an automatic boundary
+        // here would steal its State dependencies and hide explicit revision changes from its
+        // established diagnostic and invalidation contract.
+        case Some(store) => store.retainWidget(key, revision, cachePaint, {=> buildChildRaw(body)})
+        case None => RetainedRecord(revision, cachePaint, buildChildRaw(body))
     }
 }
 
 /** Throws `IllegalStateException` when no application root is being built. */
 protected func currentStateStore(): StateStore {
-    match (activeStateStore) {
+    match (currentStateStoreIfActive()) {
         case Some(store) => store
         case None => throw IllegalStateException("rememberState must be called while building a DesktopApp view")
     }
 }
 
+/** Returns the active build store without requiring that the caller is inside a build. */
+func currentStateStoreIfActive(): ?StateStore {
+    match (activeStateStore) {
+        case Some(store) where store.acceptingBuildDeclarations => Some(store)
+        case _ => None
+    }
+}
+
 /** Retains implicit control state when building an app and falls back for headless use. */
 protected func localState<T>(key: String, initial: () -> T): State<T> {
-    match (activeStateStore) {
+    match (currentStateStoreIfActive()) {
         case Some(store) => store.remember<T>(key, initial)
         case None => State<T>(initial())
     }
@@ -181,7 +248,7 @@ protected func resolveControlKey(key: ?String, kind: String): String {
  * state. Outside a build the base name is returned unchanged.
  */
 protected func controlIdentity(base: String): String {
-    match (activeStateStore) {
+    match (currentStateStoreIfActive()) {
         case Some(store) => store.uniqueControlId(base)
         case None => base
     }
@@ -193,7 +260,7 @@ protected func controlIdentity(base: String): String {
  * Outside a build it is a no-op, keeping headless widget construction side-effect free.
  */
 protected func registerFocusable(id: String): Unit {
-    match (activeStateStore) {
+    match (currentStateStoreIfActive()) {
         case Some(store) => store.registerFocusable(id)
         case None => ()
     }
@@ -213,7 +280,7 @@ public func focusableControlIdentity(base: String): String {
 
 /** Drops `id` from the current build's focus ring (no-op outside a build). */
 protected func unregisterFocusable(id: String): Unit {
-    match (activeStateStore) {
+    match (currentStateStoreIfActive()) {
         case Some(store) => store.unregisterFocusable(id)
         case None => ()
     }
@@ -221,7 +288,7 @@ protected func unregisterFocusable(id: String): Unit {
 
 /** The number of focus stops the current build has registered so far (0 outside a build). */
 protected func focusableCountNow(): Int64 {
-    match (activeStateStore) {
+    match (currentStateStoreIfActive()) {
         case Some(store) => store.focusableCount()
         case None => 0
     }
@@ -229,7 +296,7 @@ protected func focusableCountNow(): Int64 {
 
 /** The focus stops registered since `start` in the current build; empty outside a build. */
 protected func focusablesSince(start: Int64): Array<String> {
-    match (activeStateStore) {
+    match (currentStateStoreIfActive()) {
         case Some(store) => store.focusablesFrom(start)
         case None => []
     }
@@ -237,7 +304,7 @@ protected func focusablesSince(start: Int64): Array<String> {
 
 /** Keeps the focus ring consistent when a control's `.key(...)` overrides its auto id. */
 protected func reregisterFocusable(previous: String, replacement: String): Unit {
-    match (activeStateStore) {
+    match (currentStateStoreIfActive()) {
         case Some(store) => store.reregisterFocusable(previous, replacement)
         case None => ()
     }
@@ -262,9 +329,10 @@ protected func collectFocusableIds(children: Array<Widget>): Array<String> {
  */
 public func claimHoverIfInside(ctx: UiContext, event: UiEvent, frame: Rect, id: String, shape: CursorShape): Unit {
     match (event) {
-        case UiEvent.MouseMove(x, y) => if (frame.contains(x, y)) {
-            ctx.claimHover(id, shape)
-        }
+        case UiEvent.MouseMove(x, y) =>
+            if (frame.contains(x, y)) {
+                ctx.claimHover(id, shape)
+            }
         case _ => ()
     }
 }

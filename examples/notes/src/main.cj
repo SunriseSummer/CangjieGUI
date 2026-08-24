@@ -10,7 +10,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = NotesModel()
-    let app = DesktopApp(WindowSpec("CUI 笔记", 860, 620, scale: 1.5), theme: notesTheme())
+    let app = DesktopApp(WindowSpec("CUI 笔记", 860, 620, scale: 1.0), theme: notesTheme())
     app.setMinimumSize(640, 480)
     app.run {
         notesView(model)

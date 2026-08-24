@@ -13,7 +13,7 @@ import cui.{ApplicationPaths, DesktopApp, FrameHandler, WindowSpec}
 
 main(): Int64 {
     let model = NotepadModel()
-    let app = DesktopApp(WindowSpec("CUI 记事本", 900, 580, scale: 1.5), metadata: Some(notepadMetadata()),
+    let app = DesktopApp(WindowSpec("CUI 记事本", 900, 580, scale: 1.0), metadata: Some(notepadMetadata()),
         hints: notepadHints(), theme: notepadTheme())
     // 布局按 640x460 的设计下限编写；限定窗口最小尺寸，避免工具栏与状态栏被挤出可视区。
     app.setMinimumSize(640, 460)

@@ -6,4 +6,4 @@ output-type = "static"
 description = "Reusable timing and reporting utilities shared by CUI benchmarks."
 
 [dependencies]
-sdl = { path = "../../sdl" }
+sdl = { path = "../../../CangjieSDL" }

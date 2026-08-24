@@ -12,7 +12,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = BoardModel()
-    let app = DesktopApp(WindowSpec("CUI 产品看板", 1180, 720, scale: 1.5), theme: boardTheme())
+    let app = DesktopApp(WindowSpec("CUI 产品看板", 1180, 720, scale: 1.0), theme: boardTheme())
     app.setMinimumSize(880, 560)
     app.run {
         boardView(model)

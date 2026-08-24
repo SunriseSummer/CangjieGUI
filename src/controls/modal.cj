@@ -1,9 +1,8 @@
 package cui.controls
 
 import sdl.{Color, Key, Rect, Size, SurfaceStyle, UiEvent}
-import sdl.input.Keyboard
-import cui.core.{Bindable, Overlay, UiContext, Widget, buildChild, controlIdentity, drawSurface, emit,
-    focusableCountNow, focusablesSince}
+import cui.core.{Bindable, Overlay, UiContext, Widget, buildChild, controlIdentity, drawSurface, emit, focusableCountNow,
+    focusablesSince}
 
 private let MODAL_PADDING: Float32 = 22.0
 private let MODAL_MAX_W: Float32 = 460.0
@@ -41,7 +40,7 @@ public class Modal <: Widget {
         this.overlayOwner = controlIdentity("Modal")
         if (presented.value) {
             let focusStart = focusableCountNow()
-            this.content = Some(buildChild(body))
+            this.content = Some(buildChild("Modal", body))
             this.contentFocusables = focusablesSince(focusStart)
         } else {
             this.content = None
@@ -65,23 +64,17 @@ public class Modal <: Widget {
                 let w = size.w + MODAL_PADDING * 2.0
                 let h = size.h + MODAL_PADDING * 2.0
                 dialogRect = Rect((ctx.viewportWidth - w) / 2.0, (ctx.viewportHeight - h) / 2.0, w, h)
+                // Register the dialog before laying out its body. An open popup in that body then
+                // registers later and naturally sits above the modal in the overlay stack.
+                ctx.setOverlay(
+                    Overlay(handleEvent: {c, e => handleModal(c, e)}, render: {c => drawModal(c)}, owner: overlayOwner))
                 body.layout(ctx, dialogRect.inset(MODAL_PADDING))
             case None => ()
         }
     }
 
-    public func draw(ctx: UiContext): Unit {
-        // Register only once the body exists. `presented` can flip true during this frame's event
-        // phase — after init already built `content` as None — and painting then would flash an
-        // empty panel for one frame; instead the dialog appears next frame, when the body is built.
-        if (presented.value) {
-            match (content) {
-                case Some(_) =>
-                    ctx.setOverlay(Overlay(handleEvent: {c, e => handleModal(c, e)}, render: {c => drawModal(c)},
-                        owner: overlayOwner))
-                case None => ()
-            }
-        }
+    public func draw(_: UiContext): Unit {
+        // The shell uses the overlay registered during layout for both input and painting.
     }
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
@@ -103,12 +96,11 @@ public class Modal <: Widget {
     private func handleModal(ctx: UiContext, event: UiEvent): Bool {
         match (event) {
             case UiEvent.KeyDown(Key.Escape, _) => dismiss(ctx)
-            case UiEvent.KeyDown(Key.Tab, _) =>
-                cycleDialogFocus(ctx, if (Keyboard.modifiers().shift) {
-                    -1
-                } else {
-                    1
-                })
+            case UiEvent.KeyDown(Key.Tab, _) => cycleDialogFocus(ctx, if (ctx.eventModifiers().shift) {
+                -1
+            } else {
+                1
+            })
             case UiEvent.MouseDown(_, x, y) =>
                 if (dialogRect.contains(x, y)) {
                     routeToContent(ctx, event)

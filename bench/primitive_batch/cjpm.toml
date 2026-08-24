@@ -1,0 +1,10 @@
+[package]
+cjc-version = "1.0.5"
+name = "bench_primitive_batch"
+version = "0.1.0"
+output-type = "executable"
+description = "Display A/B benchmark for contiguous primitive command batching."
+
+[dependencies]
+sdl = { path = "../../../CangjieSDL" }
+bench_harness = { path = "../harness" }

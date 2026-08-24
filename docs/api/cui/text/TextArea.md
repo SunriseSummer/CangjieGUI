@@ -150,7 +150,7 @@ public func layout(_: UiContext, rect: Rect): Unit
 
 ### draw
 
-[`Widget`](../core/Widget.md) 协议实现：绘制底框、选区、可见行、光标与右缘滚动条。先把滚动偏移限制在内容范围（仅在变化时写回），行内容来自按修订号缓存的行拆分；聚焦时上报 IME 光标锚点并维持光标闪烁。
+[`Widget`](../core/Widget.md) 协议实现：绘制底框、选区、可见行、IME pre-edit、光标与右缘滚动条。先把滚动偏移限制在内容范围（仅在变化时写回），行内容来自按修订号缓存的行拆分；点击定位使用 shaped-cluster hit test；聚焦时上报 IME 光标锚点并维持光标闪烁。
 
 ```cangjie
 public func draw(ctx: UiContext): Unit

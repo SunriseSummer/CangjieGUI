@@ -10,7 +10,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = ChatModel()
-    let app = DesktopApp(WindowSpec("CUI 聊天", 640, 680, scale: 1.5), theme: chatTheme())
+    let app = DesktopApp(WindowSpec("CUI 聊天", 640, 680, scale: 1.0), theme: chatTheme())
     app.setMinimumSize(480, 520)
     app.run {
         chatView(model)

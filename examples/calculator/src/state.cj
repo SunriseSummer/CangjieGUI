@@ -71,9 +71,9 @@ func opSymbol(op: CalcOp): String {
 }
 
 class CalcModel {
-    var display = DisplayText.ZERO
+    let display = State<String>(DisplayText.ZERO)
     var stored: Float64 = 0.0
-    var pending: ?CalcOp = None
+    let pending = State<?CalcOp>(None)
     var resetDisplay = true
     var error = false
     let mode = State<Int64>(0)

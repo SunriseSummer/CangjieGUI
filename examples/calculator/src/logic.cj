@@ -25,20 +25,20 @@ func press(model: CalcModel, key: CalcKey): Unit {
         case CalcKey.Reciprocal => reciprocal(model)
         case CalcKey.Pi =>
             recoverFromError(model)
-            model.display = formatValue(PI_VALUE)
+            model.display.value = formatValue(PI_VALUE)
             model.resetDisplay = true
     }
 }
 
 func clear(model: CalcModel): Unit {
-    model.display = DisplayText.ZERO
+    model.display.value = DisplayText.ZERO
     model.stored = 0.0
-    model.pending = None
+    model.pending.value = None
     model.resetDisplay = true
     model.error = false
 }
 
-/* ERROR 只冻结屏幕一帧交互；下一次任何输入都从干净状态重新开始。 */
+/* ERROR 保持到下一次交互；随后任何输入都从干净状态重新开始。 */
 func recoverFromError(model: CalcModel): Unit {
     if (model.error) {
         clear(model)
@@ -47,21 +47,21 @@ func recoverFromError(model: CalcModel): Unit {
 
 func appendDigit(model: CalcModel, digit: String): Unit {
     recoverFromError(model)
-    if (model.resetDisplay || model.display == DisplayText.ZERO) {
-        model.display = digit
+    if (model.resetDisplay || model.display.value == DisplayText.ZERO) {
+        model.display.value = digit
         model.resetDisplay = false
-    } else if (model.display.size < Limit.DIGITS) {
-        model.display = model.display + digit
+    } else if (model.display.value.size < Limit.DIGITS) {
+        model.display.value = model.display.value + digit
     }
 }
 
 func appendDot(model: CalcModel): Unit {
     recoverFromError(model)
     if (model.resetDisplay) {
-        model.display = "${DisplayText.ZERO}."
+        model.display.value = "${DisplayText.ZERO}."
         model.resetDisplay = false
-    } else if (!model.display.contains(".") && model.display.size < Limit.DIGITS) {
-        model.display = model.display + "."
+    } else if (!model.display.value.contains(".") && model.display.value.size < Limit.DIGITS) {
+        model.display.value = model.display.value + "."
     }
 }
 
@@ -74,12 +74,12 @@ func deleteLast(model: CalcModel): Unit {
     if (model.resetDisplay) {
         return
     }
-    if (model.display.size <= 1) {
-        model.display = DisplayText.ZERO
+    if (model.display.value.size <= 1) {
+        model.display.value = DisplayText.ZERO
         return
     }
-    let shortened = model.display[0..model.display.size - 1]
-    model.display = if (shortened == "-") {
+    let shortened = model.display.value[0..model.display.value.size - 1]
+    model.display.value = if (shortened == "-") {
         DisplayText.ZERO
     } else {
         shortened
@@ -89,20 +89,20 @@ func deleteLast(model: CalcModel): Unit {
 /* 一元函数共用骨架：复位错误 → 取当前值 → 写回格式化结果。 */
 func applyUnary(model: CalcModel, transform: (Float64) -> String): Unit {
     recoverFromError(model)
-    model.display = transform(currentValue(model))
+    model.display.value = transform(currentValue(model))
     model.resetDisplay = true
 }
 
 /* 取负在位翻转符号，且不结束数字输入：键入 12 → ± → 3 得到 -123；对 0 取负保持原样。 */
 func negate(model: CalcModel): Unit {
     recoverFromError(model)
-    if (model.display == DisplayText.ZERO) {
+    if (model.display.value == DisplayText.ZERO) {
         return
     }
-    model.display = if (model.display.startsWith("-")) {
-        model.display[1..model.display.size]
+    model.display.value = if (model.display.value.startsWith("-")) {
+        model.display.value[1..model.display.value.size]
     } else {
-        "-${model.display}"
+        "-${model.display.value}"
     }
 }
 
@@ -113,7 +113,7 @@ func squareRoot(model: CalcModel): Unit {
         fail(model)
         return
     }
-    model.display = formatValue(sqrt(value))
+    model.display.value = formatValue(sqrt(value))
     model.resetDisplay = true
 }
 
@@ -125,13 +125,13 @@ func reciprocal(model: CalcModel): Unit {
         fail(model)
         return
     }
-    model.display = formatValue(1.0 / value)
+    model.display.value = formatValue(1.0 / value)
     model.resetDisplay = true
 }
 
 func choose(model: CalcModel, op: CalcOp): Unit {
     recoverFromError(model)
-    if (model.pending.isSome() && !model.resetDisplay) {
+    if (model.pending.value.isSome() && !model.resetDisplay) {
         finish(model)
         if (model.error) {
             return
@@ -139,13 +139,13 @@ func choose(model: CalcModel, op: CalcOp): Unit {
     } else {
         model.stored = currentValue(model)
     }
-    model.pending = Some(op)
+    model.pending.value = Some(op)
     model.resetDisplay = true
 }
 
 func finish(model: CalcModel): Unit {
     recoverFromError(model)
-    let op = match (model.pending) {
+    let op = match (model.pending.value) {
         case Some(value) => value
         case None => return
     }
@@ -163,20 +163,20 @@ func finish(model: CalcModel): Unit {
             result = model.stored / rhs
     }
     model.stored = result
-    model.display = formatValue(result)
-    model.pending = None
+    model.display.value = formatValue(result)
+    model.pending.value = None
     model.resetDisplay = true
 }
 
 func fail(model: CalcModel): Unit {
-    model.display = DisplayText.ERROR
+    model.display.value = DisplayText.ERROR
     model.error = true
-    model.pending = None
+    model.pending.value = None
     model.resetDisplay = true
 }
 
 func currentValue(model: CalcModel): Float64 {
-    match (Float64.tryParse(model.display)) {
+    match (Float64.tryParse(model.display.value)) {
         case Some(value) => value
         case None => 0.0
     }

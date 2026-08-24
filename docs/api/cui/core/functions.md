@@ -111,7 +111,7 @@ LazyGrid(photos, 4, 160.0, spacing: 12.0, columnSpacing: 12.0) { photo => photoC
 
 ### currentStateGeneration
 
-当前 UI 线程的全局状态写代数。桌面循环跨帧比较它：没动过就说明 UI 线程没有写入状态，配合无输入、无动画即可跳帧。任何 [`State`](State.md) 赋值都会推进它；此计数器是普通 `UInt64`，不提供跨线程同步或原子性保证。UI 状态须在桌面 UI 线程修改；后台并发写入既可能与状态值、观察者回调竞态，也可能让脏帧检测漏掉变化。
+兼容诊断用的进程级原子状态写代数。任何 [`State`](State.md) 赋值都会推进它，但桌面循环不再依赖该全局值：每个应用由独立 [`FrameScheduler`](FrameScheduler.md) 判断失效，避免多窗口互相触发重建。运行中的状态绑定所属 UI 线程；后台结果应通过 [`DesktopApp.post`](../desktop/DesktopApp.md#post) 投递。
 
 ```cangjie
 public func currentStateGeneration(): UInt64
@@ -138,6 +138,65 @@ public func rememberState<T>(key: String, initial: () -> T): State<T>
 
 - `IllegalArgumentException` — `key` 为空。
 - `IllegalStateException` — 在活动构建之外调用；同作用域键重复；同键值类型改变。
+
+### mountEffect
+
+在当前声明身份挂载一次有清理能力的副作用。`setup` 不在 builder 执行中立即调用，而是在整个根构建体成功后
+准备；构建随后失败会关闭已准备资源且不替换旧 effect。边界卸载、应用清理或同键 effect 被替换时关闭返回的
+`Resource`。
+
+```cangjie
+public func mountEffect(key: String, setup: () -> Resource): Unit
+```
+
+`key` 在当前 `Keyed` / `RetainedSubtree` scope 内必须非空且唯一。setup 属于提交阶段，不能在其中调用
+`rememberState`、effect 或继续声明 UI。只需 cleanup 闭包时返回 [`EffectCleanup`](EffectCleanup.md)。
+
+### lifecycleEffect
+
+`mountEffect` 的 revision 版本。revision 不变时保留当前 Resource；变化时先成功建立新 Resource，再关闭旧
+Resource，因此 setup 失败不会破坏此前已提交的 effect。cleanup 抛异常时框架继续清理兄弟资源、保留失败资源
+供下次重试，并在提交后把首个异常抛给宿主。
+
+```cangjie
+public func lifecycleEffect(key: String, revision: UInt64, setup: () -> Resource): Unit
+```
+
+```cangjie
+lifecycleEffect("selection-observer", selection.revision) {
+    selection.observe({_, value => analytics.recordSelection(value)})
+}
+```
+
+普通对象、主题或服务配置不会自动成为 effect revision；调用方应把会改变 setup 捕获语义的输入合成到 revision。
+
+### subscribeFrame
+
+为自定义 Widget 在当前构建登记一个合成帧回调。应在组件构造函数中调用；普通重建会重新登记，retained
+边界命中会重放已保存的登记。静态组件不要订阅，框架不再把合成 `Frame` 广播给整棵树。仅需包装现有内容时
+优先使用 [`FrameHandler`](FrameHandler.md)，它还会自动请求后续帧。
+
+```cangjie
+public func subscribeFrame(callback: (UiContext, FrameInfo) -> Unit): Unit
+```
+
+**参数**
+
+- `callback`: `(UiContext, FrameInfo) -> Unit` — 每个实际渲染帧调用一次；回调自行决定是否 `requestFrame()`。
+
+### broadcastEvent
+
+把不可消费的广播阶段转发给一个组件，并有意丢弃其 `handle` 返回值。该函数只适合合成 `Frame` 或自定义宿主定义的同类 fan-out 阶段；普通键鼠、文本和拖放输入必须直接调用 `widget.handle(ctx, event)` 并遵守返回的消费结果，否则后层控件可能重复响应。
+
+```cangjie
+public func broadcastEvent(widget: Widget, ctx: UiContext, event: UiEvent): Unit
+```
+
+**参数**
+
+- `widget`: [`Widget`](Widget.md) — 接收广播的组件。
+- `ctx`: [`UiContext`](UiContext.md) — 当前事件上下文。
+- `event`: `UiEvent` — 不允许由单个组件截断的广播事件。
 
 ### drawFocusRing
 

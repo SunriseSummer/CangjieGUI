@@ -12,16 +12,19 @@
  */
 package cui_process_manager
 
+import std.env.getCommandLine
 import cui.{DesktopApp, FrameHandler, WindowSpec}
 
 main(): Int64 {
     let model = ProcessModel()
-    let worker = RefreshWorker()
+    // Snapshot E2E runs inject stable source data while still exercising the real background
+    // worker/mailbox path; interactive runs continue to query the live operating system.
+    let worker = RefreshWorker(snapshotFixture: processSnapshotFixture(getCommandLine()))
     // 启动立即拉取第一份快照，首帧就有内容可以等待，而不是干等 5 秒间隔。
     worker.request()
     // 硬件与电源事实在应用生命周期内几乎不变，启动时查询一次即可。
     let facts = systemFacts()
-    let app = DesktopApp(WindowSpec("CUI 进程管理器", 940, 620, scale: 1.5), metadata: Some(processMetadata()),
+    let app = DesktopApp(WindowSpec("CUI 进程管理器", 940, 620, scale: 1.0), metadata: Some(processMetadata()),
         hints: processHints(), theme: processTheme())
     // 布局没有为更小的窗口做回流设计，锁定最小尺寸防止内容被挤出屏幕。
     app.setMinimumSize(720, 520)

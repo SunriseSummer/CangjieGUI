@@ -1,6 +1,6 @@
 package cui_booking
 
-import cui.CalendarDate
+import cui.{CalendarDate, Rect, WidgetTestHost}
 
 // 固定的“今天”使派生默认值在不同机器与时钟下保持确定。
 private let ANCHOR = CalendarDate(2026, 7, 16)
@@ -61,9 +61,17 @@ func confirmOnlyRecordsWhenValid(): Unit {
 @Test
 func editingAfterConfirmClearsStaleReceipt(): Unit {
     let model = BookingModel(ANCHOR)
+    let host = WidgetTestHost()
+    let _ = host.frame(Rect(0.0, 0.0, 720.0, 560.0), body: {=> bookingView(model)})
     model.confirm()
     @Expect(!model.confirmation.value.isEmpty())
     // 任何编辑都会作废回执，避免其误表述新的选择。
     model.guests.value = 3
     @Expect(model.confirmation.value.isEmpty())
+
+    // 视图卸载后观察句柄已被取消，模型不会被已离场的 UI 继续修改。
+    model.confirm()
+    host.reset()
+    model.guests.value = 4
+    @Expect(!model.confirmation.value.isEmpty())
 }

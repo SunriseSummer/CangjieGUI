@@ -11,7 +11,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = WorkbenchModel()
-    let app = DesktopApp(WindowSpec("CUI 工作台", 960, 660, scale: 1.5), theme: workbenchTheme())
+    let app = DesktopApp(WindowSpec("CUI 工作台", 960, 660, scale: 1.0), theme: workbenchTheme())
     app.setMinimumSize(720, 520)
     app.run {
         workbenchView(model)

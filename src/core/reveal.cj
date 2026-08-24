@@ -29,7 +29,7 @@ public class Reveal <: Widget {
         delay!: UInt64 = 0,
         content!: () -> Unit
     ) {
-        this.child = buildChild(content)
+        this.child = buildChild("Reveal", content)
         this.shown = shown
         let id = resolveControlKey(key, "Reveal")
         // Start at the current disclosure state so a first frame that is already open (or closed) is

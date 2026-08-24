@@ -8,7 +8,6 @@ import sdl.{FrameInfo, Rect, UiEvent}
  * that decision — the state-write generation counter and each animation's requestFrame — so the loop
  * integration (which needs a window and is validated interactively) rests on unit-checked pieces.
  */
-
 @Test
 func stateWriteBumpsGlobalGeneration(): Unit {
     let s = State<Int64>(0)
@@ -41,18 +40,39 @@ func tooltipRequestsFramesWhileRevealPending(): Unit {
     ctx.mouseX = 25.0
     ctx.mouseY = 15.0
 
-    let _ = ctx.takeFrameRequest()
+    let _ = ctx.takeFrameSchedule()
     tip.draw(ctx) // hover starts (records the start time)
     ctx.frame = FrameInfo(UInt64(200), UInt64(0)) // 100ms into the 500ms delay
-    let _ = ctx.takeFrameRequest()
+    let _ = ctx.takeFrameSchedule()
     tip.draw(ctx)
-    @Expect(ctx.takeFrameRequest()) // still counting down -> keeps frames coming
+    let pending = ctx.takeFrameSchedule()
+    @Expect(!pending.immediate)
+    @Expect(pending.deadlineMs.getOrThrow(), UInt64(600))
 
     // Pointer leaves: nothing pending, so no continuous frame is requested.
     ctx.mouseX = 500.0
     let _ = ctx.takeFrameRequest()
     tip.draw(ctx)
     @Expect(!ctx.takeFrameRequest())
+}
+
+@Test
+func frameScheduleCoalescesToEarliestDeadlineAndPreservesImmediateRequest(): Unit {
+    let ctx = testContext()
+    ctx.requestFrameAt(UInt64(900))
+    ctx.requestFrameAt(UInt64(700))
+    ctx.requestFrameAt(UInt64(800))
+    ctx.requestFrame()
+
+    let schedule = ctx.takeFrameSchedule()
+    @Expect(schedule.immediate)
+    @Expect(schedule.deadlineMs.getOrThrow(), UInt64(700))
+    @Expect(schedule.isDue(UInt64(699))) // the immediate request wins even before the timer
+
+    ctx.requestFrameAt(UInt64(700))
+    let deadlineOnly = ctx.takeFrameSchedule()
+    @Expect(!deadlineOnly.isDue(UInt64(699)))
+    @Expect(deadlineOnly.isDue(UInt64(700)))
 }
 
 @Test

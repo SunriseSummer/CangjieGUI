@@ -123,6 +123,27 @@ func textFieldUsesExternalCursorState(): Unit {
 }
 
 @Test
+func textFieldKeepsImePreeditOutOfBindableUntilCommit(): Unit {
+    let ctx = textTestContext()
+    let text = State<String>("abc")
+    let cursor = State<Int64>(1)
+    let field = TextField(text, key: "ime.field", cursor: Some(cursor))
+    field.layout(ctx, Rect(0.0, 0.0, 180.0, 34.0))
+    ctx.focus("ime.field")
+
+    @Expect(field.handle(ctx, UiEvent.TextEditing("拼", 0, 1)))
+    @Expect(text.value, "abc")
+    match (ctx.imeComposition("ime.field")) {
+        case Some(composition) => @Expect(composition.text, "拼")
+        case None => @Fail("focused field should own IME pre-edit")
+    }
+
+    @Expect(field.handle(ctx, UiEvent.TextInput("拼")))
+    @Expect(text.value, "a拼bc")
+    @Expect(ctx.imeComposition("ime.field").isNone())
+}
+
+@Test
 func textAreaReadOnlyStillMovesCursor(): Unit {
     let ctx = textTestContext()
     let text = State<String>("abc")

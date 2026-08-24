@@ -1,48 +1,7 @@
 package cui.core
 
-import std.collection.{ArrayList, HashMap, HashSet}
-
-/*
- * A process-global counter bumped on every `State` assignment, used by the desktop loop's dirty-frame
- * skipping (档 0): when it has not moved since the last rendered frame, no state changed and — with no
- * input events and no animation pending — the frame can be skipped. A background thread's write bumps
- * it too; the increment is not atomic, but a lost increment still leaves the value different from the
- * last snapshot (it only ever advances), so a real change is never missed, only occasionally
- * over-counted into a harmless extra render.
- */
-var stateWriteGeneration: UInt64 = 0 // cjcheck-ignore: global-var # monotonic dirty-frame counter; benign race documented above
-
-class StateListener<T> {
-    let callback: (T, T) -> Unit
-    var isActive = true
-
-    init(callback: (T, T) -> Unit) {
-        this.callback = callback
-    }
-}
-
-/** A cancellable observation returned by `Observable.observe`. */
-public class StateObservation<T> <: Resource {
-    private let cancel: () -> Unit
-    private var closed = false
-
-    init(cancel: () -> Unit) {
-        this.cancel = cancel
-    }
-
-    /** Returns whether this observation has been cancelled. */
-    public func isClosed(): Bool {
-        closed
-    }
-
-    /** Cancels future callbacks. Calling this method repeatedly is safe. */
-    public func close(): Unit {
-        if (!closed) {
-            closed = true
-            cancel()
-        }
-    }
-}
+import std.collection.{ArrayList, HashMap}
+import sdl.Rect
 
 /**
  * A readable, observable value. `State` is the writable single source of truth;
@@ -96,17 +55,20 @@ public interface Bindable<T> <: Observable<T> {
 
 /**
  * An observable, single-source-of-truth value used by stateful controls and views.
- * Assigning `value` updates the revision and notifies observers synchronously on the
- * caller thread. UI state should be mutated on the desktop UI thread.
+ * Assigning `value` updates the revision and notifies observers synchronously on the caller thread.
+ * A State is thread-confined: after it enters an application, reads, writes, observation changes,
+ * and transforms must remain on that UI thread; workers publish results through DesktopApp.post.
  */
 public class State<T> <: Bindable<T> {
     private var storedValue: T
     private let listeners = ArrayList<StateListener<T>>()
     private var stateRevision: UInt64 = UInt64(0)
+    private var scheduler: ?FrameScheduler = None
 
     /** Increases after every assignment, including assignments of an equal value. */
     public prop revision: UInt64 {
         get() {
+            prepareRead()
             stateRevision
         }
     }
@@ -114,13 +76,16 @@ public class State<T> <: Bindable<T> {
     /** Reads or replaces the current value. */
     public mut prop value: T {
         get() {
+            prepareRead()
             storedValue
         }
         set(next) {
+            bindToCurrentScheduler()
             let previous = storedValue
             storedValue = next
             stateRevision = nextRevision(stateRevision)
-            stateWriteGeneration = nextRevision(stateWriteGeneration)
+            recordStateWrite()
+            invalidateScheduler()
             notify(previous, next)
         }
     }
@@ -131,23 +96,88 @@ public class State<T> <: Bindable<T> {
 
     /** Replaces the value with the result of `transform`. */
     public func update(transform: (T) -> T): Unit {
-        value = transform(storedValue)
+        // Check before running user code so background misuse cannot execute transform side effects.
+        value = transform(value)
+    }
+
+    private func bindToCurrentScheduler(): Unit {
+        match (currentFrameScheduler()) {
+            case Some(active) => match (scheduler) {
+                case Some(bound) =>
+                    if (sameScheduler(bound, active)) {
+                        active.assertOwnerThread()
+                    } else {
+                        // Sequential same-thread apps may transfer; unrelated threads may not.
+                        bound.assertOwnerThread()
+                        active.assertOwnerThread()
+                        scheduler = Some(active)
+                    }
+                case None =>
+                    active.assertOwnerThread()
+                    scheduler = Some(active)
+            }
+            case None => assertSchedulerThread()
+        }
+    }
+
+    private func prepareRead(): Unit {
+        match (scheduler) {
+            case Some(bound) =>
+                bound.assertOwnerThread()
+                if (bound.isCollectingStateReads()) {
+                    recordCollectedStateRead(this)
+                }
+            case None =>
+                bindToCurrentScheduler()
+                match (scheduler) {
+                    case Some(bound) =>
+                        if (bound.isCollectingStateReads()) {
+                            recordCollectedStateRead(this)
+                        }
+                    case None => recordUnscheduledStateRead(this)
+                }
+        }
+    }
+
+    private func assertSchedulerThread(): Unit {
+        match (scheduler) {
+            case Some(bound) => bound.assertOwnerThread()
+            case None => ()
+        }
+    }
+
+    private func invalidateScheduler(): Unit {
+        match (scheduler) {
+            case Some(bound) => bound.invalidate()
+            case None => match (currentFrameScheduler()) {
+                case Some(active) =>
+                    scheduler = Some(active)
+                    active.invalidate()
+                case None => ()
+            }
+        }
     }
 
     public func observe(callback: (T, T) -> Unit): StateObservation<T> {
+        bindToCurrentScheduler()
         let listener = StateListener<T>(callback)
         listeners.add(listener)
-        StateObservation<T>({=> listener.isActive = false})
+        StateObservation<T>(
+            {
+                =>
+                    assertSchedulerThread()
+                    listener.isActive = false
+                    removeListener(listener)
+            }
+        )
     }
 
     private func notify(previous: T, current: T): Unit {
         if (listeners.isEmpty()) {
             return
         }
-        // Iterate a snapshot: a callback may cancel observations or register new ones
-        // (a re-subscribe pattern), which would otherwise shift a live index walk.
-        // Listeners added by a callback see only later assignments; cancelled ones are
-        // skipped via isActive. Compaction of cancelled entries runs after the loop.
+        // A snapshot tolerates cancellation/re-subscription: new listeners see later assignments,
+        // cancelled ones are skipped, and compaction follows the iteration.
         let snapshot = listeners.toArray()
         for (listener in snapshot) {
             if (listener.isActive) {
@@ -166,6 +196,25 @@ public class State<T> <: Bindable<T> {
             i -= 1
         }
     }
+
+    private func removeListener(listener: StateListener<T>): Unit {
+        var i = listeners.size - 1
+        while (i >= 0) {
+            if (sameListener(listeners[i], listener)) {
+                listeners.remove(at: i)
+                return
+            }
+            i -= 1
+        }
+    }
+}
+
+private func sameListener<T>(left: StateListener<T>, right: StateListener<T>): Bool {
+    refEq((left as Object).getOrThrow(), (right as Object).getOrThrow()) // cjcheck-ignore: unchecked-cast # both operands are class instances by construction
+}
+
+private func sameScheduler(left: FrameScheduler, right: FrameScheduler): Bool {
+    refEq((left as Object).getOrThrow(), (right as Object).getOrThrow()) // cjcheck-ignore: unchecked-cast # both operands are class instances by construction
 }
 
 extend<T> State<T> where T <: Equatable<T> {
@@ -182,30 +231,39 @@ extend<T> State<T> where T <: Equatable<T> {
     }
 }
 
-internal func nextRevision(current: UInt64): UInt64 {
-    if (current == UInt64.Max) {
-        UInt64(0)
-    } else {
-        current + UInt64(1)
-    }
-}
-
-/** The current global state-write generation. The desktop loop compares this across frames. */
-public func currentStateGeneration(): UInt64 {
-    stateWriteGeneration
-}
-
 /**
  * Retains explicitly keyed local state across declarative tree rebuilds. Entries that
  * are not visited during a completed build are removed, matching view unmount semantics.
  */
 public class StateStore {
-    private let entries = HashMap<String, Any>()
-    private let visited = HashSet<String>()
-    private let addedDuringBuild = ArrayList<String>()
-    private let scopes = ArrayList<String>()
+    let entries = HashMap<String, Any>()
+    let retainedEntries = HashMap<String, RetainedRecord>()
+    let automaticEntries = HashMap<String, AutomaticCompositionRecord>()
+    let automaticPaintBudget = AutomaticPaintBudget()
+    let lifecycleEffects = HashMap<String, LifecycleEffectRecord>()
+    let rootMountScope = StateMountScope()
+    let mountBuilds = ArrayList<StateMountBuild>()
+    let activeMountBuilds = ArrayList<StateMountBuild>()
+    let stateAddedDuringBuild = ArrayList<String>()
+    let retainedAddedDuringBuild = ArrayList<String>()
+    let automaticAddedDuringBuild = ArrayList<String>()
+    let retainedReplacements = ArrayList<PendingRetainedReplacement>()
+    let automaticReplacements = ArrayList<PendingAutomaticCompositionReplacement>()
+    let pendingLifecycleEffects = ArrayList<PendingLifecycleEffect>()
+    let lifecycleEffectRemovals = ArrayList<String>()
+    let failedLifecycleCleanups = ArrayList<Resource>()
+    let frameSubscribers = ArrayList<FrameSubscriber>()
+    var forceFullRetainedExecution = false
+    var automaticCompositionEnabled = false
+    var acceptingBuildDeclarations = false
+    let scopes = ArrayList<String>()
     private let controlIdCounts = HashMap<String, Int64>()
+    let automaticScopeCounts = HashMap<String, Int64>()
     private let focusOrder = ArrayList<String>()
+    var pendingRetainedDamage: ?Rect = None
+    var fullRetainedDamagePending = true
+    var rootLayoutDependencies: ?PhaseStateDependencies = None
+    var rootPaintDependencies: ?PhaseStateDependencies = None
 
     /**
      * Returns the state at the current scope and key, creating it on first use.
@@ -215,10 +273,7 @@ public class StateStore {
     public func remember<T>(key: String, initial: () -> T): State<T> {
         validateKey(key)
         let path = scopedKey(key)
-        if (visited.contains(path)) {
-            throw IllegalStateException("Duplicate remembered state key '${key}' in the same scope")
-        }
-        visited.add(path)
+        visitRememberedState(this, path, key)
 
         match (entries.get(path)) {
             case Some(stored) => match (stored as State<T>) {
@@ -228,46 +283,65 @@ public class StateStore {
             case None =>
                 let state = State<T>(initial())
                 let _ = entries.add(path, state) // cjcheck-ignore: ignore-result # key was just checked absent; no displaced value exists
-                addedDuringBuild.add(path)
+                recordStateInsertion(this, path)
                 state
         }
     }
 
     /** Removes every retained state value. */
     public func clear(): Unit {
-        entries.clear()
+        let effectFailure = clearLifecycleEffects(this)
+        clearMountedState(this)
+        clearRetainedDamageTracking(this)
+        match (effectFailure) {
+            case Some(error) => throw error
+            case None => ()
+        }
     }
 
     // Builds run every frame, so the per-build bookkeeping reuses its collections
     // instead of allocating fresh ones.
     func beginBuild(): Unit {
-        visited.clear()
-        addedDuringBuild.clear()
+        acceptingBuildDeclarations = true
+        beginMountBuild(this)
+        beginStateReadCollection()
+        beginLifecycleEffectBuild(this)
         scopes.clear()
         controlIdCounts.clear()
+        automaticScopeCounts.clear()
         focusOrder.clear()
+        frameSubscribers.clear()
     }
 
-    func finishBuild(): Unit {
-        let obsolete = ArrayList<String>()
-        for ((key, _) in entries) {
-            if (!visited.contains(key)) {
-                obsolete.add(key)
-            }
+    func finishBuildBody(): Unit {
+        if (!acceptingBuildDeclarations) {
+            throw IllegalStateException("UI build body was already finished")
         }
-        for (key in obsolete) {
-            let _ = entries.remove(key) // cjcheck-ignore: ignore-result # key comes from iterating entries; removal cannot miss
+        endStateReadCollection()
+        acceptingBuildDeclarations = false
+    }
+
+    func finishBuild(): ?Exception {
+        if (acceptingBuildDeclarations) {
+            throw IllegalStateException("UI build body must finish before commit")
         }
+        prepareLifecycleEffectBuild(this)
+        finishMountBuild(this)
         scopes.clear()
+        commitLifecycleEffectBuild(this)
     }
 
     /** Rolls back state created by a build that threw partway through. */
-    func cancelBuild(): Unit {
-        for (key in addedDuringBuild) {
-            let _ = entries.remove(key) // cjcheck-ignore: ignore-result # rollback removes keys recorded at insertion; removal cannot miss
+    func cancelBuild(): ?Exception {
+        if (acceptingBuildDeclarations) {
+            endStateReadCollection()
+            acceptingBuildDeclarations = false
         }
-        addedDuringBuild.clear()
+        let effectFailure = cancelLifecycleEffectBuild(this)
+        cancelMountBuild(this)
+        frameSubscribers.clear()
         scopes.clear()
+        effectFailure
     }
 
     func pushScope(key: String): Unit {
@@ -376,12 +450,25 @@ public class StateStore {
         Array<String>(focusOrder.size - from, {i => focusOrder[from + i]})
     }
 
-    private func scopedKey(key: String): String {
+    func scopedKey(key: String): String {
         let result = StringBuilder()
         for (scope in scopes) {
             appendKeySegment(result, scope)
         }
         appendKeySegment(result, key)
+        result.toString()
+    }
+
+    func diagnosticScopedKey(key: String): String {
+        let result = StringBuilder()
+        for (scope in scopes) {
+            if (scope.startsWith("@")) {
+                continue
+            }
+            result.append(scope)
+            result.append(" / ")
+        }
+        result.append(key)
         result.toString()
     }
 
@@ -393,7 +480,7 @@ public class StateStore {
     }
 
     /** Throws `IllegalArgumentException` when a state identity key is empty. */
-    private func validateKey(key: String): Unit {
+    func validateKey(key: String): Unit {
         if (key.isEmpty()) {
             throw IllegalArgumentException("State key must not be empty")
         }

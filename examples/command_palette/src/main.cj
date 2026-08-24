@@ -10,7 +10,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = PaletteModel()
-    let app = DesktopApp(WindowSpec("CUI 命令面板", 720, 640, scale: 1.5), theme: paletteTheme())
+    let app = DesktopApp(WindowSpec("CUI 命令面板", 720, 640, scale: 1.0), theme: paletteTheme())
     app.setMinimumSize(520, 480)
     app.run {
         paletteView(model)

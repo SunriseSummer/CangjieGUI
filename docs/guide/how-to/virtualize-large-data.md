@@ -50,12 +50,45 @@ main(): Unit {
 ```cangjie role=variation
 LazyColumn.of(messages, 52.0,
     key: {message => message.id},
+    revision: messagesRevision,
     scroll: Some(scroll), id: "messages") {
     message => MessageRow(message, drafts[message.id])
 }
 ```
 
-这里 `drafts` 属于页面模型。滚出视口再滚回时，新行会从模型取回草稿。若行高不统一，把同一身份规则迁移到 `LazyList`，而不是在固定高度行里塞入任意高内容。
+这里 `drafts` 属于页面模型。滚出视口再滚回时，新行会从模型取回草稿。插入、删除或排序后递增 `messagesRevision`，列表以顶部稳定 key 做像素锚定，不会让正在阅读的内容跳走。若行高不统一，把同一身份规则迁移到 `LazyList`，而不是在固定高度行里塞入任意高内容。
+
+### 5. 可变高度选择 revision 或 extent 模型
+
+高度只随一批数据更新时，把该批次版本传给 `revision`；版本不变期间 `LazyList` 复用 Fenwick 索引，不再每帧调用全部 `heightOf`：
+
+```cangjie role=variation
+LazyList.of(messages, {message => message.cachedHeight},
+    key: {message => message.id}, revision: Some(messagesRevision), id: "thread") {
+    message => MessageRow(message)
+}
+```
+
+聊天气泡展开、增量测高等高频单行变化使用 `LazyListExtents`。`update` 为 O(log N) 并自动请求帧；插入/删除/重排才调用 O(N) 的 `reset`：
+
+```cangjie role=variation
+let extents = LazyListExtents(cachedHeights, spacing: 6.0)
+LazyList.ofExtents(messages, extents, key: {message => message.id}, id: "thread") {
+    message => MessageRow(message)
+}
+let _ = extents.update(changedIndex, measuredHeight)
+```
+
+### 6. 按业务 key 定位
+
+把 `LazyViewportController` 放进页面模型，通过 `scrollToKey` 显示搜索命中、恢复阅读位置或先把待聚焦控件物化。控制器与 `scroll` 二选一；请求不存在的 key 后可用 `lastTargetFound()` 诊断。
+
+```cangjie role=variation
+controller.scrollToKey(selectedId, alignment: LazyScrollAlignment.Nearest)
+LazyColumn.of(messages, 52.0, key: {message => message.id}, controller: controller, id: "messages") {
+    message => MessageRow(message)
+}
+```
 
 ## 确认结果
 
@@ -68,11 +101,14 @@ LazyColumn.of(messages, 52.0,
 - 把 `rememberState` 当跨滚动存储：行卸载后状态会被清理。
 - 使用数组索引作 key：插入或重排后状态串到别项。
 - 在行构建器里筛选整个数组：每个可见行都重复做同一工作。
+- 数据/高度已稳定却不给 `LazyList` revision：兼容模式会为正确性每帧重扫全部高度。
+- revision 已递增却仍用索引 key：锚定的是槽位，不是业务对象。
+- 同时传 `scroll` 和 `controller`：所有权不明确，构造会直接拒绝。
 - 外层和内层同时强制消费滚轮：内容不足一屏时形成滚动死区。
 
 ## 相关 API
 
-[LazyColumn](../../api/cui/core/LazyColumn.md)、[LazyList](../../api/cui/core/LazyList.md)、[LazyRow](../../api/cui/core/LazyRow.md)、[LazyGrid](../../api/cui/core/functions.md)。
+[LazyColumn](../../api/cui/core/LazyColumn.md)、[LazyList](../../api/cui/core/LazyList.md)、[LazyListExtents](../../api/cui/core/LazyListExtents.md)、[LazyViewportController](../../api/cui/core/LazyViewportController.md)、[LazyRow](../../api/cui/core/LazyRow.md)、[LazyGrid](../../api/cui/core/functions.md)。
 
 ## 下一步
 

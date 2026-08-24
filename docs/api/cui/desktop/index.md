@@ -6,7 +6,10 @@
 import cui.desktop.*
 ```
 
-桌面应用对象包：[`DesktopApp`](DesktopApp.md) 拥有 SDL 窗口与渲染循环，驱动构建-布局-绘制-事件分发，并提供资源管理、系统文件对话框、基础光标与最小窗口尺寸等应用级设施。闲置帧被跳过（脏帧机制），`--snapshot`/`--profile` 命令行开关内置。
+桌面应用对象包：[`DesktopApp`](DesktopApp.md) 拥有 SDL 窗口与渲染循环，驱动事务式失效、分相 retained
+执行、透明命令重放、保守局部 damage、事件后同帧一致性重建与绘制，并提供跨线程动作投递、资源管理、系统
+文件对话框、基础光标与最小窗口尺寸等设施。空闲时阻塞等待事件或截止时间；`--snapshot`/`--profile` 与
+retained 对照开关内置。
 
 ## 类型
 

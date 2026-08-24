@@ -21,7 +21,7 @@ public class Tooltip <: Widget {
     private var frame = Rect.zero()
 
     public init(text!: String, body!: () -> Unit) {
-        this.child = buildChild(body)
+        this.child = buildChild("Tooltip", body)
         this.text = text
         // UInt64.Max is the "not hovering" sentinel, so a hover starting at t=0 still counts.
         let key = controlIdentity("Tooltip")
@@ -47,10 +47,8 @@ public class Tooltip <: Widget {
             } else if (now >= hoverStart.value && now - hoverStart.value >= TOOLTIP_DELAY_MS) {
                 ctx.showTooltip(text, frame)
             } else {
-                // Still counting down to the reveal: request the next frame so the clock keeps
-                // advancing while the pointer rests, otherwise the dirty-frame loop (档 0) would idle
-                // here and the tooltip would never appear.
-                ctx.requestFrame()
+                // Nothing changes before the dwell deadline, so let the shell sleep until then.
+                ctx.requestFrameAt(hoverStart.value + TOOLTIP_DELAY_MS)
             }
         } else if (hoverStart.value != UInt64.Max) {
             hoverStart.value = UInt64.Max // reset once; a per-frame write would be wasted churn
@@ -104,7 +102,8 @@ protected func drawTooltip(ctx: UiContext, windowWidth: Float32, windowHeight: F
     if (y + height > windowHeight) {
         y = anchor.y - TOOLTIP_GAP - height
     }
-    let x = clampF32(anchor.centerX() - width / 2.0, TOOLTIP_MARGIN, max(TOOLTIP_MARGIN, windowWidth - width - TOOLTIP_MARGIN))
+    let x = clampF32(anchor.centerX() - width / 2.0, TOOLTIP_MARGIN,
+        max(TOOLTIP_MARGIN, windowWidth - width - TOOLTIP_MARGIN))
     let bubble = Rect(x, y, width, height)
 
     ctx.renderer.fillRoundedRect(bubble, ctx.theme.smallRadius, ctx.theme.text.withAlpha(240))

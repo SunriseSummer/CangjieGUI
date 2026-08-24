@@ -18,7 +18,9 @@ LazyList <: [`Widget`](Widget.md)
 
 ## 说明
 
-行偏移是行高的运行前缀和，可见窗口对它二分查找，因此偏移表是一次对全部行高的轻量累加、构建仍只发生在可见行上。这要求 `heightOf` 为 O(1)——返回存好的或预估的高度，而不是每次重新测量文本；且必须与行实际绘制的高度一致，否则行会重叠或露缝。滚动偏移、`key` 与 `id` 的语义与 [`LazyColumn`](LazyColumn.md) 相同：行内局部状态随滚出销毁、`key` 让状态跟随条目、内容溢出时右缘保留滚动条车道、滚轮一格 72 逻辑像素。
+行偏移保存在 Fenwick extent 索引中，前缀定位与单点高度更新为 O(log N)。兼容的 `heightOf` 形式在未给 `revision` 时每次构建扫描全部高度，确保任意闭包变化仍正确；若高度和 key 顺序在版本不变期间稳定，传 `revision` 后只在版本变化时重建索引。高频单行变高使用 [`LazyListExtents`](LazyListExtents.md)，其 `update` 不扫描其余行。
+
+`heightOf` 必须返回已存或预估高度，不能现场测量文本，并须与实际行槽一致。像素预取、稳定 key 锚定、[`LazyViewportController`](LazyViewportController.md)、局部状态卸载和滚动条语义与 [`LazyColumn`](LazyColumn.md) 相同。
 
 ## 示例
 
@@ -55,12 +57,14 @@ main(): Unit {
 | 成员 | 说明 |
 |---|---|
 | [`init(...)`](#init) | 索引形式：`count` 行按索引惰性构建，行高来自 `heightOf(index)`。 |
+| [`init(extents, ...)`](#init-extents) | 可变 extent 模型形式：单行高度更新保持 O(log N)。 |
 
 **方法**
 
 | 成员 | 说明 |
 |---|---|
 | [`static of(...)`](#of) | 数据驱动形式：由 `Array<T>`、每条目的高度提取器与构建器建列表。 |
+| [`static ofExtents(...)`](#ofextents) | 数据数组与 `LazyListExtents` 组合的高频变高形式。 |
 | [`measure(...)`](#measure) | 恒占满全部可用空间：列表填满父容器分配的区域。 |
 | [`layout(...)`](#layout) | 记录视口高度供下一帧构建、把滚动偏移限制在有效范围，并按前缀和偏移逐行摆放已构建行。 |
 | [`draw(...)`](#draw) | 裁剪到视口逐行绘制，内容溢出时在右缘画滚动条。 |
@@ -82,6 +86,9 @@ public init(
     scroll!: ?State<Float32> = None,
     key!: ?((Int64) -> String) = None,
     id!: ?String = None,
+    revision!: ?UInt64 = None,
+    controller!: ?LazyViewportController = None,
+    overscan!: Float32 = 144.0,
     item!: (Int64) -> Unit
 )
 ```
@@ -89,16 +96,35 @@ public init(
 **参数**
 
 - `count`: `Int64` — 行数；负值按 0 处理。
-- `heightOf`: `(Int64) -> Float32` — 行高函数，逻辑像素；须为 O(1) 且与行实际绘制高度一致，负值按 0 处理。构造时对每行调用一次以累加偏移表。
+- `heightOf`: `(Int64) -> Float32` — 行高函数，逻辑像素；须为 O(1) 且与行槽一致，负值按 0。
 - `spacing!`: `Float32` — 行间距，只存在于行与行之间；默认 `0.0`，负值按 0 处理。
 - `scroll!`: `?`[`State`](State.md)`<Float32>` — 外部持有的滚动偏移；默认 `None`，由列表按 `id` 自持。
 - `key!`: `?((Int64) -> String)` — 行的稳定标识函数，让行内状态跟随条目跨插入/重排；默认 `None`，按索引键控。
 - `id!`: `?String` — 容器标识，界定保留的滚动与行内状态；默认 `None` 按构建顺序自动推导，显式给出时须非空。
+- `revision!`: `?UInt64` — 高度与 key 顺序快照版本。`None` 每帧重扫；`Some(v)` 仅在 `v`、数量或间距变化时重建索引。
+- `controller!`: `?`[`LazyViewportController`](LazyViewportController.md) — 外部滚动/按 key 定位；与 `scroll` 二选一。
+- `overscan!`: `Float32` — 静止预取像素；默认 `144.0`。
 - `item!`: `(Int64) -> Unit` — 行构建器，收到行索引；只对视口附近的行调用。
 
 **异常**
 
-- `IllegalArgumentException` — `id` 显式给出且为空字符串时。
+- `IllegalArgumentException` — `id` 为空，或同时给出 `scroll` 与 `controller`。
+
+### init extents
+
+由可变 extent 模型驱动；间距属于模型，单行 `update` 后列表 O(log N) 重新定位并保持顶部 key 锚定。
+
+```cangjie
+public init(
+    extents: LazyListExtents,
+    scroll!: ?State<Float32> = None,
+    key!: ?((Int64) -> String) = None,
+    id!: ?String = None,
+    controller!: ?LazyViewportController = None,
+    overscan!: Float32 = 144.0,
+    item!: (Int64) -> Unit
+)
+```
 
 ## 方法
 
@@ -114,6 +140,9 @@ public static func of<T>(
     scroll!: ?State<Float32> = None,
     key!: ?((T) -> String) = None,
     id!: ?String = None,
+    revision!: ?UInt64 = None,
+    controller!: ?LazyViewportController = None,
+    overscan!: Float32 = 144.0,
     item!: (T) -> Unit
 ): LazyList
 ```
@@ -126,6 +155,9 @@ public static func of<T>(
 - `scroll!`: `?`[`State`](State.md)`<Float32>` — 外部滚动偏移；默认 `None`。
 - `key!`: `?((T) -> String)` — 条目的稳定标识函数；默认 `None` 按索引键控。
 - `id!`: `?String` — 容器标识；默认 `None` 自动推导。
+- `revision!`: `?UInt64` — 高度/key 快照版本；语义同构造函数。
+- `controller!`: `?`[`LazyViewportController`](LazyViewportController.md) — 外部控制器；与 `scroll` 二选一。
+- `overscan!`: `Float32` — 静止预取像素。
 - `item!`: `(T) -> Unit` — 行构建器，直接收到条目。
 
 **返回值** `LazyList` — 配置好的列表。
@@ -134,6 +166,23 @@ public static func of<T>(
 LazyList.of(model.messages, {m => m.height}, key: {m => m.id}) {
     msg => bubble(msg)
 }
+```
+
+### ofExtents
+
+把数据数组与可变 extent 模型组合；两者数量必须一致，否则抛出 `IllegalArgumentException`。
+
+```cangjie
+public static func ofExtents<T>(
+    data: Array<T>,
+    extents: LazyListExtents,
+    scroll!: ?State<Float32> = None,
+    key!: ?((T) -> String) = None,
+    id!: ?String = None,
+    controller!: ?LazyViewportController = None,
+    overscan!: Float32 = 144.0,
+    item!: (T) -> Unit
+): LazyList
 ```
 
 ### measure

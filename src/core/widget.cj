@@ -7,12 +7,14 @@ protected let CUI_SMALL_H: Float32 = 28.0
 protected let CUI_GAP: Float32 = 8.0
 
 /*
- * The immediate-mode widget contract. The tree is rebuilt from application code on every rendered
- * frame, so instances carry no retained scene — anything that must survive a rebuild lives in `State`
- * (see `localState`). Constructors call `emit(this)` so the enclosing container collects the widget in
- * declaration order. Each frame the shell calls `measure` (preferred size within `available`), `layout`
- * (assigns the frame), `draw`, and `handle` per input event; `handle` returns whether the event was
- * consumed, which stops dispatch to the widgets behind it. The default `width`/`padding`/... modifiers
+ * The widget contract. Application code remains declarative, while DesktopApp automatically retains
+ * clean builder bodies and re-executes only State-dependent dirty paths. Widget instances are still
+ * transient values rather than application state — anything that must survive replacement lives in
+ * `State` (see `localState`). Constructors call `emit(this)` so the enclosing container collects the
+ * widget in declaration order. The committed tree runs `measure` (preferred size within `available`),
+ * `layout` (assigns the frame), `draw`, and `handle`; synthesized frame ticks use the explicit
+ * subscription registry (`FrameHandler` / `subscribeFrame`) instead of traversing every widget.
+ * `handle` returns whether input was consumed, which stops dispatch to the widgets behind it. The default `width`/`padding`/... modifiers
  * wrap the widget in a `ModifiedWidget` and return the wrapper for chaining.
  */
 public interface Widget {
@@ -283,8 +285,8 @@ public interface Widget {
 
     /** Strokes a fully configured dashed rounded border (width, corner radius, dash and gap lengths). */
     func dashedBorder(color: Color, width!: Float32, radius!: Float32, dash!: Float32, gap!: Float32): Widget {
-        applyModifier(this, WidgetModifier.DashedBorder(color, max(0.0, width), vpLength(radius), max(0.0, dash),
-            max(0.0, gap)))
+        applyModifier(this,
+            WidgetModifier.DashedBorder(color, max(0.0, width), vpLength(radius), max(0.0, dash), max(0.0, gap)))
     }
 
     /** Gives this widget a relative share of an enclosing stack's remaining space. */

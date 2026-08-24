@@ -7,8 +7,12 @@
  */
 package bench_scenes
 
-import cui.{Button, Dropdown, FlowRow, HStack, Label, LengthUnits, Panel, RadioButton, ScrollView, Slider, Spacer,
-    State, Stepper, Switch, VStack, Widget}
+import cui.{Button, Dropdown, FlowRow, HStack, Label, LazyColumn, LengthUnits, Panel, RadioButton, ScrollView, Slider,
+    Spacer, State, Stepper, Switch, VStack, Widget}
+
+// The benchmark section is deliberately fixed-height: every repeated section has the same controls
+// and single-line labels. The slot includes the panel's content padding and the inter-section gap.
+private let CONTROLS_SECTION_HEIGHT: Float32 = 320.0
 
 /** Builds the scrollable settings page over `sections` repeated control groups, bound to `scroll`. */
 public func controlsFormScene(scroll: State<Float32>, sections: Int64): Widget {
@@ -28,6 +32,18 @@ public func controlsFormScene(scroll: State<Float32>, sections: Int64): Widget {
     }
     view.scrollState(scroll)
     view
+}
+
+/** The same form through the framework's viewport virtualization path for direct A/B measurement. */
+public func lazyControlsFormScene(scroll: State<Float32>, sections: Int64): Widget {
+    let notify = State<Bool>(true)
+    let priority = State<Int64>(1)
+    let minutes = State<Int64>(45)
+    let density = State<Int64>(1)
+    let volume = State<Float32>(0.6)
+    LazyColumn(sections, CONTROLS_SECTION_HEIGHT, spacing: 12.0, scroll: scroll, id: "bench.controls.lazy") {
+        index => controlsSection(index, notify, priority, minutes, density, volume)
+    }
 }
 
 private func controlsSection(

@@ -18,7 +18,7 @@ FrameHandler <: [`Widget`](Widget.md)
 
 ## 说明
 
-挂载即是一份逐帧契约：每收到 `Frame` 事件都调用 [`UiContext`](UiContext.md) 的 [`requestFrame`](UiContext.md#requestframe)，桌面循环因此持续渲染、回调持续触发，不会被空闲跳帧冻住。这给出"按需帧"模式——只在需要时挂载：番茄钟只在计时运行态包上 `FrameHandler`，暂停即卸下，应用回到零帧空闲；异步文件对话框的结果也可在回调里逐帧轮询取回。
+挂载即向当前构建的显式 Frame 订阅表登记一份逐帧契约；retained 边界命中会重放该登记，不需要遍历全部静态组件。回调调用 [`UiContext`](UiContext.md) 的 [`requestFrame`](UiContext.md#requestframe)，桌面循环因此持续渲染、回调持续触发，不会被空闲跳帧冻住。这给出"按需帧"模式——只在需要时挂载：番茄钟只在计时运行态包上 `FrameHandler`，暂停即卸下，应用回到零帧空闲；异步文件对话框的结果也可在回调里逐帧轮询取回。
 
 只需拦截输入事件而不需要帧脉搏时，用 [`EventHandler`](EventHandler.md)。
 
@@ -59,7 +59,7 @@ main(): Unit {
 | [`measure(ctx: UiContext, available: Size)`](#measure) | 把可用空间原样转给子树并返回其测量尺寸。 |
 | [`layout(ctx: UiContext, rect: Rect)`](#layout) | 把框架原样转给子树布局。 |
 | [`draw(ctx: UiContext)`](#draw) | 绘制子树。 |
-| [`handle(ctx: UiContext, event: UiEvent)`](#handle) | 收到 `Frame` 事件时请求续帧、调用回调并广播给子树，其余事件原样转发。 |
+| [`handle(ctx: UiContext, event: UiEvent)`](#handle) | 直接调用兼容：收到 `Frame` 时执行本回调并转发子树；宿主正常走显式订阅表。 |
 | [`isFlexible()`](#isflexible) | 转发子树的弹性参与声明。 |
 | [`flexWeight()`](#flexweight) | 转发子树声明的弹性权重。 |
 | [`acceptsStretch(axis: Axis)`](#acceptsstretch) | 转发子树是否允许在给定轴上被拉伸。 |
@@ -126,7 +126,7 @@ public func draw(ctx: UiContext): Unit
 
 ### handle
 
-收到 `Frame` 事件时请求续帧、调用回调并广播给子树，其余事件原样转发。`Frame` 分支总是返回 `false`，帧脉搏因此继续广播给树中其他组件。
+直接调用 `handle(Frame)` 时请求续帧、调用回调并转发给子树，其余事件原样转发。桌面与测试宿主正常通过构建期订阅表直接调用本回调，子树中的订阅者各自登记；保留这个分支便于单组件测试与兼容手动派发。
 
 ```cangjie
 public func handle(ctx: UiContext, event: UiEvent): Bool

@@ -6,6 +6,8 @@
  */
 package bench_harness
 
+import std.collection.ArrayList
+import std.sort.sort
 import sdl.system.PerformanceClock
 
 /** The outcome of one timed benchmark: total nanoseconds over `iterations` runs of the body. */
@@ -33,6 +35,91 @@ public struct BenchResult {
     }
 }
 
+/** Stable nearest-rank latency summary for one bounded sequence of measured frames. */
+public struct FrameDistribution {
+    public let samples: Int64
+    public let p50Ns: UInt64
+    public let p90Ns: UInt64
+    public let p95Ns: UInt64
+    public let p99Ns: UInt64
+    public let maxNs: UInt64
+    public let over120FpsBudget: Int64
+    public let over60FpsBudget: Int64
+    public let over30FpsBudget: Int64
+
+    public init(
+        samples: Int64,
+        p50Ns: UInt64,
+        p90Ns: UInt64,
+        p95Ns: UInt64,
+        p99Ns: UInt64,
+        maxNs: UInt64,
+        over120FpsBudget: Int64,
+        over60FpsBudget: Int64,
+        over30FpsBudget: Int64
+    ) {
+        this.samples = samples
+        this.p50Ns = p50Ns
+        this.p90Ns = p90Ns
+        this.p95Ns = p95Ns
+        this.p99Ns = p99Ns
+        this.maxNs = maxNs
+        this.over120FpsBudget = over120FpsBudget
+        this.over60FpsBudget = over60FpsBudget
+        this.over30FpsBudget = over30FpsBudget
+    }
+}
+
+/** One per-frame timing run with both its compatibility average and within-run distribution. */
+public struct SampledBenchResult {
+    public let result: BenchResult
+    public let distribution: FrameDistribution
+
+    public init(result: BenchResult, distribution: FrameDistribution) {
+        this.result = result
+        this.distribution = distribution
+    }
+}
+
+/** Computes nearest-rank percentiles without mutating the caller's sample array. */
+public func frameDistribution(samples: Array<UInt64>): FrameDistribution {
+    if (samples.isEmpty()) {
+        return FrameDistribution(0, 0, 0, 0, 0, 0, 0, 0, 0)
+    }
+    let ordered = samples.clone()
+    sort(ordered)
+    var over120: Int64 = 0
+    var over60: Int64 = 0
+    var over30: Int64 = 0
+    for (sample in ordered) {
+        if (sample > UInt64(8333333)) {
+            over120 += 1
+        }
+        if (sample > UInt64(16666667)) {
+            over60 += 1
+        }
+        if (sample > UInt64(33333333)) {
+            over30 += 1
+        }
+    }
+    FrameDistribution(
+        ordered.size,
+        nearestRank(ordered, 50),
+        nearestRank(ordered, 90),
+        nearestRank(ordered, 95),
+        nearestRank(ordered, 99),
+        ordered[ordered.size - 1],
+        over120,
+        over60,
+        over30
+    )
+}
+
+private func nearestRank(ordered: Array<UInt64>, percentile: Int64): UInt64 {
+    let rank = max(Int64(0), (ordered.size * percentile + 99) / 100 - 1)
+    ordered[min(rank, ordered.size - 1)]
+}
+
 /*
  * Runs `body` `iterations` times and reports the elapsed time. `body` returns an Int64 that is
  * summed into a checksum carried out of the loop, which keeps the compiler from optimising away a
@@ -49,6 +136,25 @@ public func timeit(name: String, iterations: Int64, body: () -> Int64): BenchRes
     }
     let end = PerformanceClock.ticksNanoseconds()
     BenchResult(name, iterations, elapsed(start, end), checksum)
+}
+
+/** Times each frame separately so tail latency and frame-budget misses remain observable. */
+public func sampleFrames(name: String, iterations: Int64, body: () -> Int64): SampledBenchResult {
+    let count = max(Int64(0), iterations)
+    let samples = ArrayList<UInt64>()
+    var checksum: Int64 = 0
+    var totalNs: UInt64 = 0
+    var i: Int64 = 0
+    while (i < count) {
+        let start = PerformanceClock.ticksNanoseconds()
+        checksum += body()
+        let end = PerformanceClock.ticksNanoseconds()
+        let sample = elapsed(start, end)
+        samples.add(sample)
+        totalNs += sample
+        i += 1
+    }
+    SampledBenchResult(BenchResult(name, count, totalNs, checksum), frameDistribution(samples.toArray()))
 }
 
 // SDL's tick counter is monotonic; guard against a same-or-backwards reading just in case.
@@ -89,7 +195,8 @@ public func printResult(result: BenchResult): Unit {
 public func printComparison(label: String, before: BenchResult, after: BenchResult): Unit {
     let beforeText = padRight(formatDuration(before.perIterationNs()), 14)
     let afterText = padRight(formatDuration(after.perIterationNs()), 14)
-    println("  ${padRight(label, 36)}${beforeText}-> ${afterText}(${formatRatio(before.perIterationNs(), after.perIterationNs())})")
+    println(
+        "  ${padRight(label, 36)}${beforeText}-> ${afterText}(${formatRatio(before.perIterationNs(), after.perIterationNs())})")
 }
 
 // --- formatting (integer arithmetic only) ---
@@ -154,7 +261,7 @@ private func padRight(text: String, width: Int64): String {
 
 /*
  * Emits a result in both forms: the human-readable console row, plus a machine-readable line the
- * report generator (bench/run.ps1) parses into the HTML summary. The machine line is
+ * report generator (bench/run.py) parses into the HTML summary. The machine line is
  *   @@RESULT|<kind>|<group>|<name>|<nsPerIteration>|<iterations>
  * `kind` is "frame" (a per-frame cost, judged against the frame budget) or "micro" (an isolated
  * operation, judged on raw throughput). `group` and `name` must not contain '|'.
@@ -162,6 +269,28 @@ private func padRight(text: String, width: Int64): String {
 public func report(kind: String, group: String, result: BenchResult): Unit {
     printResult(result)
     println("@@RESULT|${kind}|${group}|${result.name}|${result.perIterationNs()}|${result.iterations}")
+}
+
+/*
+ * Emits the within-run latency distribution for a display benchmark. This is intentionally a
+ * separate record from @@RESULT so existing parsers keep accepting the average result while newer
+ * tooling can judge tail latency and budget misses:
+ *   @@FRAME_DIST|group|name|p50|p90|p95|p99|max|over120|over60|over30|samples
+ */
+public func reportFrameDistribution(group: String, name: String, distribution: FrameDistribution): Unit {
+    println(
+        "@@FRAME_DIST|${group}|${name}|${distribution.p50Ns}|${distribution.p90Ns}|${distribution.p95Ns}|${distribution.p99Ns}|${distribution.maxNs}|${distribution.over120FpsBudget}|${distribution.over60FpsBudget}|${distribution.over30FpsBudget}|${distribution.samples}")
+}
+
+/** Emits the actual display backend used by one benchmark case. */
+public func reportBenchmarkEnvironment(
+    group: String,
+    name: String,
+    driver: String,
+    supersample: Int32,
+    vsync: Int32
+): Unit {
+    println("@@BENCH_ENV|${group}|${name}|${driver}|${supersample}|${vsync}")
 }
 
 /*

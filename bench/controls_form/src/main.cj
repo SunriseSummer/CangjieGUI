@@ -16,7 +16,7 @@ package bench_controls_form
 
 import std.env.getCommandLine
 import cui.{DesktopApp, State, WindowSpec}
-import bench_scenes.{BenchAccumulator, BenchDriver, controlsFormScene}
+import bench_scenes.{BenchAccumulator, BenchDriver, controlsFormScene, lazyControlsFormScene}
 import bench_harness.ScrollSweep
 
 private let DEFAULT_SECTIONS = 40
@@ -26,20 +26,38 @@ private let SCROLL_SPAN: Float32 = 6000.0
 main(): Int64 {
     let sections = sectionsArgument()
     let supersample = supersampleArgument()
+    let lazy = lazyArgument()
     let scroll = State<Float32>(0.0)
     let sweep = ScrollSweep(SCROLL_SPAN, SCROLL_STEP)
-    let accumulator = BenchAccumulator(group: "控件密集表单（上机实测）", name: "${sections} 分区 ss${supersample}x",
-        scroll: scroll, sweep: sweep, frames: 150)
+    let mode = if (lazy) {
+        "窗口化"
+    } else {
+        "全量"
+    }
+    let accumulator = BenchAccumulator(group: "控件密集表单（上机实测）",
+        name: "${sections} 分区 ${mode} ss${supersample}x", scroll: scroll, sweep: sweep, frames: 150)
     // vsync off + frameDelay 0 so the measured frame period is true per-frame work.
-    let app = DesktopApp(
-        WindowSpec("CUI bench: controls form", 640, 720, vsync: false, supersample: supersample),
+    let app = DesktopApp(WindowSpec("CUI bench: controls form", 640, 720, vsync: false, supersample: supersample),
         frameDelay: 0)
     app.setMinimumSize(480, 480)
     app.run {
         BenchDriver(accumulator)
-        controlsFormScene(scroll, sections)
+        if (lazy) {
+            let _ = lazyControlsFormScene(scroll, sections)
+        } else {
+            let _ = controlsFormScene(scroll, sections)
+        }
     }
     return 0
+}
+
+private func lazyArgument(): Bool {
+    for (arg in getCommandLine()) {
+        if (arg == "lazy") {
+            return true
+        }
+    }
+    false
 }
 
 private func sectionsArgument(): Int64 {

@@ -12,7 +12,7 @@ import cui.{DesktopApp, SystemCursor, WindowSpec}
 
 main(): Int64 {
     let model = PaintModel()
-    let app = DesktopApp(WindowSpec("CUI 画板", 900, 600, scale: 1.5), theme: paintTheme())
+    let app = DesktopApp(WindowSpec("CUI 画板", 900, 600, scale: 1.0), theme: paintTheme())
     // 低于此尺寸时工具栏会挤掉色板，锁住下限保证控件始终完整可见。
     app.setMinimumSize(640, 480)
     // 画布静止态用十字光标；悬停到按钮、滑块等可交互控件时，外壳会自动切换为手形光标。

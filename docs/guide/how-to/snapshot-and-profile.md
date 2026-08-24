@@ -56,7 +56,7 @@ cjpm run --run-args="--snapshot artifacts/release-check.bmp"
 
 ```cangjie role=variation
 // 快照覆盖初始画面；事件测试覆盖行为。
-let consumed = widget.handle(ctx, UiEvent.KeyDown(Key.Enter, KeyModifiers()))
+let consumed = widget.handle(ctx, UiEvent.KeyDown(Key.Enter, false))
 @Expect(consumed)
 @Expect(model.submitted.value)
 ```
@@ -66,6 +66,25 @@ Modal 背景屏蔽、Tab 顺序、菜单 Escape、画布拖动都应通过控件
 ### 4. 读取阶段帧报告
 
 先分别测“静止 5 秒”“滚动大列表”“动画期间”“图片首次出现”和“图片缓存命中”。记录窗口大小、数据规模、构建类型与机器环境，再比较构建、布局、绘制各阶段；没有这些上下文的单个毫秒数不可复现。
+
+`--profile` 每 60 帧同时输出阶段均值、总帧 P50/P90/P95/P99/最大值、同帧稳定化次数、触发来源（输入/状态/
+计时/尺寸/强制）、后端实际采用的 retained 局部 damage 帧数，以及文本度量、实算、塑形、绘制次数。阶段均值定位持续成本，P95/最大值定位偶发
+长帧；稳定化次数大于 1 表示事件或布局写状态后发生了绘制前重建，长期触顶则应移除构建副作用。
+
+每个窗口还输出一条 `@@FRAME_PROFILE` 键值记录，字段均使用纳秒或计数，可直接被日志采集器解析；该行与上方
+中文说明来自同一批样本。记录比较时同时保存窗口尺寸、数据规模、构建优化级别、渲染后端和机器环境。
+
+局部 damage 计数为 0 不一定是故障：输入、动画/Frame 订阅、浮层、窗口变化、大范围更新、1× 无持久目标或
+`--cui-disable-retained-damage` 都会有意全帧。先从 `retainedDiagnostics().describe()` 查看 pending damage、
+dirty 原因和命令规模，再用全量开关做像素差分；不要仅凭帧率猜测是否走了优化路径。
+
+长文本问题还应记录 `ctx.paragraphCacheStats()`：预热后的同文同宽应以 hits 增长，持续 misses 表示文本、宽度、
+字号/字体或行数上限正在抖动，evictions 快速增长表示工作集超过 4 MiB。display list 的
+`RenderCommandBufferStats.batchSubmissionCount` / `batchedCommandCount` 可确认相邻基础原语是否真正形成批次；
+批次为 0 不代表错误，圆角 mesh、文本、纹理或被 clip/颜色隔开的命令本来就不应强行合并。
+
+仓库开发者还可运行 `python bench/run.py` 生成 headless/显示基准报告，用
+`python .devtools/test_examples.py --smoke-snapshots` 运行跨特性端到端窗口看护。
 
 ## 确认结果
 

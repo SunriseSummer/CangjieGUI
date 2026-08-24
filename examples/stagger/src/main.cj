@@ -10,7 +10,7 @@ import cui.{DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = StaggerModel()
-    let app = DesktopApp(WindowSpec("CUI 交错入场", 620, 600, scale: 1.5), theme: staggerTheme())
+    let app = DesktopApp(WindowSpec("CUI 交错入场", 620, 600, scale: 1.0), theme: staggerTheme())
     app.setMinimumSize(520, 480)
     app.run {
         staggerView(model)

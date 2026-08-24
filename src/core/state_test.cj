@@ -1,7 +1,5 @@
 package cui.core
 
-
-
 @Test
 func stateTracksRevisionAndCancellableObservers(): Unit {
     let state = State<Int64>(2)
@@ -18,6 +16,22 @@ func stateTracksRevisionAndCancellableObservers(): Unit {
     state.value = 9
     @Expect(observedTotal.value, Int64(7))
     @Expect(observation.isClosed())
+}
+
+@Test
+func stateStoreSupportsDirectRememberUntilClear(): Unit {
+    let store = StateStore()
+    let first = store.remember<Int64>("direct") {3}
+    first.value = 8
+    let second = store.remember<Int64>("direct") {99}
+
+    @Expect(refEq((first as Object).getOrThrow(), (second as Object).getOrThrow())) // cjcheck-ignore: unchecked-cast # test asserts public StateStore identity
+    @Expect(second.value, Int64(8))
+
+    store.clear()
+    let remounted = store.remember<Int64>("direct") {5}
+    @Expect(!refEq((first as Object).getOrThrow(), (remounted as Object).getOrThrow())) // cjcheck-ignore: unchecked-cast # test asserts clear removes public StateStore identity
+    @Expect(remounted.value, Int64(5))
 }
 
 @Test
@@ -115,21 +129,20 @@ func forEachKeyedStateFollowsItemAcrossReorder(): Unit {
     let first = State<?State<Int64>>(None)
     let second = State<?State<Int64>>(None)
     let build = {
-        items: Array<String> =>
-            let _ = buildRoot({
-                => VStack {
-                    ForEach(items, key: {item => item}) {
-                        item =>
-                            let local = rememberState<Int64>("count") {0}
-                            if (item == "a") {
-                                first.value = Some(local)
-                            } else {
-                                second.value = Some(local)
-                            }
-                            Spacer()
-                    }
+        items: Array<String> => let _ = buildRoot({
+            => VStack {
+                ForEach(items, key: {item => item}) {
+                    item =>
+                        let local = rememberState<Int64>("count") {0}
+                        if (item == "a") {
+                            first.value = Some(local)
+                        } else {
+                            second.value = Some(local)
+                        }
+                        Spacer()
                 }
-            }, store)
+            }
+        }, store)
     }
 
     build(["a", "b"])

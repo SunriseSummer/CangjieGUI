@@ -22,7 +22,7 @@ public class TextField <: Widget
 - **编辑快捷键**：Ctrl+A 全选、Ctrl+C 复制、Ctrl+X 剪切、Ctrl+V 粘贴、Ctrl+Z 撤销、Ctrl+Y 与 Ctrl+Shift+Z 重做；Home/End 移到两端，按住 Shift 的方向键扩展选区。粘贴的多行文本被折叠为一行（换行变空格、回车符丢弃）。剪贴板访问按尽力而为处理：没有桌面会话时复制粘贴静默失败，不会让控件崩溃。
 - **分组撤销**：500 毫秒内的连续编辑合并为一步撤销，停顿即开新组；光标跳转（点击、方向键导航）也会切分撤销组；撤销栈上限 300 步。空操作编辑（如在开头按退格）不产生撤销步。
 - **水平跟随**：值比控件宽时文本窗口左移，且仅在光标越出可视窗口时移动（桌面编辑器的常见手感）；偏移有限制，文本尾部不会脱离右缘。
-- **焦点与 IME**：聚焦时每帧把光标矩形上报为 IME 候选窗锚点，输入法窗口跟随光标；`editable: false` 渲染为只读且不进入 Tab 焦点遍历，但仍可点选、全选与复制。
+- **焦点与 IME**：聚焦时每帧把光标矩形上报为 IME 候选窗锚点；`TextEditing` pre-edit 独立保存并以文本加下划线绘制，不会提前写入绑定值，`TextInput` 到达才提交；`editable: false` 渲染为只读且不进入 Tab 焦点遍历，但仍可点选、全选与复制。
 
 ## 示例
 
@@ -146,7 +146,7 @@ public func layout(_: UiContext, rect: Rect): Unit
 
 ### draw
 
-[`Widget`](../core/Widget.md) 协议实现：绘制底框、选区、文本与光标，三者共用同一水平跟随偏移并整体裁剪进框内。聚焦时把光标矩形上报为 IME 锚点，并请求后续帧以维持光标闪烁。
+[`Widget`](../core/Widget.md) 协议实现：绘制底框、选区、文本、IME pre-edit 与光标，共用同一水平跟随偏移并整体裁剪进框内。点击定位使用 SDL_ttf shaped-cluster hit test，避免长行逐前缀测量并正确处理连字/RTL。聚焦时把光标矩形上报为 IME 锚点，并请求后续帧以维持光标闪烁。
 
 ```cangjie
 public func draw(ctx: UiContext): Unit

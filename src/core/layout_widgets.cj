@@ -34,6 +34,15 @@ class Stack <: Widget {
     private var flexible: Bool
     private var mainAlignment = MainAxisAlignment.Start
     private var crossAlignment = CrossAxisAlignment.Stretch
+    // One build instance is measured and then laid out synchronously. Remembering that exact
+    // constraint removes the otherwise duplicate child-measure traversal between the two phases;
+    // a changed rect misses conservatively. The cache dies with the immediate-mode instance.
+    private var measureCacheReady: Bool = false
+    private var measureCacheAvailable = Size(-1.0, -1.0)
+    private var measureCacheInnerAvailable = Size(-1.0, -1.0)
+    private var measureCacheResult = Size.zero()
+    private let childMeasureCache: Array<Size>
+    private let childMeasureValid: Array<Bool>
 
     init(
         axis: Axis,
@@ -47,6 +56,8 @@ class Stack <: Widget {
         this.spacing = spacing
         this.contentPadding = padding
         this.flexible = flexible
+        this.childMeasureCache = Array<Size>(children.size, {_ => Size.zero()})
+        this.childMeasureValid = Array<Bool>(children.size, repeat: false)
     }
 
     func setSpacing(value: Length): Unit {
@@ -69,6 +80,13 @@ class Stack <: Widget {
     // the tallest/widest child. This lets a container opt out of filling (flexible: false)
     // and be laid out at exactly the size of what it holds, e.g. a compact toolbar row.
     public func measure(ctx: UiContext, available: Size): Size {
+        if (measureCacheReady && sameLayoutSize(measureCacheAvailable, available)) {
+            return measureCacheResult
+        }
+        measureCacheReady = false
+        for (index in 0..childMeasureValid.size) {
+            childMeasureValid[index] = false
+        }
         let padding = ctx.resolve(contentPadding)
         let inner = Size(
             max(0.0, available.w - padding.horizontal()),
@@ -77,20 +95,28 @@ class Stack <: Widget {
         var along: Float32 = 0.0
         var cross: Float32 = 0.0
         var participating: Int64 = 0
-        for (child in children) {
+        for (index in 0..children.size) {
+            let child = children[index]
             if (!child.participatesInLayout()) {
                 continue
             }
             participating += 1
             let size = child.measure(ctx, inner)
+            childMeasureCache[index] = size
+            childMeasureValid[index] = true
             along += mainOf(size)
             cross = max(cross, crossOf(size))
         }
         along += gapTotal(resolvedGap(ctx), participating)
-        match (axis) {
+        let result = match (axis) {
             case Axis.Horizontal => Size(along + padding.horizontal(), cross + padding.vertical())
             case Axis.Vertical => Size(cross + padding.horizontal(), along + padding.vertical())
         }
+        measureCacheAvailable = available
+        measureCacheInnerAvailable = inner
+        measureCacheResult = result
+        measureCacheReady = true
+        result
     }
 
     /*
@@ -132,13 +158,22 @@ class Stack <: Widget {
                 weightTotal += child.flexWeight()
                 flexCount += 1
             } else {
-                let measured = child.measure(ctx, Size(inner.w, inner.h))
+                let measured = cachedChildMeasure(ctx, child, i, Size(inner.w, inner.h))
                 extents[i] = mainOf(measured)
                 crossSizes[i] = crossOf(measured)
                 mainTotal += extents[i]
             }
         }
         FixedPass(mainTotal, weightTotal, flexCount, participating)
+    }
+
+    private func cachedChildMeasure(ctx: UiContext, child: Widget, index: Int64, available: Size): Size {
+        if (measureCacheReady && childMeasureValid[index]) {
+            if (sameLayoutSize(measureCacheInnerAvailable, available)) {
+                return childMeasureCache[index]
+            }
+        }
+        child.measure(ctx, available)
     }
 
     /** Distributes `remaining` main-axis space to flexible children; returns their total. */
@@ -343,4 +378,8 @@ class Stack <: Widget {
             case Axis.Horizontal => Rect(mainPos, crossPos, mainSize, crossSize)
         }
     }
+}
+
+private func sameLayoutSize(left: Size, right: Size): Bool {
+    left.w.toBits() == right.w.toBits() && left.h.toBits() == right.h.toBits()
 }

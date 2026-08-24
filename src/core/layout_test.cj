@@ -44,6 +44,43 @@ class SizedLayoutProbe <: Widget {
     }
 }
 
+private class CountingMeasureProbe <: Widget {
+    var calls: Int64 = 0
+    var rect = Rect.zero()
+
+    public func measure(_: UiContext, available: Size): Size {
+        calls += 1
+        Size(min(40.0, available.w), min(20.0, available.h))
+    }
+
+    public func layout(_: UiContext, assigned: Rect): Unit {
+        rect = assigned
+    }
+
+    public func draw(_: UiContext): Unit {}
+
+    public func handle(_: UiContext, _: UiEvent): Bool {
+        false
+    }
+}
+
+@Test
+func stackReusesExactMeasureBetweenMeasureAndLayout(): Unit {
+    let ctx = testContext()
+    let child = CountingMeasureProbe()
+    let view = VStack {
+        emit(child)
+    }
+    let available = Size(200.0, 100.0)
+    let _ = view.measure(ctx, available)
+    view.layout(ctx, Rect(0.0, 0.0, available.w, available.h))
+    @Expect(child.calls, 1)
+
+    // A changed constraint must miss rather than reuse stale geometry.
+    view.layout(ctx, Rect(0.0, 0.0, 180.0, 100.0))
+    @Expect(child.calls, 2)
+}
+
 @Test
 func chainedSizeModifiersReplaceEmittedNode(): Unit {
     let ctx = testContext()
