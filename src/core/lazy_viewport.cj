@@ -1,5 +1,7 @@
 package cui.core
 
+import std.collection.HashMap
+
 internal let LAZY_DEFAULT_OVERSCAN_PIXELS: Float32 = 144.0
 
 /** Placement of an item requested through `LazyViewportController.scrollToKey`. */
@@ -90,6 +92,10 @@ class LazyViewportMemory {
     var contentRevision: UInt64
     var structuralRevision: UInt64
     var controllerRevision: UInt64 = UInt64(0)
+    var keyIndex = HashMap<String, Int64>()
+    var keyIndexStructuralRevision: UInt64 = UInt64(0)
+    var keyIndexCount: Int64 = -1
+    var keyIndexReady = false
     var anchorKey: String = ""
     var anchorIndex: Int64 = -1
     var anchorWithinItem: Float32 = 0.0
@@ -243,19 +249,39 @@ internal func lazyResolveControllerScroll(
             }
             memory.controllerRevision = revision
             let target = value.requestedKey()
-            var index: Int64 = 0
-            while (index < geometry.count) {
-                if (geometry.key(index) == target) {
+            rebuildLazyKeyIndexIfNeeded(memory, geometry)
+            match (memory.keyIndex.get(target)) {
+                case Some(index) =>
                     value.markTargetFound()
                     return lazyScrollForItem(current, geometry.itemTop(index), geometry.itemExtent(index),
                         geometry.contentExtent, memory.viewportExtent, value.requestedAlignment())
-                }
-                index += 1
+                case None => ()
             }
             value.markTargetMissing()
             current
         case None => current
     }
+}
+
+private func rebuildLazyKeyIndexIfNeeded(memory: LazyViewportMemory, geometry: LazyItemGeometry): Unit {
+    if (memory.keyIndexReady && memory.keyIndexStructuralRevision == memory.structuralRevision &&
+        memory.keyIndexCount == geometry.count) {
+        return
+    }
+    if (memory.keyIndex.capacity < geometry.count) {
+        memory.keyIndex = HashMap<String, Int64>(geometry.count)
+    } else {
+        memory.keyIndex.clear()
+    }
+    // Reverse insertion preserves the previous linear search's first-match behavior for duplicate keys.
+    var index = geometry.count - 1
+    while (index >= 0) {
+        memory.keyIndex.add(geometry.key(index), index)
+        index -= 1
+    }
+    memory.keyIndexStructuralRevision = memory.structuralRevision
+    memory.keyIndexCount = geometry.count
+    memory.keyIndexReady = true
 }
 
 internal func lazyFloatChanged(left: Float32, right: Float32): Bool {

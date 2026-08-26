@@ -26,6 +26,7 @@ main(): Int64 {
     runInstanceReuseBench()
     runAutomaticCompositionBench()
     runRetainedFrameBench()
+    runScalabilityProbeBench()
     runTextMeasureDiag()
     println("")
     return 0

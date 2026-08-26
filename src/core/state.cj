@@ -60,6 +60,7 @@ public interface Bindable<T> <: Observable<T> {
  * and transforms must remain on that UI thread; workers publish results through DesktopApp.post.
  */
 public class State<T> <: Bindable<T> {
+    private let identity = allocateStateIdentity()
     private var storedValue: T
     private let listeners = ArrayList<StateListener<T>>()
     private var stateRevision: UInt64 = UInt64(0)
@@ -92,6 +93,11 @@ public class State<T> <: Bindable<T> {
 
     public init(value: T) {
         this.storedValue = value
+    }
+
+    /* Stable across the State lifetime and independent of its erased generic value type. */
+    func dependencyIdentity(): UInt64 {
+        identity
     }
 
     /** Replaces the value with the result of `transform`. */
@@ -259,7 +265,7 @@ public class StateStore {
     let scopes = ArrayList<String>()
     private let controlIdCounts = HashMap<String, Int64>()
     let automaticScopeCounts = HashMap<String, Int64>()
-    private let focusOrder = ArrayList<String>()
+    private let focusRegistry = FocusRegistry()
     var pendingRetainedDamage: ?Rect = None
     var fullRetainedDamagePending = true
     var rootLayoutDependencies: ?PhaseStateDependencies = None
@@ -309,7 +315,7 @@ public class StateStore {
         scopes.clear()
         controlIdCounts.clear()
         automaticScopeCounts.clear()
-        focusOrder.clear()
+        focusRegistry.clear()
         frameSubscribers.clear()
     }
 
@@ -383,12 +389,7 @@ public class StateStore {
      * declared tree without any retained widget references.
      */
     func registerFocusable(id: String): Unit {
-        // A duplicate id (two controls given the same explicit id) registers once: the
-        // first-match search in moveFocus would otherwise bounce between the twin
-        // entries forever and Tab could never leave them.
-        if (!focusOrder.contains(id)) {
-            focusOrder.add(id)
-        }
+        focusRegistry.register(id)
     }
 
     /*
@@ -398,42 +399,22 @@ public class StateStore {
      * The auto id is almost always the last entry, so the search from the end is O(1).
      */
     func reregisterFocusable(previous: String, replacement: String): Unit {
-        removeFocusable(replacement) // keep the no-duplicate invariant on id collisions
-        var i = focusOrder.size - 1
-        while (i >= 0) {
-            if (focusOrder[i] == previous) {
-                focusOrder[i] = replacement
-                return
-            }
-            i -= 1
-        }
-        focusOrder.add(replacement)
+        focusRegistry.reregister(previous, replacement)
     }
 
     /** Removes `id` from this build's ring — a control disabled by `.enabled(false)` leaves Tab traversal. */
     func unregisterFocusable(id: String): Unit {
-        removeFocusable(id)
-    }
-
-    private func removeFocusable(id: String): Unit {
-        var i = focusOrder.size - 1
-        while (i >= 0) {
-            if (focusOrder[i] == id) {
-                focusOrder.remove(at: i)
-                return
-            }
-            i -= 1
-        }
+        focusRegistry.unregister(id)
     }
 
     /** The focusable control ids gathered by the most recent build, in traversal order. */
     protected func focusRing(): Array<String> {
-        focusOrder.toArray()
+        focusRegistry.ring()
     }
 
     /** Number of focus stops registered so far in this build; see `focusablesFrom`. */
     func focusableCount(): Int64 {
-        focusOrder.size
+        focusRegistry.size
     }
 
     /*
@@ -443,11 +424,7 @@ public class StateStore {
      * trap cycles through.
      */
     func focusablesFrom(start: Int64): Array<String> {
-        if (start >= focusOrder.size) {
-            return []
-        }
-        let from = max(0, start)
-        Array<String>(focusOrder.size - from, {i => focusOrder[from + i]})
+        focusRegistry.from(start)
     }
 
     func scopedKey(key: String): String {

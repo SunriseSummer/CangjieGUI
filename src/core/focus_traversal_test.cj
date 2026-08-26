@@ -114,3 +114,20 @@ func emptyRingLeavesFocusUnchanged(): Unit {
     ctx.focusPrevious()
     @Expect(ctx.focusId, "")
 }
+
+@Test
+func duplicateExplicitFocusIdsKeepOneOrderedStop(): Unit {
+    let store = StateStore()
+    let _ = buildRoot({
+        => VStack {
+            Button("First", {=>}).key("shared")
+            Button("Second", {=>}).key("shared")
+            Button("Tail", {=>}).key("tail")
+        }
+    }, store)
+    let ring = store.focusRing()
+
+    @Expect(ring.size, Int64(2))
+    @Expect(ring[0], "shared")
+    @Expect(ring[1], "tail")
+}

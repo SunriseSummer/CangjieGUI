@@ -4,6 +4,7 @@ name = "bench_incremental_dashboard"
 version = "0.1.0"
 output-type = "executable"
 description = "Real-renderer A/B benchmark for retained command replay and partial damage."
+compile-option = "-O2"
 
 [dependencies]
 cui = { path = "../.." }

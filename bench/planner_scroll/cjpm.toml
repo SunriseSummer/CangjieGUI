@@ -4,6 +4,7 @@ name = "bench_planner_scroll"
 version = "0.1.0"
 output-type = "executable"
 description = "End-to-end (display) frame-rate benchmark: auto-scrolling a composed content page."
+compile-option = "-O2"
 
 [dependencies]
 cui = { path = "../.." }

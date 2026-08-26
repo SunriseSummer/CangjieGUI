@@ -1,13 +1,14 @@
 package cui.core
 
-import std.collection.ArrayList
+import std.collection.{ArrayList, HashMap, HashSet}
 
 /* Transactional dependency set for one retained execution phase. */
 class PhaseStateDependencies {
     private let invalidate: () -> Unit
     private let dependencies = ArrayList<StateReadDependency>()
+    private let dependenciesByState = HashMap<UInt64, StateReadDependency>()
     private let pending = ArrayList<StateReadDependency>()
-    private let pendingSources = ArrayList<Object>()
+    private let pendingSources = HashSet<UInt64>()
     private let created = ArrayList<StateReadDependency>()
     private var collecting = false
     private var invalidatedDuringCollection = false
@@ -37,18 +38,15 @@ class PhaseStateDependencies {
     }
 
     func readState<T>(source: State<T>): Unit {
-        let sourceObject = stateObject(source)
-        for (seen in pendingSources) {
-            if (refEq(seen, sourceObject)) {
-                return
-            }
+        let identity = source.dependencyIdentity()
+        if (!pendingSources.add(identity)) {
+            return
         }
-        pendingSources.add(sourceObject)
-        for (dependency in dependencies) {
-            if (dependency.matches(sourceObject)) {
+        match (dependenciesByState.get(identity)) {
+            case Some(dependency) =>
                 pending.add(dependency)
                 return
-            }
+            case None => ()
         }
         let dependency = TypedStateReadDependency<T>(source, {=> handleInvalidation()})
         pending.add(dependency)
@@ -57,13 +55,15 @@ class PhaseStateDependencies {
 
     func commit(): Unit {
         for (previous in dependencies) {
-            if (!pendingContains(previous)) {
+            if (!pendingSources.contains(previous.sourceIdentity)) {
                 previous.close()
             }
         }
         dependencies.clear()
+        dependenciesByState.clear()
         for (dependency in pending) {
             dependencies.add(dependency)
+            dependenciesByState.add(dependency.sourceIdentity, dependency)
         }
         created.clear()
         pending.clear()
@@ -87,15 +87,7 @@ class PhaseStateDependencies {
             dependency.close()
         }
         dependencies.clear()
-    }
-
-    private func pendingContains(candidate: StateReadDependency): Bool {
-        for (dependency in pending) {
-            if (sameStateReadDependency(dependency, candidate)) {
-                return true
-            }
-        }
-        false
+        dependenciesByState.clear()
     }
 
     private func handleInvalidation(): Unit {

@@ -8,6 +8,12 @@ import std.sync.AtomicUInt64
  * and observers themselves are thread-confined, not concurrent containers.
  */
 private let stateWriteGeneration = AtomicUInt64(UInt64(0))
+private let stateIdentityGeneration = AtomicUInt64(UInt64(0))
+
+/* Process-unique State identity used by dependency indexes across erased generic types. */
+func allocateStateIdentity(): UInt64 {
+    stateIdentityGeneration.fetchAdd(UInt64(1))
+}
 
 func recordStateWrite(): Unit {
     stateWriteGeneration.fetchAdd(UInt64(1))

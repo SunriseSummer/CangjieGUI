@@ -1,6 +1,6 @@
 package cui.core
 
-import std.collection.{ArrayList, HashSet}
+import std.collection.{ArrayList, HashMap, HashSet}
 
 /* Persistent ownership node for a rebuild boundary; child scopes isolate retained dependencies. */
 class StateMountScope {
@@ -15,6 +15,7 @@ class StateMountScope {
     let automaticKeys = ArrayList<String>()
     let effectKeys = ArrayList<String>()
     let buildDependencies = ArrayList<StateReadDependency>()
+    let buildDependenciesByState = HashMap<UInt64, StateReadDependency>()
     var buildDirty = false
     var buildSelfDirty = false
     var buildDescendantDirty = false
@@ -72,6 +73,7 @@ class StateMountScope {
             dependency.close()
         }
         buildDependencies.clear()
+        buildDependenciesByState.clear()
         buildDirty = false
         buildSelfDirty = false
         buildDescendantDirty = false
@@ -187,7 +189,7 @@ class StateMountBuild {
     private let collectStateReads: Bool
     private let invalidate: () -> Unit
     private let dependencies = ArrayList<StateReadDependency>()
-    private let dependencySources = ArrayList<Object>()
+    private let dependencySources: HashSet<UInt64>
     private let newDependencies = ArrayList<StateReadDependency>()
     private let dirtyVersionAtStart: UInt64
     let forceAutomaticDescendants: Bool
@@ -204,6 +206,7 @@ class StateMountBuild {
         this.scope = scope
         this.collectStateReads = collectStateReads
         this.invalidate = invalidate
+        this.dependencySources = HashSet<UInt64>(max(Int64(16), scope.buildDependencies.size))
         this.dirtyVersionAtStart = scope.dirtyVersion
         this.forceAutomaticDescendants = forceAutomaticDescendants
         this.automaticSubtreeWeight = automaticSubtreeWeight
@@ -267,18 +270,15 @@ class StateMountBuild {
         if (!collectStateReads) {
             return
         }
-        let sourceObject = stateObject(source)
-        for (seen in dependencySources) {
-            if (refEq(seen, sourceObject)) {
-                return
-            }
+        let identity = source.dependencyIdentity()
+        if (!dependencySources.add(identity)) {
+            return
         }
-        dependencySources.add(sourceObject)
-        for (dependency in scope.buildDependencies) {
-            if (dependency.matches(sourceObject)) {
+        match (scope.buildDependenciesByState.get(identity)) {
+            case Some(dependency) =>
                 dependencies.add(dependency)
                 return
-            }
+            case None => ()
         }
         let dependency = TypedStateReadDependency<T>(source, invalidate)
         dependencies.add(dependency)
@@ -290,13 +290,15 @@ class StateMountBuild {
             return
         }
         for (previous in scope.buildDependencies) {
-            if (!containsDependency(previous)) {
+            if (!dependencySources.contains(previous.sourceIdentity)) {
                 previous.close()
             }
         }
         scope.buildDependencies.clear()
+        scope.buildDependenciesByState.clear()
         for (dependency in dependencies) {
             scope.buildDependencies.add(dependency)
+            scope.buildDependenciesByState.add(dependency.sourceIdentity, dependency)
         }
         newDependencies.clear()
         let invalidatedDuringBuild = scope.dirtyVersion != dirtyVersionAtStart
@@ -313,15 +315,6 @@ class StateMountBuild {
             dependency.close()
         }
         newDependencies.clear()
-    }
-
-    private func containsDependency(candidate: StateReadDependency): Bool {
-        for (dependency in dependencies) {
-            if (sameStateReadDependency(dependency, candidate)) {
-                return true
-            }
-        }
-        false
     }
 }
 

@@ -4,6 +4,7 @@ name = "bench_primitive_batch"
 version = "0.1.0"
 output-type = "executable"
 description = "Display A/B benchmark for contiguous primitive command batching."
+compile-option = "-O2"
 
 [dependencies]
 sdl = { path = "../../../CangjieSDL" }

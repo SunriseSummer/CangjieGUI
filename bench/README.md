@@ -66,7 +66,10 @@ cp936 中文场景名不会被替换字符污染；报告、基线和 JSON 始�
   lifecycle effect 稳定/替换成本。自动运行时用普通 UI 代码对照增量/强制全量：240 分支单点更新看护
   脏 body 为 1/240；稳定绘制看护自动显示列表使 widget draw 访问为 0；复杂兄弟更新看护自动晋升边界
   使稳定子树 layout 访问为 0。惰性视口用例直接对比 10000 行 legacy 每帧高度扫描与 revision 缓存，
-  并看护 100000 行 `LazyListExtents` 单点更新+完整 headless 帧。
+  并看护 100000 行 `LazyListExtents` 单点更新+完整 headless 帧。规模探针另以确定性访问计数配对耗时，
+  测量单作用域读取 1000/10000 个 State、10000/100000 项随机 `scrollToKey`、1000/10000 个
+  focusable 的注册与遍历，以及 1000/10000 节点最上层/最深层事件命中；这些曲线用于决定是否引入
+  依赖 HashMap、key-index、焦点索引或事件空间索引，不预设优化结论。
 - `phase3/`、`phase3_probe.py`：与普通回归基线隔离的架构决策及演进回归实验。对大而密 UI 的单区域高频更新做
   full-tree/manual-retained/auto-retained/command/damage 同进程 A/B，记录 build/layout/event/draw 的耗时与
   访问数；另测 retained 命中时后代状态/effect 生命周期簿记的规模曲线，并验证漏写 revision 与 dynamic paint

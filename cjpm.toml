@@ -4,6 +4,7 @@ name = "cui"
 version = "0.9.5"
 output-type = "static"
 description = "Declarative desktop GUI framework for Cangjie"
+compile-option = "-O2"
 
 [dependencies]
 sdl = { git = "https://github.com/SunriseSummer/CangjieSDL.git" }

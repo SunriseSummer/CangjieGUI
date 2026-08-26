@@ -48,7 +48,7 @@ def decode_process_output(data, fallback_encoding=None):
         return data.decode("utf-8", errors="replace")
 
 
-def run_command(command, cwd, timeout, env=None):
+def run_command(command, cwd, timeout, env=None, new_process_group=True):
     """Return (code, stdout, stderr, timed_out) with lossless cross-platform text capture."""
     kwargs = {
         "cwd": cwd,
@@ -57,9 +57,9 @@ def run_command(command, cwd, timeout, env=None):
     }
     if env is not None:
         kwargs["env"] = env
-    if os.name == "nt":
+    if os.name == "nt" and new_process_group:
         kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
-    else:
+    elif os.name != "nt":
         kwargs["start_new_session"] = True
     try:
         proc = subprocess.Popen(command, **kwargs)

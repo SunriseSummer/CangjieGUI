@@ -4,6 +4,7 @@ name = "cui_scheduler"
 version = "0.1.0"
 output-type = "executable"
 description = "CUI TimePicker meeting-scheduler example."
+compile-option = "-O2"
 
 [dependencies]
 cui = { path = "../.." }

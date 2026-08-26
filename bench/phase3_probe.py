@@ -3,8 +3,10 @@
 
 import argparse
 import json
+import os
 import statistics
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -14,6 +16,9 @@ RESULTS = ROOT / "results"
 RAW = RESULTS / "phase3.out.txt"
 JSON_REPORT = RESULTS / "phase3.json"
 MARKDOWN_REPORT = RESULTS / "phase3.md"
+WINDOWS_PROJECT_BUILT = False
+LAST_WINDOWS_PROBE_END = None
+WINDOWS_PROBE_COOLDOWN_SECONDS = 1.0
 
 sys.path.insert(0, str(ROOT.parent / ".devtools"))
 from process_runner import run_command
@@ -379,7 +384,32 @@ def render_markdown(records, observations, evidence, sample_count):
 
 
 def run_probe(timeout):
-    code, stdout, stderr, timed_out = run_command(["cjpm", "run"], PROJECT, timeout)
+    global LAST_WINDOWS_PROBE_END, WINDOWS_PROJECT_BUILT
+    if os.name == "nt":
+        if not WINDOWS_PROJECT_BUILT:
+            build_code, build_stdout, build_stderr, build_timed_out = run_command(["cjpm", "build"], PROJECT, timeout)
+            if build_code != 0:
+                suffix = f"; timed out after {timeout}s" if build_timed_out else ""
+                raise RuntimeError(
+                    f"phase-three build failed (exit {build_code}{suffix})\n{build_stdout}{build_stderr}")
+            WINDOWS_PROJECT_BUILT = True
+        executable = PROJECT / "target" / "release" / "bin" / "main.exe"
+        if not executable.is_file():
+            raise RuntimeError(f"phase-three executable is missing: {executable}")
+        environment = os.environ.copy()
+        sdl_runtime = ROOT.parent.parent / "CangjieSDL" / ".sdl3"
+        environment["PATH"] = str(sdl_runtime) + os.pathsep + environment.get("PATH", "")
+        if LAST_WINDOWS_PROBE_END is None:
+            time.sleep(WINDOWS_PROBE_COOLDOWN_SECONDS)
+        else:
+            remaining = WINDOWS_PROBE_COOLDOWN_SECONDS - (time.monotonic() - LAST_WINDOWS_PROBE_END)
+            if remaining > 0.0:
+                time.sleep(remaining)
+        code, stdout, stderr, timed_out = run_command(
+            [str(executable)], PROJECT, timeout, env=environment, new_process_group=False)
+        LAST_WINDOWS_PROBE_END = time.monotonic()
+    else:
+        code, stdout, stderr, timed_out = run_command(["cjpm", "run"], PROJECT, timeout)
     if code != 0:
         suffix = f"; timed out after {timeout}s" if timed_out else ""
         raise RuntimeError(f"phase-three probe failed (exit {code}{suffix})\n{stdout}{stderr}")

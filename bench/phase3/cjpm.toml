@@ -4,6 +4,7 @@ name = "bench_phase3"
 version = "0.1.0"
 output-type = "executable"
 description = "Decision probes for CUI phase-three incremental update architecture."
+compile-option = "-O2"
 
 [dependencies]
 cui = { path = "../.." }

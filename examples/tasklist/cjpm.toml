@@ -4,6 +4,7 @@ name = "cui_tasklist"
 version = "0.1.0"
 output-type = "executable"
 description = "CUI ReorderableList task-priority example."
+compile-option = "-O2"
 
 [dependencies]
 cui = { path = "../.." }

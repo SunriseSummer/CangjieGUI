@@ -12,6 +12,7 @@ __pycache__/
 .claude/
 .idea/
 .vscode/
+.codegraph/
 *.user
 cjpm.lock
 .cjcheck-baseline.json

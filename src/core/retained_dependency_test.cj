@@ -154,3 +154,29 @@ func stateWriteDuringRetainedBuildKeepsScopeDirtyForRetry(): Unit {
     let _ = buildRoot(body, store)
     @Expect(builds.value, Int64(2))
 }
+
+@Test
+func indexedBuildDependenciesDeduplicateReuseAndPruneByStateIdentity(): Unit {
+    let scope = StateMountScope()
+    let primary = State<Int64>(0)
+    let secondary = State<String>("initial")
+    let invalidations = DependencyBuildCounter()
+    let first = StateMountBuild(scope, collectStateReads: true, invalidate: {=> invalidations.value += 1})
+
+    first.readState(primary)
+    first.readState(primary)
+    first.readState(secondary)
+    first.commitStateReads()
+    @Expect(scope.buildDependencies.size, Int64(2))
+
+    let second = StateMountBuild(scope, collectStateReads: true, invalidate: {=> invalidations.value += 1})
+    second.readState(secondary)
+    second.commitStateReads()
+    @Expect(scope.buildDependencies.size, Int64(1))
+
+    primary.value = 1
+    @Expect(invalidations.value, Int64(0))
+    secondary.value = "changed"
+    @Expect(invalidations.value, Int64(1))
+    scope.closeBuildDependencies()
+}

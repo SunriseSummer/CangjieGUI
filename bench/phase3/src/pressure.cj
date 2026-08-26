@@ -468,7 +468,7 @@ private func validateMetrics(metrics: TestFrameMetrics): Unit {
 }
 
 func emitLine(text: String): Unit {
-    println(text) // cjcheck-ignore: no-println # benchmark executable machine-record protocol is stdout
+    print(text + "\n", flush: true) // cjcheck-ignore: no-println # benchmark machine protocol must remain observable before a timeout
 }
 
 private func average(total: UInt64, frames: Int64): UInt64 {

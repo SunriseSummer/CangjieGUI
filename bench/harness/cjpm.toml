@@ -4,6 +4,7 @@ name = "bench_harness"
 version = "0.1.0"
 output-type = "static"
 description = "Reusable timing and reporting utilities shared by CUI benchmarks."
+compile-option = "-O2"
 
 [dependencies]
 sdl = { path = "../../../CangjieSDL" }

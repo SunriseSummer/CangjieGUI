@@ -4,6 +4,7 @@ name = "bench_controls_form"
 version = "0.1.0"
 output-type = "executable"
 description = "End-to-end (display) frame-rate benchmark: a controls-dense settings page (switches, radios, sliders)."
+compile-option = "-O2"
 
 [dependencies]
 cui = { path = "../.." }

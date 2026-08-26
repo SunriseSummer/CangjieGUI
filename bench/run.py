@@ -36,6 +36,7 @@ import platform
 import statistics
 import subprocess
 import sys
+import time
 import webbrowser
 from datetime import datetime
 from pathlib import Path
@@ -50,6 +51,9 @@ JSON_REPORT = RESULTS / "report.json"
 CHECK_JSON_REPORT = RESULTS / "check.json"
 BASELINE = ROOT / "baseline.json"
 BASELINE_META = ROOT / "baseline.meta.json"
+BUILT_WINDOWS_PACKAGES = set()
+LAST_WINDOWS_BENCHMARK_END = None
+WINDOWS_BENCHMARK_COOLDOWN_SECONDS = 1.0
 
 sys.path.insert(0, str(ROOT.parent / ".devtools"))
 from process_runner import run_command
@@ -138,7 +142,44 @@ def cjpm_command(action, run_args=None):
 
 def run_cjpm(pkg_dir: Path, action: str = "run", timeout: int = 600, run_args=None) -> list:
     """Run `cjpm <action>` in pkg_dir and return its stdout as a list of lines."""
-    returncode, stdout, stderr, timed_out = run_command(cjpm_command(action, run_args), pkg_dir, timeout)
+    global LAST_WINDOWS_BENCHMARK_END
+    if action == "run" and os.name == "nt":
+        # On Windows an optimized benchmark can emit its complete machine log in under two seconds.
+        # `cjpm run` intermittently stalls while forwarding that fast child output into another
+        # captured process, even though the same executable is stable when launched directly. Build
+        # first, then bypass only cjpm's forwarding layer; the benchmark process itself keeps the
+        # shared timeout/process-tree capture and the SDL runtime directory is explicit.
+        package_key = str(pkg_dir.resolve())
+        if package_key not in BUILT_WINDOWS_PACKAGES:
+            build_code, build_stdout, build_stderr, build_timed_out = run_command(
+                cjpm_command("build"), pkg_dir, timeout)
+            if build_code != 0:
+                suffix = f"; timed out after {timeout}s" if build_timed_out else ""
+                raise RuntimeError(
+                    f"cjpm build failed in {pkg_dir} (exit {build_code}{suffix})\n{build_stdout}{build_stderr}")
+            BUILT_WINDOWS_PACKAGES.add(package_key)
+        executable = pkg_dir / "target" / "release" / "bin" / "main.exe"
+        if not executable.is_file():
+            raise RuntimeError(f"built benchmark executable is missing: {executable}")
+        environment = os.environ.copy()
+        sdl_runtime = ROOT.parent.parent / "CangjieSDL" / ".sdl3"
+        environment["PATH"] = str(sdl_runtime) + os.pathsep + environment.get("PATH", "")
+        command = [str(executable)]
+        if run_args:
+            command.extend(run_args.split())
+        if LAST_WINDOWS_BENCHMARK_END is None:
+            time.sleep(WINDOWS_BENCHMARK_COOLDOWN_SECONDS)
+        else:
+            remaining = WINDOWS_BENCHMARK_COOLDOWN_SECONDS - (time.monotonic() - LAST_WINDOWS_BENCHMARK_END)
+            if remaining > 0.0:
+                time.sleep(remaining)
+        # CREATE_NEW_PROCESS_GROUP intermittently stalls optimized Cangjie executables on Windows.
+        # taskkill /PID /T still provides exact timeout tree cleanup without that creation flag.
+        returncode, stdout, stderr, timed_out = run_command(
+            command, pkg_dir, timeout, env=environment, new_process_group=False)
+        LAST_WINDOWS_BENCHMARK_END = time.monotonic()
+    else:
+        returncode, stdout, stderr, timed_out = run_command(cjpm_command(action, run_args), pkg_dir, timeout)
     if returncode != 0:
         sys.stderr.write(stdout)
         sys.stderr.write(stderr)
