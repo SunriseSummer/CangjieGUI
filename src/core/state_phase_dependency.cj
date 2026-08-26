@@ -113,7 +113,7 @@ func collectPhaseStateReads<T>(dependencies: PhaseStateDependencies, body: () ->
         try {
             let result = body()
             dependencies.commit()
-            result
+            return result
         } catch (error: Exception) {
             dependencies.cancel()
             throw error
