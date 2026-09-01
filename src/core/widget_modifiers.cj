@@ -24,25 +24,28 @@ protected enum WidgetModifier {
     | GradientBackground(Gradient, Length)
     | DropShadow(Shadow, Length)
     | MultiShadow(Array<Shadow>, Length)
+    | PaintOverflow(PaintOutset)
     | Border(Color, Float32, Length)
     | DashedBorder(Color, Float32, Length, Float32, Float32)
     | Flex(Float32)
     | Visible(Bool)
     | Enabled(Bool)
+    | Accessibility(String, Semantics)
+    | PointerLayoutBounds
 }
 
 class ModifiedWidget <: Widget {
     private let child: Widget
-    private let modifier: WidgetModifier
+    private let operation: WidgetModifier
     private var frame = Rect.zero()
 
-    init(child: Widget, modifier: WidgetModifier) {
+    init(child: Widget, operation: WidgetModifier) {
         this.child = child
-        this.modifier = modifier
+        this.operation = operation
     }
 
     public func measure(ctx: UiContext, available: Size): Size {
-        match (modifier) {
+        match (operation) {
             case WidgetModifier.Width(length) =>
                 let value = exact(ctx, length)
                 let childSize = child.measure(ctx, Size(min(value, available.w), available.h))
@@ -84,26 +87,35 @@ class ModifiedWidget <: Widget {
 
     public func layout(ctx: UiContext, rect: Rect): Unit {
         frame = rect
-        match (modifier) {
-            case WidgetModifier.Width(length) =>
-                child.layout(ctx, Rect(rect.x, rect.y, min(exact(ctx, length), rect.w), rect.h))
-            case WidgetModifier.Height(length) =>
-                child.layout(ctx, Rect(rect.x, rect.y, rect.w, min(exact(ctx, length), rect.h)))
-            case WidgetModifier.MaxWidth(length) =>
-                child.layout(ctx, Rect(rect.x, rect.y, min(exact(ctx, length), rect.w), rect.h))
-            case WidgetModifier.MaxHeight(length) =>
-                child.layout(ctx, Rect(rect.x, rect.y, rect.w, min(exact(ctx, length), rect.h)))
+        match (operation) {
+            case WidgetModifier.Width(length) => child.layout(ctx,
+                Rect(rect.x, rect.y, min(exact(ctx, length), rect.w), rect.h))
+            case WidgetModifier.Height(length) => child.layout(ctx,
+                Rect(rect.x, rect.y, rect.w, min(exact(ctx, length), rect.h)))
+            case WidgetModifier.MaxWidth(length) => child.layout(ctx,
+                Rect(rect.x, rect.y, min(exact(ctx, length), rect.w), rect.h))
+            case WidgetModifier.MaxHeight(length) => child.layout(ctx,
+                Rect(rect.x, rect.y, rect.w, min(exact(ctx, length), rect.h)))
             case WidgetModifier.Padding(edges) => child.layout(ctx, rect.inset(ctx.resolve(edges)))
             case WidgetModifier.Visible(isVisible) =>
                 if (isVisible) {
                     child.layout(ctx, rect)
                 }
+            case WidgetModifier.Enabled(isEnabled) =>
+                let semanticsStart = ctx.semanticRegistrationCount()
+                child.layout(ctx, rect)
+                if (!isEnabled) {
+                    ctx.disableSemanticRegistrationsFrom(semanticsStart)
+                }
+            case WidgetModifier.Accessibility(id, properties) =>
+                child.layout(ctx, rect)
+                ctx.registerSemantics(SemanticsNode(id, properties, rect))
             case _ => child.layout(ctx, rect)
         }
     }
 
     public func draw(ctx: UiContext): Unit { // cjcheck-ignore: long-function # one match with one short arm per modifier kind; the length is the enum's width, not nested logic
-        match (modifier) {
+        match (operation) {
             case WidgetModifier.Surface(style) =>
                 drawSurface(ctx, frame, style)
                 child.draw(ctx)
@@ -162,8 +174,8 @@ class ModifiedWidget <: Widget {
 
     // Strokes the border arm shared by Border and DashedBorder: centred on the edge (inset by
     // half the width), rounded to the resolved radius; a zero dash means a solid stroke.
-    private func drawBorderStroke(ctx: UiContext, color: Color, width: Float32, radius: Length,
-        dash!: Float32, gap!: Float32): Unit {
+    private func drawBorderStroke(ctx: UiContext, color: Color, width: Float32, radius: Length, dash!: Float32,
+        gap!: Float32): Unit {
         if (width <= 0.0 || Int64(color.a) == 0) {
             return
         }
@@ -177,21 +189,45 @@ class ModifiedWidget <: Widget {
     }
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
-        match (modifier) {
+        match (operation) {
             case WidgetModifier.Visible(isVisible) => isVisible && child.handle(ctx, event)
             case WidgetModifier.Enabled(isEnabled) =>
                 // Disabled suppresses input, not time: the per-frame tick still flows, so a
                 // wrapped Frame hook (e.g. dialog polling) keeps running while greyed out.
                 match (event) {
-                    case UiEvent.Frame(_) => child.handle(ctx, event)
-                    case _ => isEnabled && child.handle(ctx, event)
-                }
+                case UiEvent.Frame(_) => child.handle(ctx, event)
+                case _ => isEnabled && child.handle(ctx, event)
+            }
             case _ => child.handle(ctx, event)
         }
     }
 
+    public func pointerEventScope(): PointerEventScope {
+        match (operation) {
+            case WidgetModifier.PointerLayoutBounds => PointerEventScope.LayoutBounds
+            case _ => child.pointerEventScope()
+        }
+    }
+
+    public func paintOutset(): PaintOutset {
+        let inherited = child.paintOutset()
+        match (operation) {
+            case WidgetModifier.Surface(style) => inherited.join(surfacePaintOutset(style))
+            case WidgetModifier.DropShadow(shadow, _) => inherited.join(configurableShadowPaintOutset(shadow))
+            case WidgetModifier.MultiShadow(layers, _) =>
+                var result = inherited
+                for (layer in layers) {
+                    result = result.join(configurableShadowPaintOutset(layer))
+                }
+                result
+            case WidgetModifier.PaintOverflow(value) => inherited.join(value)
+            case WidgetModifier.Visible(false) => PaintOutset()
+            case _ => inherited
+        }
+    }
+
     public func isFlexible(): Bool {
-        match (modifier) {
+        match (operation) {
             case WidgetModifier.Flex(_) => true
             case WidgetModifier.Visible(isVisible) => isVisible && child.isFlexible()
             case _ => child.isFlexible()
@@ -199,14 +235,14 @@ class ModifiedWidget <: Widget {
     }
 
     public func flexWeight(): Float32 {
-        match (modifier) {
+        match (operation) {
             case WidgetModifier.Flex(weight) => weight
             case _ => child.flexWeight()
         }
     }
 
     public func acceptsStretch(axis: Axis): Bool {
-        match (modifier) {
+        match (operation) {
             // A size modifier pins its own axis and defers the other to the child, so a chain
             // like `.width(w).height(h)` reports both axes rigid — hard-coding the cross axis
             // to `true` here would mask an inner size modifier and break ZStack alignment.
@@ -239,9 +275,16 @@ class ModifiedWidget <: Widget {
     }
 
     public func participatesInLayout(): Bool {
-        match (modifier) {
+        match (operation) {
             case WidgetModifier.Visible(isVisible) => isVisible && child.participatesInLayout()
             case _ => child.participatesInLayout()
+        }
+    }
+
+    public func needsDetachedLayout(): Bool {
+        match (operation) {
+            case WidgetModifier.Visible(isVisible) => isVisible && child.needsDetachedLayout()
+            case _ => child.needsDetachedLayout()
         }
     }
 

@@ -299,6 +299,23 @@ func tabTraversalShowsFocusRing(): Unit {
     @Expect(ctx.showFocusRing("one")) // now reached by keyboard
 }
 
+@Test
+func uiContextProtocolPropertiesNormalizeUnsafeHostValues(): Unit {
+    let ctx = testContext()
+
+    ctx.displayScale = 0.0
+    ctx.fontScale = -2.0
+    ctx.viewportWidth = -100.0
+    ctx.viewportHeight = -50.0
+    ctx.clickCount = 99
+
+    @Expect(ctx.displayScale, Float32(0.001))
+    @Expect(ctx.fontScale, Float32(0.1))
+    @Expect(ctx.viewportWidth, Float32(0.0))
+    @Expect(ctx.viewportHeight, Float32(0.0))
+    @Expect(ctx.clickCount, Int64(3))
+}
+
 // Overlays stack: events walk the layers top-most first with unconsumed events falling
 // through; drawing walks bottom-up; removing by owner leaves the other layers open.
 @Test
@@ -360,6 +377,49 @@ func overlayReregistrationReplacesInPlace(): Unit {
     @Expect(painted.value, "fresh")
 }
 
+@Test
+func overlayOwnerIndexTracksRemovalShiftsAndLaterReplacement(): Unit {
+    let ctx = testContext()
+    let painted = State<String>("")
+    let layer = {
+        owner: String, text: String => Overlay(handleEvent: {_, _ => false},
+            render: {_ => painted.value = painted.value + text}, owner: owner)
+    }
+    ctx.setOverlay(layer("base", "base"))
+    ctx.setOverlay(layer("middle", "middle-stale"))
+    ctx.setOverlay(layer("top", "top-stale"))
+
+    ctx.removeOverlay("middle")
+    ctx.setOverlay(layer("top", "top-fresh"))
+    ctx.setOverlay(layer("middle", "middle-fresh"))
+    ctx.drawActiveOverlay()
+
+    @Expect(ctx.overlayCount(), Int64(3))
+    @Expect(painted.value, "basetop-freshmiddle-fresh")
+}
+
+@Test
+func overlayRemovedDuringDispatchIsSkippedFromTheEventSnapshot(): Unit {
+    let ctx = testContext()
+    let trace = State<String>("")
+    let base = Overlay(handleEvent: {
+        _, _ =>
+            trace.value = trace.value + "base"
+            true
+    }, render: {_ => ()}, owner: "base")
+    let top = Overlay(handleEvent: {
+        context, _ =>
+            trace.value = trace.value + "top"
+            context.removeOverlay("base")
+            false
+    }, render: {_ => ()}, owner: "top")
+    ctx.registerOverlayFragment(overlaySnapshotFromRegistrations([base, top]))
+
+    @Expect(!ctx.dispatchOverlay(UiEvent.Unknown(UInt32(0))))
+    @Expect(trace.value, "top")
+    @Expect(ctx.overlayCount(), Int64(1))
+}
+
 // Rendering a layer may register further overlays — a popup opened inside a dialog
 // registers while the dialog's body draws — and the draw pass picks them up within the
 // same frame, painting them above the layer that spawned them.
@@ -367,7 +427,7 @@ func overlayReregistrationReplacesInPlace(): Unit {
 func overlayRegisteredDuringRenderPaintsSameFrame(): Unit {
     let ctx = testContext()
     let trace = State<String>("")
-    ctx.setOverlay(Overlay(
+    let dialog = Overlay(
         handleEvent: {_, _ => true},
         render: {
             c =>
@@ -376,7 +436,8 @@ func overlayRegisteredDuringRenderPaintsSameFrame(): Unit {
                 render: {_ => trace.value = trace.value + "(popup)"}, owner: "popup"))
         },
         owner: "dialog"
-    ))
+    )
+    ctx.registerOverlayFragment(overlaySnapshotFromRegistrations([dialog]))
     ctx.drawActiveOverlay()
     @Expect(trace.value, "(dialog)(popup)")
     @Expect(ctx.overlayCount(), Int64(2))

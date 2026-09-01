@@ -1,10 +1,10 @@
 package cui.controls
 
 import sdl.{Color, FontSizes, Key, MouseButton, Rect, Size, UiEvent}
-import cui.core.{rekeyControl, clampItemIndex, Bindable, CUI_CONTROL_H, CUI_SMALL_H, CursorShape, ScrollBar, maxScrollOffset, Spring, State, UiContext, Widget, requireControlId,
+import cui.core.{rekeyControl, clampItemIndex, Bindable, CUI_CONTROL_H, CUI_SMALL_H, CursorShape, ScrollBar,
+    maxScrollOffset, Semantics, SemanticsAction, SemanticsRole, Spring, State, UiContext, Widget, requireControlId,
     claimHoverIfInside, clampScrollOffset, drawFocusRing, drawSurface, drawVerticalScrollBar, emit,
-    focusableControlIdentity, localState, scrollLineIndex, scrollLineRemainder,
-    scrollOffsetAfterWheel}
+    focusableControlIdentity, localState, scrollLineIndex, scrollLineRemainder, scrollOffsetAfterWheel}
 
 /*
  * A labelled on/off toggle bound to a `Bindable<Bool>`, with an animated check fill.
@@ -45,8 +45,17 @@ public class Checkbox <: Widget {
         Size(min(available.w, ctx.renderer.textWidth(label) + 34.0), CUI_CONTROL_H)
     }
 
-    public func layout(_: UiContext, rect: Rect): Unit {
+    public func layout(ctx: UiContext, rect: Rect): Unit {
         frame = rect
+        ctx.registerSemanticProvider(controlId, rect, [SemanticsAction.Activate],
+            {=> Semantics(label: label, role: SemanticsRole.Checkbox, checked: Some(checked.value))}, {
+                action => match (action) {
+                    case SemanticsAction.Activate =>
+                        checked.value = !checked.value
+                        true
+                    case _ => false
+                }
+            })
     }
 
     public func draw(ctx: UiContext): Unit {
@@ -174,8 +183,7 @@ public class ListView <: Widget {
     public func draw(ctx: UiContext): Unit {
         // Clamp writes only on change: this runs every frame, and the offset may be an
         // externally owned state whose observers should not fire for no-op writes.
-        let clampedScroll = clampScrollOffset(scrollStateValue.value, listContentHeight(items),
-            listViewport(frame).h)
+        let clampedScroll = clampScrollOffset(scrollStateValue.value, listContentHeight(items), listViewport(frame).h)
         if (clampedScroll != scrollStateValue.value) {
             scrollStateValue.value = clampedScroll
         }

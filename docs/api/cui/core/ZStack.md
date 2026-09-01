@@ -132,7 +132,7 @@ public func draw(ctx: UiContext): Unit
 
 ### handle
 
-把事件自顶向下派发给子组件并返回是否被消费。`Frame` 事件广播给全部子组件并返回 `false`；其余事件后声明者（视觉最上层）优先，遇到消费者即停止，上层因此天然遮挡下层的点击。
+把事件自顶向下派发给子组件并返回是否被消费。`Frame` 事件广播给全部子组件并返回 `false`；其余事件后声明者（视觉最上层）优先，遇到消费者即停止。点事件会用布局提交的有序 AABB 树跳过不相交的 [`PointerEventScope.LayoutBounds`](PointerEventScope.md) 子树；完全重叠候选仍保持逐层语义，无界兼容叶和活动捕获也不会被剪掉。
 
 ```cangjie
 public func handle(ctx: UiContext, event: UiEvent): Bool

@@ -2,14 +2,18 @@ package cui.controls
 
 import std.collection.{ArrayList, HashMap}
 import sdl.{Color, FontSizes, Key, MouseButton, Rect, Size, UiEvent, drawIcon}
-import cui.core.{CUI_SMALL_H, CursorShape, Length, LengthUnit, UiContext, Widget, drawFocusRing, emit,
-    focusableControlIdentity, resolveControlKey}
+import cui.core.{CUI_SMALL_H, CursorShape, Length, LengthUnit, UiContext, UiEnvironmentKey, Widget, drawFocusRing, emit,
+    focusableControlIdentity, resolveControlKey, sameUiEnvironment}
 
 // Gap after an inline icon before the next span.
 private let RICH_SPAN_GAP: Float32 = 3.0
 
 // Corner radius of a span's `<mark>`-style highlight box.
 private let RICH_HIGHLIGHT_RADIUS: Float32 = 3.0
+
+private func sameRichMeasureKey(left: Float32, right: Float32): Bool {
+    left == right // cjcheck-ignore: float-equal # exact memo key; a miss only recomputes layout
+}
 
 /**
  * Inline styled text: a sequence of `RichSpan`s (coloured, styled text runs and inline icons) laid out
@@ -40,9 +44,7 @@ public class RichText <: Widget {
     private var cached: ?RichLayout = None
     private var cachedWidthKey: Float32 = -1.0
     private var cachedPointSize: Float32 = -1.0
-    // A 1vp probe folded into the cache key: per-span sizes resolve through the vp scale, which can
-    // change (a DPI move) while the fp-resolved base size stays equal, so ps alone under-keys them.
-    private var cachedVpProbe: Float32 = -1.0
+    private var cachedUiEnvironment: ?UiEnvironmentKey = None
 
     public init(
         spans: Array<RichSpan>,
@@ -124,15 +126,14 @@ public class RichText <: Widget {
                 case None => ()
             }
             match (item.kind) {
-                case PlacedKind.PlacedText(text) =>
-                    ctx.renderer.text(text, box.x, box.y, color, pointSize: item.size, style: item.style,
-                        font: item.font)
+                case PlacedKind.PlacedText(text) => ctx
+                    .renderer
+                    .text(text, box.x, box.y, color, pointSize: item.size, style: item.style, font: item.font)
                 case PlacedKind.PlacedIcon(icon) => drawIcon(ctx.renderer, icon, box, color)
             }
             // A keyboard focus ring around the focused link's fragment (shown for keyboard focus only).
             match (linkIdFor(item.spanIndex)) {
-                case Some(fid) where item.onTap.isSome() && ctx.showFocusRing(fid) =>
-                    drawFocusRing(ctx, box, 3.0)
+                case Some(fid) where item.onTap.isSome() && ctx.showFocusRing(fid) => drawFocusRing(ctx, box, 3.0)
                 case _ => ()
             }
         }
@@ -276,13 +277,14 @@ public class RichText <: Widget {
     // single line to its content width, so draw() asks for exactly layout.width and would otherwise
     // miss the cache (and re-wrap) every frame in the inline-row case.
     private func layoutFor(ctx: UiContext, width: Float32, ps: Float32, lineHeight: Float32): RichLayout {
-        let vpProbe = ctx.resolve(Length(1.0, LengthUnit.Vp))
-        match (cached) {
+        let environment = ctx.uiEnvironmentKey()
+        match ((cached, cachedUiEnvironment)) {
             // Exact float comparison is deliberate: the cache keys are reused input values,
             // not computed approximations, so equality means "same inputs as last time" and
             // the worst case of a near-miss is one redundant re-layout, never a wrong one.
-            case Some(layout) where cachedPointSize == ps && cachedVpProbe == vpProbe && // cjcheck-ignore: float-equal # cache-key identity; miss only costs a re-layout
-                (cachedWidthKey == width || (layout.lines <= 1 && layout.width <= width)) => layout // cjcheck-ignore: float-equal # cache-key identity; miss only costs a re-layout
+            case (Some(layout), Some(previousEnvironment)) where sameUiEnvironment(previousEnvironment, environment) &&
+                sameRichMeasureKey(cachedPointSize, ps) && (sameRichMeasureKey(cachedWidthKey, width) || (layout.lines <=
+                1 && layout.width <= width)) => layout
             case _ =>
                 let sizes = resolveSpanSizes(ctx, ps)
                 let layout = layoutRichSpans(
@@ -297,7 +299,7 @@ public class RichText <: Widget {
                 cached = Some(layout)
                 cachedWidthKey = width
                 cachedPointSize = ps
-                cachedVpProbe = vpProbe
+                cachedUiEnvironment = Some(environment)
                 layout
         }
     }

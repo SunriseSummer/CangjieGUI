@@ -7,8 +7,8 @@
  */
 package bench_scenes
 
-import cui.{Button, Dropdown, FlowRow, HStack, Label, LazyColumn, LengthUnits, Panel, RadioButton, ScrollView, Slider,
-    Spacer, State, Stepper, Switch, VStack, Widget}
+import cui.{Button, Dropdown, FlowRow, HStack, Label, LazyColumn, LazyList, LengthUnits, Panel, RadioButton, ScrollView,
+    Slider, Spacer, State, Stepper, Switch, VStack, Widget}
 
 // The benchmark section is deliberately fixed-height: every repeated section has the same controls
 // and single-line labels. The slot includes the panel's content padding and the inter-section gap.
@@ -42,6 +42,19 @@ public func lazyControlsFormScene(scroll: State<Float32>, sections: Int64): Widg
     let density = State<Int64>(1)
     let volume = State<Float32>(0.6)
     LazyColumn(sections, CONTROLS_SECTION_HEIGHT, spacing: 12.0, scroll: scroll, id: "bench.controls.lazy") {
+        index => controlsSection(index, notify, priority, minutes, density, volume)
+    }
+}
+
+/** Self-measuring virtualization of the same form; callers maintain no section-height model. */
+public func measuredControlsFormScene(scroll: State<Float32>, sections: Int64): Widget {
+    let notify = State<Bool>(true)
+    let priority = State<Int64>(1)
+    let minutes = State<Int64>(45)
+    let density = State<Int64>(1)
+    let volume = State<Float32>(0.6)
+    LazyList.measured(sections, estimatedHeight: 240.0, spacing: 12.0, scroll: scroll,
+        id: "bench.controls.measured") {
         index => controlsSection(index, notify, priority, minutes, density, volume)
     }
 }

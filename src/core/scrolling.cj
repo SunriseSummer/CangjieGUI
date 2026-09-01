@@ -1,6 +1,6 @@
 package cui.core
 
-import sdl.{Rect, clampF32}
+import sdl.{Rect, Size, UiEvent, clampF32}
 
 internal let CUI_SCROLL_W: Float32 = 6.0
 internal let CUI_SCROLL_MARGIN: Float32 = 2.0
@@ -342,5 +342,106 @@ public class HScrollBar {
             return true
         }
         false
+    }
+}
+
+/** A vertical viewport that clips its scroll axis and preserves declared cross-axis paint overflow. */
+public class ScrollView <: Widget {
+    private let child: Widget
+    private let paintOverflow: PaintOutset
+    private var scrollOffset: State<Float32>
+    private let scrollBar: ScrollBar
+    private var frame = Rect.zero()
+    private var spatialClip = exactSpatialClip(Rect.zero())
+    private var contentHeight: Float32 = 0.0
+
+    public init(key!: ?String = None, body!: () -> Unit) {
+        let ident = resolveControlKey(key, "ScrollView")
+        child = buildChild("ScrollView", body)
+        paintOverflow = child.paintOutset()
+        scrollOffset = localState<Float32>("ScrollView:${ident}:offset") {0.0}
+        scrollBar = ScrollBar("ScrollView:${ident}:thumb")
+        emit(this)
+    }
+
+    /** Uses an externally owned vertical scroll offset. */
+    public func scrollState(value: State<Float32>): ScrollView {
+        scrollOffset = value
+        this
+    }
+
+    public func measure(_: UiContext, available: Size): Size {
+        available
+    }
+
+    public func layout(ctx: UiContext, rect: Rect): Unit {
+        frame = rect
+        spatialClip = verticalViewportSpatialClip(rect, paintOverflow)
+        // Content gets the full width until it overflows; then it gives up the bar's gutter. A
+        // narrower child can only grow taller, so one re-measure settles without oscillating.
+        var contentWidth = rect.w
+        var measured = child.measure(ctx, Size(contentWidth, LAYOUT_UNBOUNDED))
+        if (measured.h > rect.h) {
+            contentWidth = max(0.0, rect.w - scrollBarGutter())
+            measured = child.measure(ctx, Size(contentWidth, LAYOUT_UNBOUNDED))
+        }
+        contentHeight = measured.h
+        let clamped = clampScrollOffset(scrollOffset.value, contentHeight, rect.h)
+        if (clamped != scrollOffset.value) {
+            scrollOffset.value = clamped
+        }
+        let laidOutContentWidth = contentWidth
+        ctx.withSpatialClip(spatialClip) {
+            => child.layout(ctx, Rect(rect.x, rect.y - scrollOffset.value, laidOutContentWidth, contentHeight))
+        }
+    }
+
+    public func draw(ctx: UiContext): Unit {
+        ctx.drawWithinSpatialClip(spatialClip) {=> child.draw(ctx)}
+        drawVerticalScrollBar(ctx, frame, scrollOffset.value, contentHeight, frame.h, active: scrollBar.dragging(ctx))
+    }
+
+    public func handle(ctx: UiContext, event: UiEvent): Bool {
+        match (event) {
+            case UiEvent.MouseWheel(_, wheelY, pointerX, pointerY) =>
+                // Fitting content does not consume the wheel, so an enclosing scroller can react.
+                if (spatialClip.contains(pointerX, pointerY) && maxScrollOffset(contentHeight, frame.h) > 0.0) {
+                    scrollOffset.value = scrollOffsetAfterWheel(scrollOffset.value, wheelY, contentHeight, frame.h)
+                    return true
+                }
+            case UiEvent.MouseDown(_, x, y) =>
+                if (scrollBar.press(ctx, frame, scrollOffset, contentHeight, frame.h, x, y)) {
+                    return true
+                }
+                if (!spatialClip.contains(x, y)) {
+                    return false
+                }
+            case UiEvent.MouseMove(x, y) =>
+                if (scrollBar.drag(ctx, frame, scrollOffset, contentHeight, frame.h, y)) {
+                    return true
+                }
+                // Active child capture keeps receiving moves beyond the viewport until release.
+                if (!spatialClip.contains(x, y) && ctx.dragId.isEmpty()) {
+                    return false
+                }
+            case UiEvent.MouseUp(_, x, y) =>
+                if (!spatialClip.contains(x, y) && ctx.dragId.isEmpty()) {
+                    return false
+                }
+            case _ => ()
+        }
+        child.handle(ctx, event)
+    }
+
+    public func isFlexible(): Bool {
+        true
+    }
+
+    public func paintOutset(): PaintOutset {
+        paintOverflow.horizontalOnly()
+    }
+
+    public func focusableIds(): Array<String> {
+        child.focusableIds()
     }
 }

@@ -9,10 +9,14 @@ protected let LAYOUT_UNBOUNDED: Float32 = 999936.0
 /** Layers children back-to-front and aligns each child inside the same frame. */
 public class ZStack <: Widget {
     private let children: Array<Widget>
+    private let paintOverflow: PaintOutset
+    private var eventTopology: ChildEventTopology
     private var contentAlignment = Alignment.Center
 
     public init(body!: () -> Unit) {
         children = buildChildren("ZStack", body)
+        paintOverflow = aggregatePaintOutsets(children)
+        eventTopology = ChildEventTopology(children.size)
         emit(this)
     }
 
@@ -37,8 +41,12 @@ public class ZStack <: Widget {
     }
 
     public func layout(ctx: UiContext, rect: Rect): Unit {
-        for (child in children) {
+        eventTopology = activeAutomaticEventTopology(this, children.size, eventTopology)
+        eventTopology.beginLayout()
+        for (index in 0..children.size) {
+            let child = children[index]
             if (!child.participatesInLayout()) {
+                layoutDetachedIfNeeded(child, ctx)
                 continue
             }
             let measured = child.measure(ctx, Size(rect.w, rect.h))
@@ -52,8 +60,11 @@ public class ZStack <: Widget {
             } else {
                 min(rect.h, measured.h)
             }
-            child.layout(ctx, alignedRect(rect, width, height, contentAlignment))
+            let childRect = alignedRect(rect, width, height, contentAlignment)
+            child.layout(ctx, childRect)
+            eventTopology.noteChildLayout(index, childRect, child)
         }
+        eventTopology.commitLayout(children, rect)
     }
 
     public func draw(ctx: UiContext): Unit {
@@ -63,22 +74,15 @@ public class ZStack <: Widget {
     }
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
-        match (event) {
-            case UiEvent.Frame(_) =>
-                for (child in children) {
-                    broadcastEvent(child, ctx, event)
-                }
-                return false
-            case _ => ()
-        }
-        var i = children.size - 1
-        while (i >= 0) {
-            if (children[i].handle(ctx, event)) {
-                return true
-            }
-            i -= 1
-        }
-        false
+        eventTopology.dispatch(children, ctx, event)
+    }
+
+    public func pointerEventScope(): PointerEventScope {
+        eventTopology.pointerEventScope()
+    }
+
+    public func paintOutset(): PaintOutset {
+        paintOverflow
     }
 
     public func focusableIds(): Array<String> {
@@ -93,6 +97,8 @@ public class ZStack <: Widget {
 public class Grid <: Widget {
     private let columns: Int64
     private let children: Array<Widget>
+    private let paintOverflow: PaintOutset
+    private var eventTopology: ChildEventTopology
     private var horizontalGap: Length = vpLength(CUI_GAP)
     private var verticalGap: Length = vpLength(CUI_GAP)
 
@@ -103,6 +109,8 @@ public class Grid <: Widget {
         }
         this.columns = columns
         this.children = buildChildren("Grid", body)
+        this.paintOverflow = aggregatePaintOutsets(children)
+        this.eventTopology = ChildEventTopology(children.size)
         emit(this)
     }
 
@@ -136,6 +144,8 @@ public class Grid <: Widget {
     }
 
     public func layout(ctx: UiContext, rect: Rect): Unit {
+        eventTopology = activeAutomaticEventTopology(this, children.size, eventTopology)
+        eventTopology.beginLayout()
         let hGap = gapH(ctx)
         let cellWidth = gridCellWidth(rect.w, hGap)
         let heights = rowHeights(ctx, rect.w, rect.h)
@@ -146,6 +156,7 @@ public class Grid <: Widget {
             var column: Int64 = 0
             while (column < columns && childIndex < children.size) {
                 if (!children[childIndex].participatesInLayout()) {
+                    layoutDetachedIfNeeded(children[childIndex], ctx)
                     childIndex += 1
                     continue
                 }
@@ -162,13 +173,16 @@ public class Grid <: Widget {
                 } else {
                     measured.h
                 }
-                child.layout(ctx, Rect(x, y, min(cellWidth, width), min(heights[row], height)))
+                let childRect = Rect(x, y, min(cellWidth, width), min(heights[row], height))
+                child.layout(ctx, childRect)
+                eventTopology.noteChildLayout(childIndex, childRect, child)
                 column += 1
                 childIndex += 1
             }
             y += heights[row] + gapV(ctx)
             row += 1
         }
+        eventTopology.commitLayout(children, rect)
     }
 
     public func draw(ctx: UiContext): Unit {
@@ -178,7 +192,15 @@ public class Grid <: Widget {
     }
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
-        dispatchChildren(children, ctx, event)
+        eventTopology.dispatch(children, ctx, event)
+    }
+
+    public func pointerEventScope(): PointerEventScope {
+        eventTopology.pointerEventScope()
+    }
+
+    public func paintOutset(): PaintOutset {
+        paintOverflow
     }
 
     public func focusableIds(): Array<String> {
@@ -221,11 +243,15 @@ public class Grid <: Widget {
 /** Places children left-to-right and wraps them onto content-sized rows. */
 public class FlowRow <: Widget {
     private let children: Array<Widget>
+    private let paintOverflow: PaintOutset
+    private var eventTopology: ChildEventTopology
     private var horizontalGap: Length = vpLength(CUI_GAP)
     private var verticalGap: Length = vpLength(CUI_GAP)
 
     public init(body!: () -> Unit) {
         children = buildChildren("FlowRow", body)
+        paintOverflow = aggregatePaintOutsets(children)
+        eventTopology = ChildEventTopology(children.size)
         emit(this)
     }
 
@@ -259,7 +285,10 @@ public class FlowRow <: Widget {
     }
 
     public func layout(ctx: UiContext, rect: Rect): Unit {
+        eventTopology = activeAutomaticEventTopology(this, children.size, eventTopology)
+        eventTopology.beginLayout()
         let _ = flowExtent(ctx, Size(rect.w, rect.h), rect, shouldLayout: true) // cjcheck-ignore: ignore-result # layout pass wants the child placement side effect; the extent is measure-pass output
+        eventTopology.commitLayout(children, rect)
     }
 
     public func draw(ctx: UiContext): Unit {
@@ -272,7 +301,15 @@ public class FlowRow <: Widget {
     }
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
-        dispatchChildren(children, ctx, event)
+        eventTopology.dispatch(children, ctx, event)
+    }
+
+    public func pointerEventScope(): PointerEventScope {
+        eventTopology.pointerEventScope()
+    }
+
+    public func paintOutset(): PaintOutset {
+        paintOverflow
     }
 
     public func focusableIds(): Array<String> {
@@ -286,8 +323,12 @@ public class FlowRow <: Widget {
         var y: Float32 = 0.0
         var rowHeight: Float32 = 0.0
         var usedWidth: Float32 = 0.0
-        for (child in children) {
+        for (index in 0..children.size) {
+            let child = children[index]
             if (!child.participatesInLayout()) {
+                if (shouldLayout) {
+                    layoutDetachedIfNeeded(child, ctx)
+                }
                 continue
             }
             let childSize = child.measure(ctx, available)
@@ -297,7 +338,9 @@ public class FlowRow <: Widget {
                 rowHeight = 0.0
             }
             if (shouldLayout) {
-                child.layout(ctx, Rect(frame.x + x, frame.y + y, childSize.w, childSize.h))
+                let childRect = Rect(frame.x + x, frame.y + y, childSize.w, childSize.h)
+                child.layout(ctx, childRect)
+                eventTopology.noteChildLayout(index, childRect, child)
             }
             usedWidth = max(usedWidth, x + childSize.w)
             x += childSize.w + hGap
@@ -308,106 +351,6 @@ public class FlowRow <: Widget {
 }
 
 /** A clipped, wheel-scrollable viewport with state retained by its stable `id`. */
-public class ScrollView <: Widget {
-    private let child: Widget
-    private var scrollOffset: State<Float32>
-    private let scrollBar: ScrollBar
-    private var frame = Rect.zero()
-    private var contentHeight: Float32 = 0.0
-
-    public init(key!: ?String = None, body!: () -> Unit) {
-        let ident = resolveControlKey(key, "ScrollView")
-        child = buildChild("ScrollView", body)
-        scrollOffset = localState<Float32>("ScrollView:${ident}:offset") {0.0}
-        scrollBar = ScrollBar("ScrollView:${ident}:thumb")
-        emit(this)
-    }
-
-    /** Uses an externally owned vertical scroll offset. */
-    public func scrollState(value: State<Float32>): ScrollView {
-        scrollOffset = value
-        this
-    }
-
-    public func measure(_: UiContext, available: Size): Size {
-        available
-    }
-
-    public func layout(ctx: UiContext, rect: Rect): Unit {
-        frame = rect
-        // Content gets the full width until it overflows; then it gives up the bar's
-        // gutter so the bar never covers it. A narrower child can only grow taller,
-        // so a single re-measure settles the decision without oscillating.
-        var contentWidth = rect.w
-        var measured = child.measure(ctx, Size(contentWidth, LAYOUT_UNBOUNDED))
-        if (measured.h > rect.h) {
-            contentWidth = max(0.0, rect.w - scrollBarGutter())
-            measured = child.measure(ctx, Size(contentWidth, LAYOUT_UNBOUNDED))
-        }
-        contentHeight = measured.h
-        // Clamp writes only on change: layout runs every frame, and the offset may be an
-        // externally owned state whose observers should not fire for no-op writes.
-        let clamped = clampScrollOffset(scrollOffset.value, contentHeight, rect.h)
-        if (clamped != scrollOffset.value) {
-            scrollOffset.value = clamped
-        }
-        child.layout(ctx, Rect(rect.x, rect.y - scrollOffset.value, contentWidth, contentHeight))
-    }
-
-    public func draw(ctx: UiContext): Unit {
-        // Clip exactly on the scroll axis, but give the cross axis shadow clearance: a card at the
-        // viewport edge keeps its rounded soft halo instead of having it sliced off vertically.
-        ctx.renderer.pushClip(Rect(frame.x - CUI_SHADOW_CLEARANCE, frame.y, frame.w + 2.0 * CUI_SHADOW_CLEARANCE,
-            frame.h))
-        child.draw(ctx)
-        ctx.renderer.popClip()
-        drawVerticalScrollBar(ctx, frame, scrollOffset.value, contentHeight, frame.h, active: scrollBar.dragging(ctx))
-    }
-
-    public func handle(ctx: UiContext, event: UiEvent): Bool {
-        match (event) {
-            case UiEvent.MouseWheel(_, wheelY, pointerX, pointerY) =>
-                // A surface whose content fits does not own the wheel: consuming here would open a
-                // dead zone inside an enclosing scroller, so the event falls through instead.
-                if (frame.contains(pointerX, pointerY) && maxScrollOffset(contentHeight, frame.h) > 0.0) {
-                    scrollOffset.value = scrollOffsetAfterWheel(scrollOffset.value, wheelY, contentHeight, frame.h)
-                    return true
-                }
-            case UiEvent.MouseDown(_, x, y) =>
-                if (scrollBar.press(ctx, frame, scrollOffset, contentHeight, frame.h, x, y)) {
-                    return true
-                }
-                if (!frame.contains(x, y)) {
-                    return false
-                }
-            case UiEvent.MouseMove(x, y) =>
-                if (scrollBar.drag(ctx, frame, scrollOffset, contentHeight, frame.h, y)) {
-                    return true
-                }
-                // While a child drag is live (a slider knob, a text selection), track the
-                // pointer past the viewport edge to the release — pointer capture — instead
-                // of freezing the gesture at the boundary.
-                if (!frame.contains(x, y) && ctx.dragId.isEmpty()) {
-                    return false
-                }
-            case UiEvent.MouseUp(_, x, y) =>
-                if (!frame.contains(x, y) && ctx.dragId.isEmpty()) {
-                    return false
-                }
-            case _ => ()
-        }
-        child.handle(ctx, event)
-    }
-
-    public func isFlexible(): Bool {
-        true
-    }
-
-    public func focusableIds(): Array<String> {
-        child.focusableIds()
-    }
-}
-
 private func alignedRect(bounds: Rect, width: Float32, height: Float32, alignment: Alignment): Rect {
     let x = match (alignment) {
         case Alignment.Top => bounds.x + (bounds.w - width) / 2.0
@@ -428,25 +371,6 @@ private func alignedRect(bounds: Rect, width: Float32, height: Float32, alignmen
         case _ => bounds.y
     }
     Rect(x, y, width, height)
-}
-
-internal func dispatchChildren(children: Array<Widget>, ctx: UiContext, event: UiEvent): Bool {
-    match (event) {
-        case UiEvent.Frame(_) =>
-            for (child in children) {
-                broadcastEvent(child, ctx, event)
-            }
-            return false
-        case _ => ()
-    }
-    var i = children.size - 1
-    while (i >= 0) {
-        if (children[i].handle(ctx, event)) {
-            return true
-        }
-        i -= 1
-    }
-    false
 }
 
 // Total space consumed by the gaps between `count` children (shared by grid/flow/stack).

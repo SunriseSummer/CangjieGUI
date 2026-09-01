@@ -4,6 +4,7 @@ name = "cui_cards"
 version = "0.1.0"
 output-type = "executable"
 description = "CUI style modifiers (shadow elevation, corner radius, border) card playground."
+compile-option = "-O2"
 
 [dependencies]
 cui = { path = "../.." }

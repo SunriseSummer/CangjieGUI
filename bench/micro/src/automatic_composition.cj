@@ -5,16 +5,63 @@
  */
 package bench_micro
 
-import cui.{Color, HStack, Label, Panel, Rect, RetainedTestMode, Size, State, UiContext, UiEvent, VStack, Widget,
-    WidgetTestHost, emit}
-import bench_harness.{printSection, report, reportCount, timeit}
+import cui.{Color, EffectCleanup, HStack, Label, Panel, Rect, RetainedSubtree, RetainedTestMode, Size, Spacer, State,
+    UiContext, UiEvent, VStack, Widget, WidgetTestHost, emit, lifecycleEffect, mountEffect, rememberState}
+import bench_harness.{BenchResult, printSection, report, reportCount, timeit}
 
 private let AUTOMATIC_ROW_COUNT: Int64 = 240
-private let AUTOMATIC_FRAME_COUNT: Int64 = 100
+private let AUTOMATIC_FRAME_COUNT: Int64 = 500
 private let AUTOMATIC_PAINT_FRAME_COUNT: Int64 = 1000
 private let AUTOMATIC_LAYOUT_FRAME_COUNT: Int64 = 1000
 private let AUTOMATIC_PAINT_NODE_COUNT: Int64 = 96
 private let AUTOMATIC_LAYOUT_NODE_COUNT: Int64 = 24
+private let DECLARATION_COUNT: Int64 = 128
+private let DECLARATION_FRAME_COUNT: Int64 = 500
+private let REMEMBER_SLOT_COUNT: Int64 = 256
+private let REMEMBER_FRAME_COUNT: Int64 = 500
+
+private class DeclarationScene {
+    let externallyRevisioned: Bool
+    let positional: Bool
+    var bodyBuilds: Int64 = 0
+
+    init(externallyRevisioned: Bool, positional: Bool) {
+        this.externallyRevisioned = externallyRevisioned
+        this.positional = positional
+    }
+
+    func build(): Unit {
+        bodyBuilds += 1
+        for (index in 0..DECLARATION_COUNT) {
+            if (externallyRevisioned) {
+                if (positional) {
+                    lifecycleEffect(UInt64(0), {=> EffectCleanup({=> ()})})
+                } else {
+                    lifecycleEffect("effect-${index}", UInt64(0), {=> EffectCleanup({=> ()})})
+                }
+            } else {
+                if (positional) {
+                    mountEffect({=> EffectCleanup({=> ()})})
+                } else {
+                    mountEffect("effect-${index}", {=> EffectCleanup({=> ()})})
+                }
+            }
+        }
+        if (externallyRevisioned) {
+            RetainedSubtree("retained", UInt64(0)) {Spacer()}
+        } else {
+            RetainedSubtree("retained") {Spacer()}
+        }
+    }
+}
+
+private class BuildPhaseTotal {
+    var ns: UInt64 = UInt64(0)
+
+    func add(value: UInt64): Unit {
+        ns += value
+    }
+}
 
 private class AutomaticPaintBenchProbe <: Widget {
     private let scene: AutomaticPaintScene
@@ -131,6 +178,36 @@ private class AutomaticScene {
     }
 }
 
+private class RememberSlotScene {
+    private let positional: Bool
+    var initializations: Int64 = 0
+    var checksum: Int64 = 0
+
+    init(positional: Bool) {
+        this.positional = positional
+    }
+
+    func build(): Unit {
+        var total: Int64 = 0
+        for (index in 0..REMEMBER_SLOT_COUNT) {
+            let state = if (positional) {
+                rememberState<Int64> {
+                    initializations += 1
+                    index
+                }
+            } else {
+                rememberState<Int64>("bench.remember.${index}") {
+                    initializations += 1
+                    index
+                }
+            }
+            total += state.value
+        }
+        checksum = total
+        Spacer()
+    }
+}
+
 public func runAutomaticCompositionBench(): Unit {
     printSection("自动组合脏路径（普通 UI 代码 A/B）")
     let rect = Rect(0.0, 0.0, 720.0, 1800.0)
@@ -139,24 +216,26 @@ public func runAutomaticCompositionBench(): Unit {
     let incrementalScene = AutomaticScene()
     let incrementalBody: () -> Unit = {=> incrementalScene.build()}
     let _ = incrementalHost.frame(rect, body: incrementalBody)
+    reportAutomaticScopeFacetShape(incrementalHost)
     let incrementalBefore = incrementalScene.totalBodyBuilds()
     let _ = incrementalScene.changeNext()
     let _ = incrementalHost.frame(rect, body: incrementalBody)
     reportCount("自动组合", "单 State 变更执行分支体", UInt64(incrementalScene.totalBodyBuilds() - incrementalBefore))
-    report(
-        "frame",
-        "自动组合",
-        timeit(
-            "240 分支 / 单分支变更",
-            AUTOMATIC_FRAME_COUNT,
-            {
-                =>
-                    let changed = incrementalScene.changeNext()
-                    let result = incrementalHost.frame(rect, body: incrementalBody)
-                    changed + result.metrics.stabilizationPasses
-            }
-        )
+    let incrementalBuild = BuildPhaseTotal()
+    let incrementalResult = timeit(
+        "240 分支 / 单分支变更",
+        AUTOMATIC_FRAME_COUNT,
+        {
+            =>
+                let changed = incrementalScene.changeNext()
+                let result = incrementalHost.frame(rect, body: incrementalBody)
+                incrementalBuild.add(result.metrics.buildNs)
+                changed + result.metrics.stabilizationPasses
+        }
     )
+    report("frame", "自动组合", incrementalResult)
+    report("micro", "自动组合构建",
+        BenchResult("240 分支 / 单分支变更 build", AUTOMATIC_FRAME_COUNT, incrementalBuild.ns, 0))
 
     let fullHost = WidgetTestHost(retainedMode: RetainedTestMode.Full)
     let fullScene = AutomaticScene()
@@ -166,23 +245,119 @@ public func runAutomaticCompositionBench(): Unit {
     let _ = fullScene.changeNext()
     let _ = fullHost.frame(rect, body: fullBody)
     reportCount("自动组合", "强制全量执行分支体", UInt64(fullScene.totalBodyBuilds() - fullBefore))
+    let fullBuild = BuildPhaseTotal()
+    let fullResult = timeit(
+        "240 分支 / 强制全重建",
+        AUTOMATIC_FRAME_COUNT,
+        {
+            =>
+                let changed = fullScene.changeNext()
+                let result = fullHost.frame(rect, body: fullBody)
+                fullBuild.add(result.metrics.buildNs)
+                changed + result.metrics.stabilizationPasses
+        }
+    )
+    report("frame", "自动组合", fullResult)
+    report("micro", "自动组合构建", BenchResult("240 分支 / 强制全重建 build", AUTOMATIC_FRAME_COUNT, fullBuild.ns, 0))
+
+    runRememberSlotBench(rect)
+    runAutomaticPaintBench()
+    runAutomaticLayoutBench()
+}
+
+private func reportAutomaticScopeFacetShape(host: WidgetTestHost): Unit {
+    var ownershipOnly: Int64 = 0
+    var dependencyOnly: Int64 = 0
+    var both: Int64 = 0
+    var empty: Int64 = 0
+    for (scope in host.retainedDiagnostics().automaticScopes) {
+        let hasOwnership = scope.stateCount + scope.effectCount + scope.retainedChildCount + scope.automaticChildCount >
+            0
+        let hasDependencies = scope.buildDependencyCount > 0
+        if (hasOwnership && hasDependencies) {
+            both += 1
+        } else if (hasOwnership) {
+            ownershipOnly += 1
+        } else if (hasDependencies) {
+            dependencyOnly += 1
+        } else {
+            empty += 1
+        }
+    }
+    reportCount("自动组合 facet", "仅声明所有权 scope", UInt64(ownershipOnly))
+    reportCount("自动组合 facet", "仅构建依赖 scope", UInt64(dependencyOnly))
+    reportCount("自动组合 facet", "所有权与依赖并存 scope", UInt64(both))
+    reportCount("自动组合 facet", "空 committed scope", UInt64(empty))
+    if (dependencyOnly != AUTOMATIC_ROW_COUNT || both != 0) {
+        throw IllegalStateException(
+            "Expected ${AUTOMATIC_ROW_COUNT} dependency-only row scopes, observed ${dependencyOnly} dependency-only and ${both} combined")
+    }
+}
+
+private func runRememberSlotBench(rect: Rect): Unit {
+    runRememberSlotCase(rect, true, "256 个 keyless 位置槽")
+    runRememberSlotCase(rect, false, "256 个显式字符串键")
+}
+
+private func runRememberSlotCase(rect: Rect, positional: Bool, name: String): Unit {
+    let host = WidgetTestHost(retainedMode: RetainedTestMode.Full)
+    let scene = RememberSlotScene(positional)
+    let body: () -> Unit = {=> scene.build()}
+    let _ = host.frame(rect, body: body)
+    let result = timeit(name, REMEMBER_FRAME_COUNT, {
+        => host.frame(rect, body: body).metrics.stabilizationPasses + scene.checksum
+    })
+    if (scene.initializations != REMEMBER_SLOT_COUNT) {
+        throw IllegalStateException(
+            "${name} initialized ${scene.initializations}/${REMEMBER_SLOT_COUNT} retained states")
+    }
+    report("frame", "局部状态身份", result)
+    reportCount("局部状态身份", "${name}每帧初始化", UInt64(scene.initializations / (REMEMBER_FRAME_COUNT + 1)))
+}
+
+public func runDeclarationReplayBench(): Unit {
+    printSection("自动组合声明重放（静态 / 外部版本）")
+    let rect = Rect(0.0, 0.0, 720.0, 200.0)
+    runDeclarationReplayCase(rect, false, false, "静态声明")
+    runDeclarationReplayCase(rect, true, false, "外部版本声明")
+    runDeclarationReplayCase(rect, false, true, "keyless 静态声明")
+    runDeclarationReplayCase(rect, true, true, "keyless 外部版本声明")
+}
+
+private func runDeclarationReplayCase(
+    rect: Rect,
+    externallyRevisioned: Bool,
+    positional: Bool,
+    name: String
+): Unit {
+    let host = WidgetTestHost()
+    let scene = DeclarationScene(externallyRevisioned, positional)
+    let body: () -> Unit = {=> scene.build()}
+    let _ = host.frame(rect, body: body)
+    let before = scene.bodyBuilds
     report(
         "frame",
-        "自动组合",
+        "声明重放",
         timeit(
-            "240 分支 / 强制全重建",
-            AUTOMATIC_FRAME_COUNT,
+            "${DECLARATION_COUNT} ${name}",
+            DECLARATION_FRAME_COUNT,
             {
                 =>
-                    let changed = fullScene.changeNext()
-                    let result = fullHost.frame(rect, body: fullBody)
-                    changed + result.metrics.stabilizationPasses
+                    let result = host.frame(rect, body: body)
+                    result.metrics.stabilizationPasses
             }
         )
     )
-
-    runAutomaticPaintBench()
-    runAutomaticLayoutBench()
+    let bodyBuilds = scene.bodyBuilds - before
+    let expected = if (externallyRevisioned) {
+        DECLARATION_FRAME_COUNT
+    } else {
+        Int64(0)
+    }
+    if (bodyBuilds != expected) {
+        throw IllegalStateException("${name} expected ${expected} stable body executions, observed ${bodyBuilds}")
+    }
+    reportCount("声明重放", "${name}每帧组合体执行", UInt64(bodyBuilds) / UInt64(DECLARATION_FRAME_COUNT))
 }
 
 private func runAutomaticPaintBench(): Unit {

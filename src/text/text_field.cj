@@ -2,8 +2,8 @@ package cui.text
 
 import sdl.{FontSizes, Key, MouseButton, Rect, Size, UiEvent}
 import sdl.input.Clipboard
-import cui.core.{Bindable, CUI_CONTROL_H, CursorShape, State, UiContext, Widget, claimHoverIfInside, emit, localState,
-    registerFocusable, registerFrameSubscriber, resolveControlKey}
+import cui.core.{Bindable, CUI_CONTROL_H, CursorShape, Semantics, SemanticsAction, SemanticsRole, State, UiContext,
+    Widget, claimHoverIfInside, emit, localState, registerFocusable, registerFrameSubscriber, resolveControlKey}
 
 // SDL reports letter keys as their uppercase ASCII code, so the editing shortcuts read as
 // the familiar Ctrl+letter table.
@@ -91,8 +91,27 @@ public class TextField <: Widget {
         Size(available.w, CUI_CONTROL_H)
     }
 
-    public func layout(_: UiContext, rect: Rect): Unit {
+    public func layout(ctx: UiContext, rect: Rect): Unit {
         frame = rect
+        let actions: Array<SemanticsAction> = if (isEditable) {
+            [SemanticsAction.Focus, SemanticsAction.SetValue("")]
+        } else {
+            []
+        }
+        ctx.registerSemanticProvider(id, rect, actions, {=> Semantics(role: SemanticsRole.TextField, value: text.value)},
+            {
+                action => match (action) {
+                    case SemanticsAction.Focus where isEditable =>
+                        ctx.focus(id, viaKeyboard: true)
+                        true
+                    case SemanticsAction.SetValue(next) where isEditable =>
+                        text.value = next
+                        cursorStateValue.value = next.size
+                        anchorStateValue.value = next.size
+                        true
+                    case _ => false
+                }
+            })
     }
 
     public func draw(ctx: UiContext): Unit {

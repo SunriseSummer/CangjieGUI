@@ -45,12 +45,12 @@ private func nestedTree(depth: Int64, breadth: Int64): Widget {
 
 public func runLayoutBench(): Unit {
     printSection("深层嵌套布局")
-    measureLayout("深 12 宽 6", 12, 6, 500)
-    measureLayout("深 20 宽 8", 20, 8, 200)
-    // Rebuilding allocates a complete tree and crosses GC cycles. Keep each independent sample
-    // above roughly 100 ms so one collection cannot dominate its mean and manufacture regressions.
-    measureRebuiltLayout("深 12 宽 6", 12, 6, 400)
-    measureRebuiltLayout("深 20 宽 8", 20, 8, 240)
+    // Each sample runs for roughly 100 ms or more: shorter layout loops amplify scheduler jitter
+    // enough to hide single-digit regressions, especially on Windows power-managed CPUs.
+    measureLayout("深 12 宽 6", 12, 6, 4000)
+    measureLayout("深 20 宽 8", 20, 8, 2500)
+    measureRebuiltLayout("深 12 宽 6", 12, 6, 1600)
+    measureRebuiltLayout("深 20 宽 8", 20, 8, 800)
 }
 
 private func measureRebuiltLayout(name: String, depth: Int64, breadth: Int64, frames: Int64): Unit {
@@ -77,6 +77,7 @@ private func measureLayout(name: String, depth: Int64, breadth: Int64, frames: I
     let ctx = headlessContext()
     let rect = Rect(0.0, 0.0, 720.0, 560.0)
     let tree = nestedTree(depth, breadth)
+    let _ = tree.measure(ctx, Size(rect.w, rect.h))
     report(
         "frame",
         "深层布局",
@@ -85,8 +86,8 @@ private func measureLayout(name: String, depth: Int64, breadth: Int64, frames: I
             frames,
             {
                 =>
-                tree.layout(ctx, rect);
-                0
+                    tree.layout(ctx, rect)
+                    0
             }
         )
     )

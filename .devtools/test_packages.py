@@ -11,6 +11,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import sys
 import time
 from dataclasses import asdict, dataclass
@@ -88,23 +89,84 @@ def coverage_environment(directory):
     return environment
 
 
-def stage_coverage_inputs(name, counter_directory, staging_directory):
-    """Pair this package's build graph with its isolated counters for cjcov 1.0.5."""
-    metadata_directory = ROOT / "cov_output" / f"cui.{name}"
+def reset_coverage_metadata(metadata_root=None):
+    """Remove only the exact generated metadata root before starting one coverage generation."""
+    metadata_root = (metadata_root or ROOT / "cov_output").absolute()
+    validate_generated_root(metadata_root, "cov_output", "coverage metadata")
+    if is_link_or_reparse_point(metadata_root):
+        raise ValueError(f"coverage metadata root must not be a symbolic link or reparse point: {metadata_root}")
+    if metadata_root.exists() and not metadata_root.is_dir():
+        raise ValueError(f"coverage metadata root is not a directory: {metadata_root}")
+    if metadata_root.is_dir():
+        shutil.rmtree(metadata_root)
+
+
+def reset_cjpm_build_cache(cache_root=None):
+    """Remove only cjpm's generated target/release tree, preserving other target evidence."""
+    cache_root = (cache_root or ROOT / "target" / "release").absolute()
+    validate_generated_root(cache_root, "release", "cjpm build cache")
+    if is_link_or_reparse_point(cache_root):
+        raise ValueError(f"cjpm build cache root must not be a symbolic link or reparse point: {cache_root}")
+    if cache_root.exists() and not cache_root.is_dir():
+        raise ValueError(f"cjpm build cache root is not a directory: {cache_root}")
+    if cache_root.is_dir():
+        shutil.rmtree(cache_root)
+
+
+def validate_generated_root(path, expected_name, description):
+    if path.name != expected_name:
+        raise ValueError(f"{description} root must be named {expected_name}: {path}")
+    try:
+        path.relative_to(ROOT.absolute())
+    except ValueError as exc:
+        raise ValueError(f"{description} root must stay within the workspace: {path}") from exc
+
+
+def is_link_or_reparse_point(path):
+    if path.is_symlink():
+        return True
+    try:
+        attributes = getattr(path.lstat(), "st_file_attributes", 0)
+    except FileNotFoundError:
+        return False
+    return bool(attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0))
+
+
+def stage_coverage_inputs(name, counter_directory, staging_directory, metadata_root=None):
+    """Pair isolated counters with identical production graphs from any package build.
+
+    Cangjie 1.0.5 rewrites ``cov_output/cui.<package>`` on each package-only build.  After the
+    first build, that directory can contain only the current ``$test`` graph even though the
+    redirected directory contains production counters.  Production graphs are build-identical,
+    so resolve each counter by filename across the complete cov_output generation and reject
+    ambiguous non-identical candidates instead of silently dropping package coverage.
+    """
+    metadata_root = metadata_root or ROOT / "cov_output"
+    metadata_directory = metadata_root / f"cui.{name}"
     if not metadata_directory.is_dir():
         raise FileNotFoundError(f"coverage metadata directory does not exist: {metadata_directory}")
 
     staging_directory.mkdir(parents=True, exist_ok=True)
     graph_count = 0
     counter_count = 0
-    for source in metadata_directory.glob("*.gcno"):
-        if "$test" not in source.name:
-            shutil.copy2(source, staging_directory / source.name)
-            graph_count += 1
     for source in counter_directory.glob("*.gcda"):
-        if "$test" not in source.name:
-            shutil.copy2(source, staging_directory / source.name)
-            counter_count += 1
+        if "$test" in source.name:
+            continue
+        graph_name = source.with_suffix(".gcno").name
+        preferred = metadata_directory / graph_name
+        candidates = ([preferred] if preferred.is_file() else []) + sorted(
+            candidate for candidate in metadata_root.glob(f"*/{graph_name}")
+            if candidate.is_file() and candidate != preferred
+        )
+        if not candidates:
+            continue
+        reference = candidates[0].read_bytes()
+        if any(candidate.read_bytes() != reference for candidate in candidates[1:]):
+            raise ValueError(f"coverage graph {graph_name} has non-identical package-build candidates")
+        shutil.copy2(candidates[0], staging_directory / graph_name)
+        shutil.copy2(source, staging_directory / source.name)
+        graph_count += 1
+        counter_count += 1
     if graph_count == 0 or counter_count == 0:
         raise FileNotFoundError(
             f"coverage staging requires gcno and gcda inputs; found {graph_count} graph(s) "
@@ -140,7 +202,7 @@ def generate_coverage_report(name, counter_directory, coverage_root, timeout):
     try:
         graph_count, counter_count = stage_coverage_inputs(
             name, counter_directory, staging_directory)
-    except (FileNotFoundError, OSError) as exc:
+    except (FileNotFoundError, OSError, ValueError) as exc:
         return "", f"\nCoverage staging failed: {exc}"
     command = [
         "cjcov", "-r", str(staging_directory), "-s", str(SOURCE),
@@ -308,6 +370,13 @@ def main():
 
     selected = args.packages or available
     coverage_root = REPORT.parent / "coverage" / str(time.time_ns()) if args.coverage else None
+    if args.coverage:
+        try:
+            reset_cjpm_build_cache()
+            reset_coverage_metadata()
+        except (OSError, ValueError) as exc:
+            print(f"Cannot reset generated coverage inputs: {exc}", file=sys.stderr)
+            return 1
     results = []
     for name in selected:
         result = run_package(name, args.timeout, args.coverage, coverage_root)

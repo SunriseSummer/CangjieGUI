@@ -4,7 +4,7 @@
 
 `cui.core` 包中的 public interface
 
-所有组件共同实现的声明式值契约：按宿主选中的更新阶段参与测量、布局、绘制与事件处理，并自带尺寸、内边距、表面、阴影、弹性、可见性等整套链式修饰器。全部内置容器与控件都实现此接口；自定义组件实现 `measure`/`layout`/`draw`/`handle` 四个必选方法，即可与内置组件平起平坐地参与布局与焦点遍历。
+所有组件共同实现的声明式值契约：按宿主选中的更新阶段参与测量、布局、绘制与事件处理，并自带尺寸、内边距、表面、阴影、弹性、可见性等整套链式修饰器。全部内置容器与控件都实现此接口；自定义组件实现 `measure`/`layout`/`draw`/`handle` 四个必选方法，即可与内置组件平起平坐地参与布局与焦点遍历。确认指针处理严格局限于布局矩形时，可额外声明 [`PointerEventScope.LayoutBounds`](PointerEventScope.md) 获得空间剪枝。
 
 ## 声明
 
@@ -26,6 +26,12 @@ Label("已保存").background(Color.rgb(223, 240, 216), 6.0).padding(8.0) // 背
 ```
 
 **布局与焦点协议。**[`isFlexible`](#isflexible)/[`flexWeight`](#flexweight) 决定组件在 [`VStack`](VStack.md)/[`HStack`](HStack.md) 剩余空间分配中的角色，[`acceptsStretch`](#acceptsstretch) 回答交叉轴可否拉伸，[`participatesInLayout`](#participatesinlayout) 决定是否占位；[`focusableId`](#focusableid)/[`focusableIds`](#focusableids) 把子树的焦点项交给焦点遍历（Tab / Shift+Tab）。这六个方法都有默认实现，按需覆盖即可。
+
+**UI 环境与原子布局。**框架按“可用尺寸 × UI 环境 generation”缓存持久 Element 的 `measure`，并把布局几何、
+祖先可见域、overlay、semantics fragment 与多子容器的事件路由拓扑作为一个不可变提交缓存。窗口 DPI、
+`displayScale`、`fontScale`、Renderer/Theme、Context 身份或字体注册表发生变化时会自动失配，并按
+Measure→Layout→Paint 顺序重算；自定义 Widget 不需要订阅这些事件或清理框架缓存。`measure`/`layout` 应可重试：
+异常不覆盖旧提交，在阶段内写入刚读取的 `State` 也不会单独发布几何或事件路由。
 
 ## 示例
 
@@ -93,10 +99,13 @@ main(): Unit {
 | [`layout(ctx: UiContext, rect: Rect)`](#layout) | 把最终布局矩形 `rect` 分配给组件。 |
 | [`draw(ctx: UiContext)`](#draw) | 用 `ctx` 的渲染器绘制组件。 |
 | [`handle(ctx: UiContext, event: UiEvent)`](#handle) | 处理一条输入事件并返回是否已消费。 |
+| [`pointerEventScope()`](#pointereventscope) | 声明子树是否可能观察布局矩形之外的指针事件。 |
+| [`paintOutset()`](#paintoutset) | 声明布局矩形之外的保守绘制域。 |
 | [`isFlexible()`](#isflexible) | 报告组件是否参与所在栈的剩余空间分配。 |
 | [`flexWeight()`](#flexweight) | 报告弹性组件分享剩余空间的相对权重。 |
 | [`acceptsStretch(_: Axis)`](#acceptsstretch) | 报告栈可否沿指定轴把组件拉伸到超过测量尺寸。 |
 | [`participatesInLayout()`](#participatesinlayout) | 报告该节点是否在父布局中占据位置。 |
+| [`needsDetachedLayout()`](#needsdetachedlayout) | 不占版面时是否仍需一次零矩形 layout 以登记 Portal 类副作用。 |
 | [`focusableId()`](#focusableid) | 返回组件构建期注册的键盘焦点 id，不可聚焦时为 `None`。 |
 | [`focusableIds()`](#focusableids) | 返回组件子树按声明顺序注册的全部键盘焦点 id。 |
 | [`width(...)`](#width) | 把组件约束到恰好 `value` 宽。 |
@@ -112,11 +121,15 @@ main(): Unit {
 | [`surface(style: SurfaceStyle)`](#surface) | 在组件身后绘制一套完整的表面样式。 |
 | [`gradientBackground(...)`](#gradientbackground) | 在组件身后填充两色线性渐变背景。 |
 | [`shadow(...)`](#shadow) | 在组件身后投下柔和阴影。 |
+| [`paintOutset(...)`](#paintoutset) | 为自定义绘制声明等边或非对称 overflow。 |
 | [`border(...)`](#border) | 在组件的填充与内容之上描一圈圆角边框。 |
 | [`dashedBorder(...)`](#dashedborder) | 在组件的填充与内容之上描一圈虚线圆角边框。 |
 | [`flex(...)`](#flex) | 让组件按权重分享所在栈的剩余空间。 |
 | [`visible(isVisible: Bool)`](#visible) | 控制组件是否参与布局、绘制与事件派发。 |
 | [`enabled(isEnabled: Bool)`](#enabled) | 保留组件的布局与绘制、按 `isEnabled` 屏蔽其输入。 |
+| [`semantics(properties: Semantics, ...)`](#semantics) | 为子树添加平台无关的无障碍属性。 |
+| [`modifier(value: Modifier)`](#modifier) | 应用一个可复用的修饰器组合。 |
+| [`pointerEventsWithinLayout()`](#pointereventswithinlayout) | 证明自定义子树的指针处理局限在布局矩形内，以启用空间剪枝。 |
 
 ## 方法
 
@@ -175,6 +188,32 @@ func handle(ctx: UiContext, event: UiEvent): Bool
 
 **返回值** `Bool` — `true` 表示事件已消费，停止继续派发。
 
+### pointerEventScope
+
+声明子树是否可能观察父容器分配矩形之外的指针事件。默认 `Unbounded` 保留旧自定义 Widget 的完整路由语义；只有全部后代处理器都检查同一边界时才返回 `LayoutBounds`。多子容器把布局矩形按 z 序构造成 AABB 聚合树，点事件只访问相交叶；兼容叶始终保留在遍历中。活动按压/拖拽自动绕过索引。
+
+```cangjie
+func pointerEventScope(): PointerEventScope
+```
+
+**返回值** [`PointerEventScope`](PointerEventScope.md) — 默认实现返回 `Unbounded`。
+
+### paintOutset
+
+返回组件在 layout 矩形四边之外可能绘制的保守 [`PaintOutset`](PaintOutset.md)。默认非焦点叶为零，焦点叶
+保留统一 focus-ring 边界；容器和修饰器逐分量合成后由滚动 clip、ScenePatch 与 damage 共用。
+
+```cangjie
+func paintOutset(): PaintOutset
+```
+
+自定义 Canvas/特效也可用 fluent wrapper 声明，不改变测量尺寸：
+
+```cangjie
+func paintOutset(value: Float32): Widget
+func paintOutset(value: PaintOutset): Widget
+```
+
 ### isFlexible
 
 报告组件是否参与所在栈的剩余空间分配。默认 `false`——组件按测量尺寸贴合内容；弹性组件改为分得剩余空间的一份，用 [`Flexible`](Flexible.md) 包装或 [`flex`](#flex) 修饰器开启。
@@ -218,6 +257,16 @@ func participatesInLayout(): Bool
 ```
 
 **返回值** `Bool` — 默认实现返回 `true`。
+
+### needsDetachedLayout
+
+当 `participatesInLayout()` 为 `false` 时，是否仍需父容器调用一次 `layout(ctx, Rect.zero())`。默认 `false`；[`Portal`](Portal.md) 返回 `true`，用 placement 自行计算绝对矩形并登记浮层。透明包装器必须转发该值，`visible(false)` 则阻断它。
+
+```cangjie
+func needsDetachedLayout(): Bool
+```
+
+**返回值** `Bool` — 默认实现返回 `false`。
 
 ### focusableId
 
@@ -496,6 +545,8 @@ func shadow(layers: Array<Shadow>, radius!: Length): Widget
 func shadow(layers: Array<Shadow>, radius!: Float32): Widget
 ```
 
+阴影 modifier 会从 offset、blur 与 spread 自动推导非对称 [`PaintOutset`](PaintOutset.md)，无需应用手写余量。
+
 **参数**
 
 - `value`: [`Shadow`](Shadow.md) — 单层阴影描述（偏移、模糊、扩散、颜色）。
@@ -603,9 +654,70 @@ func enabled(isEnabled: Bool): Widget
 
 **返回值** `Widget` — 包装后的新节点，供继续链式调用。
 
+### modifier
+
+应用一个可复用 [`Modifier`](Modifier.md) 管线。它与直接链式调用保持相同顺序语义，适合设计系统令牌组合或多个页面共享的样式包。
+
+```cangjie
+func modifier(value: Modifier): Widget
+```
+
+**参数**
+
+- `value`: [`Modifier`](Modifier.md) — 按源码顺序应用的可复用组件变换管线。
+
+**返回值** `Widget` — 应用完整管线后的新节点。
+
+### onEvent
+
+给当前组件添加捕获、目标或冒泡监听器，不创建应用级组件生命周期。默认只观察几何或焦点命中本子树的事件；紧随组件声明调用时，builder last-emission facet 会传递带 owner generation 与内部声明身份的焦点片段，因此同名 public key 不跨子树误路由。应用级快捷键显式使用 `EventScope.Global`。
+
+```cangjie
+func onEvent(handler!: (UiContext, UiEvent) -> EventOutcome): Widget
+func onEvent(phase!: EventPhase, handler!: (UiContext, UiEvent) -> EventOutcome): Widget
+func onEvent(phase!: EventPhase, scope!: EventScope, handler!: (UiContext, UiEvent) -> EventOutcome): Widget
+```
+
+**参数**
+
+- `phase!`: [`EventPhase`](EventPhase.md) — 监听所在的传播阶段；省略时为 Bubble。
+- `scope!`: [`EventScope`](EventScope.md) — 子树命中或全局路由；省略时为 Subtree。
+- `handler!`: `(UiContext, UiEvent) -> EventOutcome` — 返回可组合的传播效果。
+
+**返回值** `Widget` — 事件监听包装后的节点。
+
+### pointerEventsWithinLayout
+
+把自定义子树显式标记为只观察其布局矩形内的指针事件，使索引化栈、网格、流式和层叠容器能够跳过空间上不相交的子树。该方法是性能契约而非裁剪器：它不会阻止子组件直接收到手工调用的事件，也不会改变绘制 clip；声明方必须保证自身 `handle` 和全部后代遵守边界。活动捕获期间仍全量路由。
+
+```cangjie
+func pointerEventsWithinLayout(): Widget
+```
+
+**返回值** `Widget` — 带有 [`PointerEventScope.LayoutBounds`](PointerEventScope.md) 契约的包装节点。
+
+### semantics
+
+为子树添加平台无关的无障碍属性。无 key 重载优先复用单一焦点 id，否则按声明位置生成稳定 id；需要穿越结构重排时传显式 `key`。禁用或隐藏外层修饰器会同步影响语义可用性。内建 Button、Label、Checkbox、TextField 已自动生成基础语义，自定义控件再使用本方法。
+
+```cangjie
+func semantics(properties: Semantics): Widget
+func semantics(properties: Semantics, key!: String): Widget
+```
+
+语义结果以可组合 retained fragment 缓存；布局稳定后事务化归一为带 revision 的已提交树。稳定 fragment 序列按身份短路，后续 [`UiContext.semanticsSnapshot`](UiContext.md#semanticssnapshot) 查询直接返回缓存数组，不再重复扁平化。
+
+**参数**
+
+- `properties`: [`Semantics`](Semantics.md) — 标签、角色、值和状态。
+- `key!`: `String` — 可选显式重载的稳定语义 id，不能为空。
+
+**返回值** `Widget` — 包装后的新节点，供继续链式调用。
+
 ## 另请参阅
 
 - [emit](functions.md#emit) — 构造函数登记子组件的声明收集机制。
 - [UiContext](UiContext.md) — 四个核心方法共同的每帧服务枢纽。
+- [EventListener](EventListener.md) — `onEvent` 使用的分相事件传播包装。
 - [State](State.md) — 跨帧存活的状态容器。
 - [Flexible](Flexible.md) — 弹性协议的包装容器。

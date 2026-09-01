@@ -270,12 +270,16 @@ public class DatePicker <: Widget {
         }
         let col = Int64((x - gx) / DP_CELL_W)
         let row = Int64((y - gy) / DP_CELL_H)
-        let firstWd = CalendarDate(viewYear.value, viewMonth.value, 1).firstWeekdayIndex()
+        let monthStart = CalendarDate(viewYear.value, viewMonth.value, 1)
+        let firstWd = monthStart.firstWeekdayIndex()
         let day = row * 7 + col - firstWd + 1
-        if (day >= 1 && day <= CalendarDate(viewYear.value, viewMonth.value, 1).daysInMonth()) {
-            day
-        } else {
+        if (day < 1) {
+            return 0
+        }
+        if (day > monthStart.daysInMonth()) {
             0
+        } else {
+            day
         }
     }
 
@@ -333,21 +337,30 @@ public class DatePicker <: Widget {
         let dim = monthStart.daysInMonth()
         let current = selected.get()
         let today = CalendarDate.today()
+        let focused = focusedDay.value
         for (row in 0..DP_GRID_ROWS) {
             for (col in 0..7) {
                 let day = row * 7 + col - firstWd + 1
                 if (day >= 1 && day <= dim) {
-                    drawDayCell(ctx, cellRect(popup, row, col), day, current, today)
+                    drawDayCell(ctx, cellRect(popup, row, col), day, monthStart, current, today, focused)
                 }
             }
         }
     }
 
-    private func drawDayCell(ctx: UiContext, cell: Rect, day: Int64, current: CalendarDate, today: CalendarDate): Unit {
+    private func drawDayCell(
+        ctx: UiContext,
+        cell: Rect,
+        day: Int64,
+        monthStart: CalendarDate,
+        current: CalendarDate,
+        today: CalendarDate,
+        focusedDayValue: Int64
+    ): Unit {
         let inner = cell.inset(2.0)
-        let isSelected = viewYear.value == current.year && viewMonth.value == current.month && day == current.day
-        let isToday = viewYear.value == today.year && viewMonth.value == today.month && day == today.day
-        let isFocused = day == focusedDay.value
+        let isSelected = monthStart.year == current.year && monthStart.month == current.month && day == current.day
+        let isToday = monthStart.year == today.year && monthStart.month == today.month && day == today.day
+        let isFocused = day == focusedDayValue
         if (isSelected) {
             ctx.renderer.fillRoundedRect(inner, ctx.theme.smallRadius, ctx.theme.accent)
         } else if (inner.contains(ctx.mouseX, ctx.mouseY)) {

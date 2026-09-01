@@ -30,6 +30,14 @@ public class Keyed <: Widget {
         child.handle(ctx, event)
     }
 
+    public func pointerEventScope(): PointerEventScope {
+        child.pointerEventScope()
+    }
+
+    public func paintOutset(): PaintOutset {
+        child.paintOutset()
+    }
+
     public func isFlexible(): Bool {
         child.isFlexible()
     }
@@ -45,6 +53,10 @@ public class Keyed <: Widget {
     public func participatesInLayout(): Bool {
         // Forwarded so `.visible(false)` inside ForEach leaves no stray spacing gap.
         child.participatesInLayout()
+    }
+
+    public func needsDetachedLayout(): Bool {
+        child.needsDetachedLayout()
     }
 
     public func focusableId(): ?String {

@@ -16,16 +16,30 @@ class DesktopLifecycleRunnerTests(unittest.TestCase):
         args = lifecycle.parse_args([])
         self.assertEqual(args.repeat, 1)
         self.assertEqual(args.timeout, 120)
+        self.assertEqual(args.build_timeout, 120)
 
     def test_repeat_and_timeout_are_configurable(self):
         args = lifecycle.parse_args(["--repeat", "20", "--timeout", "30"])
         self.assertEqual(args.repeat, 20)
         self.assertEqual(args.timeout, 30)
+        self.assertEqual(args.build_timeout, 120)
+
+    def test_build_timeout_is_independent_from_scenario_timeout(self):
+        args = lifecycle.parse_args([
+            "--timeout", "20", "--build-timeout", "180",
+        ])
+        self.assertEqual(args.timeout, 20)
+        self.assertEqual(args.build_timeout, 180)
 
     def test_non_positive_repeat_is_rejected(self):
         with contextlib.redirect_stderr(io.StringIO()):
             with self.assertRaises(SystemExit):
                 lifecycle.parse_args(["--repeat", "0"])
+
+    def test_non_positive_build_timeout_is_rejected(self):
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                lifecycle.parse_args(["--build-timeout", "0"])
 
     def test_each_global_state_contract_is_process_isolated(self):
         self.assertEqual(lifecycle.SCENARIOS, (

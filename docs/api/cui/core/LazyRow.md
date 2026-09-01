@@ -18,7 +18,7 @@ LazyRow <: [`Widget`](Widget.md)
 
 ## 说明
 
-可见窗口在构建期由上一帧保留的滚动偏移与视口宽度决定（首帧假定 720 逻辑像素，布局立即校正）。预取按像素并沿滚动方向自适应扩展。只有预取范围内的条目真实存在；`key`、`revision`、[`LazyViewportController`](LazyViewportController.md)、`overscan`、状态卸载与顶部（此处为左侧）锚定均与 [`LazyColumn`](LazyColumn.md) 同义。滚轮水平分量直接驱动条带；只有垂直分量时映射到水平方向。内容溢出时底缘保留滚动条车道。
+可见列的物化区间与水平位移分属不同相位：区间内滚动只重新布局/绘制已有列，视口加预取首次越界时才在同帧重建一次；布局期跟踪最新 State revision，构建期提示不会冻结画面。首帧假定 720 逻辑像素，布局立即校正。预取按像素并沿滚动方向自适应扩展。只有预取范围内的条目真实存在；`key`、[`LazyViewportController`](LazyViewportController.md)、`overscan`、状态卸载与顶部（此处为左侧）锚定均与 [`LazyColumn`](LazyColumn.md) 同义。`of(State<Array<T>>, ...)` 自动从 State 的值/版本快照处理结构变化；兼容 Array 形态才需要显式 `revision`。滚轮水平分量直接驱动条带；只有垂直分量时映射到水平方向。内容溢出时底缘保留滚动条车道。
 
 ## 示例
 
@@ -51,9 +51,9 @@ main(): Unit {
 
 | 成员 | 说明 |
 |---|---|
-| [`static of(...)`](#of) | 数据驱动形式：由 `Array<T>` 与每条目的构建器建条带，无需手写 `count` 与按索引取数。 |
+| [`static of(...)`](#of) | 数据驱动形式：接受 `Array<T>` 或自动版本化的 `State<Array<T>>`。 |
 | [`measure(...)`](#measure) | 恒占满全部可用空间：条带填满父容器分配的区域。 |
-| [`layout(...)`](#layout) | 记录视口宽度供下一帧构建、把滚动偏移限制在有效范围，并把每个已构建列摆到内容坐标减滚动偏移的位置。 |
+| [`layout(...)`](#layout) | 跟踪最新水平偏移并平移已物化列；越过物化边界时请求一次稳定化重建。 |
 | [`draw(...)`](#draw) | 裁剪到视口逐列绘制，内容溢出时在底缘画滚动条。 |
 | [`handle(...)`](#handle) | 滚轮沿条带轴滚动（垂直滚轮自动重映射）、滚动条按下/拖拽优先处理，其余事件从视觉最上层的列开始分发。 |
 | [`isFlexible()`](#isflexible) | 恒返回 `true`：条带吸收所在栈的剩余空间。 |
@@ -95,7 +95,7 @@ public init(
 
 **异常**
 
-- `IllegalArgumentException` — `id` 显式给出且为空字符串时。
+- `IllegalArgumentException` — `id` 显式给出且为空字符串，或同时给出 `scroll` 与 `controller` 时。
 
 ## 方法
 
@@ -116,11 +116,23 @@ public static func of<T>(
     overscan!: Float32 = 144.0,
     item!: (T) -> Unit
 ): LazyRow
+
+public static func of<T>(
+    data: State<Array<T>>,
+    itemWidth: Float32,
+    spacing!: Float32 = 0.0,
+    scroll!: ?State<Float32> = None,
+    key!: ?((T) -> String) = None,
+    id!: ?String = None,
+    controller!: ?LazyViewportController = None,
+    overscan!: Float32 = 144.0,
+    item!: (T) -> Unit
+): LazyRow
 ```
 
 **参数**
 
-- `data`: `Array<T>` — 数据源；列数即 `data.size`。
+- `data`: `Array<T>` 或 [`State`](State.md)`<Array<T>>` — 数据源；State 形态自动采样同一时刻的数组与 revision。
 - `itemWidth`: `Float32` — 固定列宽，逻辑像素。
 - `spacing!`: `Float32` — 列间距；默认 `0.0`。
 - `scroll!`: `?`[`State`](State.md)`<Float32>` — 外部滚动偏移；默认 `None`。
@@ -134,7 +146,7 @@ public static func of<T>(
 **返回值** `LazyRow` — 配置好的条带。
 
 ```cangjie
-LazyRow.of(model.photos, 160.0, key: {p => p.id}) {
+LazyRow.of(model.photosState, 160.0, key: {p => p.id}) {
     photo => photoCard(photo)
 }
 ```
@@ -155,7 +167,7 @@ public func measure(_: UiContext, available: Size): Size
 
 ### layout
 
-记录视口宽度供下一帧构建、把滚动偏移限制在有效范围，并把每个已构建列摆到内容坐标减滚动偏移的位置。内容溢出时条目高度让出底缘的滚动条车道。
+跟踪最新水平偏移、限制到有效范围，并平移已物化列；视口加方向预取越过当前区间时在绘制前稳定化重建一次。内容溢出时条目高度让出底缘的滚动条车道。
 
 ```cangjie
 public func layout(ctx: UiContext, rect: Rect): Unit
@@ -168,7 +180,7 @@ public func layout(ctx: UiContext, rect: Rect): Unit
 
 ### draw
 
-裁剪到视口逐列绘制，内容溢出时在底缘画滚动条。每列的裁剪矩形外扩一圈阴影余量，卡片列的柔和投影不会在槽位边界被切成硬边。
+裁剪到视口逐列绘制，内容溢出时在底缘画滚动条。每列按照组件声明的 `paintOutset` 扩张裁剪范围，因此阴影等合法外溢可见，未声明的任意越界仍被截断。
 
 ```cangjie
 public func draw(ctx: UiContext): Unit

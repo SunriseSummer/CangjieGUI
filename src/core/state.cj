@@ -1,7 +1,6 @@
 package cui.core
 
-import std.collection.{ArrayList, HashMap}
-import sdl.Rect
+import std.collection.ArrayList
 
 /**
  * A readable, observable value. `State` is the writable single source of truth;
@@ -25,6 +24,14 @@ public interface Observable<T> {
     func map<U>(transform: (T) -> U): DerivedState<U> {
         derive(this, transform)
     }
+
+    /**
+     * Returns a derived state that propagates invalidation only when projected results are not
+     * equivalent under `policy`.
+     */
+    func map<U>(transform: (T) -> U, policy!: StateMutationPolicy<U>): DerivedState<U> {
+        deriveDistinct(this, transform, policy)
+    }
 }
 
 /**
@@ -40,6 +47,11 @@ public interface Bindable<T> <: Observable<T> {
         value
     }
 
+    /** Replaces the current value with one endomorphism of its latest snapshot. */
+    func update(transform: (T) -> T): Unit {
+        value = transform(value)
+    }
+
     /**
      * Returns a two-way binding onto one component of this value. `get` extracts the
      * component and `set` rebuilds the whole value around a changed component:
@@ -51,11 +63,36 @@ public interface Bindable<T> <: Observable<T> {
     func project<U>(get!: (T) -> U, set!: (T, U) -> T): Binding<U> {
         bindingOf<T, U>(this, get, set)
     }
+
+    /** Returns a writable projection whose observations use an explicit result equivalence. */
+    func project<U>(
+        get!: (T) -> U,
+        set!: (T, U) -> T,
+        policy!: StateMutationPolicy<U>
+    ): Binding<U> {
+        bindingOf<T, U>(this, get, set, policy)
+    }
+
+    /** Returns a two-way binding through a composable, law-abiding `Lens`. */
+    func project<U>(lens: Lens<T, U>): Binding<U> {
+        bindingOf<T, U>(this, lens)
+    }
+
+    /** Returns a Lens projection whose read side advances only across result equivalence classes. */
+    func project<U>(lens: Lens<T, U>, policy!: StateMutationPolicy<U>): Binding<U> {
+        bindingOf<T, U>(this, lens, policy)
+    }
 }
 
 /**
  * An observable, single-source-of-truth value used by stateful controls and views.
- * Assigning `value` updates the revision and notifies observers synchronously on the caller thread.
+ * Assigning `value` updates the revision. Outside a scheduler transaction observers run immediately;
+ * inside one outer transaction each State reports only its first previous and final committed value.
+ * An explicit mutation policy also suppresses the whole transaction when those endpoints are
+ * equivalent, so intermediate excursions cannot create a redundant notification or frame.
+ * Every active observer is offered a change even if an earlier callback fails; the first failure is
+ * rethrown after delivery so framework invalidation listeners cannot be starved by business code.
+ * Scheduler transactions extend that guarantee across State sources and deferred derived observers.
  * A State is thread-confined: after it enters an application, reads, writes, observation changes,
  * and transforms must remain on that UI thread; workers publish results through DesktopApp.post.
  */
@@ -63,10 +100,14 @@ public class State<T> <: Bindable<T> {
     private let identity = allocateStateIdentity()
     private var storedValue: T
     private let listeners = ArrayList<StateListener<T>>()
+    private var notificationDepth: Int64 = 0
+    private var needsListenerCompaction = false
     private var stateRevision: UInt64 = UInt64(0)
     private var scheduler: ?FrameScheduler = None
+    private let mutationPolicy: ?StateMutationPolicy<T>
+    private var transactionNotification: ?TypedPendingStateNotification<T> = None
 
-    /** Increases after every assignment, including assignments of an equal value. */
+    /** Increases after every accepted assignment; a mutation policy may suppress equivalent writes. */
     public prop revision: UInt64 {
         get() {
             prepareRead()
@@ -83,21 +124,89 @@ public class State<T> <: Bindable<T> {
         set(next) {
             bindToCurrentScheduler()
             let previous = storedValue
+            match (mutationPolicy) {
+                case Some(policy) =>
+                    if (policy.equivalent(previous, next)) {
+                        return
+                    }
+                case None => ()
+            }
             storedValue = next
             stateRevision = nextRevision(stateRevision)
             recordStateWrite()
-            invalidateScheduler()
-            notify(previous, next)
+            match (mutationPolicy) {
+                case Some(_) =>
+                    // A policy State is observed through transaction endpoints. Queue it even when
+                    // it has no listeners so a net-zero batch does not request a redundant frame.
+                    if (!enqueueTransactionNotification(previous)) {
+                        invalidateScheduler()
+                        notify(previous, next)
+                    }
+                case None =>
+                    invalidateScheduler()
+                    // Avoid transaction type erasure entirely for the dominant unobserved animation path.
+                    if (!listeners.isEmpty() && !enqueueTransactionNotification(previous)) {
+                        notify(previous, next)
+                    }
+            }
         }
     }
 
     public init(value: T) {
         this.storedValue = value
+        this.mutationPolicy = None
+    }
+
+    /** Creates State with an explicit policy for suppressing observationally equivalent writes. */
+    public init(value: T, policy!: StateMutationPolicy<T>) {
+        this.storedValue = value
+        this.mutationPolicy = Some(policy)
     }
 
     /* Stable across the State lifetime and independent of its erased generic value type. */
     func dependencyIdentity(): UInt64 {
         identity
+    }
+
+    /* Returns the one lazily allocated type-erased transaction slot owned by this State. */
+    func prepareTransactionNotification(previous: T): PendingStateNotification {
+        match (transactionNotification) {
+            case Some(notification) =>
+                notification.prepare(previous)
+                notification
+            case None =>
+                let notification = TypedPendingStateNotification<T>(this, previous)
+                transactionNotification = Some(notification)
+                notification
+        }
+    }
+
+    /* Package-private ownership probe for allocation/reentry tests. */
+    func transactionNotificationSlot(): ?PendingStateNotification {
+        match (transactionNotification) {
+            case Some(notification) => Some(notification)
+            case None => None
+        }
+    }
+
+    /* Reads one collector-visible value/revision pair after a single ownership/dependency check. */
+    func valueRevisionSnapshot(): (T, UInt64) {
+        prepareRead()
+        (storedValue, stateRevision)
+    }
+
+    /*
+     * Samples a phase-transfer hint without making the active build depend on this State. The
+     * consuming phase must perform a normal tracked read and repair/rebuild when the hint is stale.
+     */
+    func phaseHintValueRevisionSnapshot(): (T, UInt64) {
+        assertSchedulerThread()
+        (storedValue, stateRevision)
+    }
+
+    /* Checks ownership without reading the value or registering a build dependency. */
+    func assertThreadAccess(): Unit {
+        assertSchedulerThread()
     }
 
     /** Replaces the value with the result of `transform`. */
@@ -115,6 +224,7 @@ public class State<T> <: Bindable<T> {
                     } else {
                         // Sequential same-thread apps may transfer; unrelated threads may not.
                         bound.assertOwnerThread()
+                        bound.assertStateTransferSourceIdle()
                         active.assertOwnerThread()
                         scheduler = Some(active)
                     }
@@ -130,16 +240,11 @@ public class State<T> <: Bindable<T> {
         match (scheduler) {
             case Some(bound) =>
                 bound.assertOwnerThread()
-                if (bound.isCollectingStateReads()) {
-                    recordCollectedStateRead(this)
-                }
+                bound.recordCollectedStateRead(this)
             case None =>
                 bindToCurrentScheduler()
                 match (scheduler) {
-                    case Some(bound) =>
-                        if (bound.isCollectingStateReads()) {
-                            recordCollectedStateRead(this)
-                        }
+                    case Some(bound) => bound.recordCollectedStateRead(this)
                     case None => recordUnscheduledStateRead(this)
                 }
         }
@@ -182,15 +287,72 @@ public class State<T> <: Bindable<T> {
         if (listeners.isEmpty()) {
             return
         }
-        // A snapshot tolerates cancellation/re-subscription: new listeners see later assignments,
-        // cancelled ones are skipped, and compaction follows the iteration.
-        let snapshot = listeners.toArray()
-        for (listener in snapshot) {
-            if (listener.isActive) {
-                listener.callback(previous, current)
+
+        // Capture only the initial logical window. Appends are invisible to this notification but
+        // visible to a nested, later assignment; removals become tombstones until the outer walk
+        // finishes, so every active walk keeps stable indices without copying the listener array.
+        let limit = listeners.size
+        var firstFailure: ?Exception = None
+        notificationDepth += 1
+        try {
+            var index: Int64 = 0
+            while (index < limit) {
+                let listener = listeners[index]
+                let failure = invokeListener(listener, previous, current)
+                if (firstFailure.isNone()) {
+                    firstFailure = failure
+                }
+                index += 1
+            }
+        } finally {
+            notificationDepth -= 1
+            if (notificationDepth == 0 && needsListenerCompaction) {
+                compactListeners()
             }
         }
-        compactListeners()
+        match (firstFailure) {
+            case Some(error) => throw error
+            case None => ()
+        }
+    }
+
+    private func invokeListener(listener: StateListener<T>, previous: T, current: T): ?Exception {
+        if (!listener.isActive) {
+            return None
+        }
+        try {
+            listener.callback(previous, current)
+            None
+        } catch (error: Exception) {
+            Some(error)
+        }
+    }
+
+    private func enqueueTransactionNotification(previous: T): Bool {
+        match (scheduler) {
+            case Some(bound) => bound.enqueueStateNotification(this, previous)
+            case None => false
+        }
+    }
+
+    /* Returns whether the transaction endpoints occupy different observational equivalence classes. */
+    func dispatchTransactionNotification(previous: T, needsEndpointComparison: Bool): Bool {
+        match (mutationPolicy) {
+            case Some(policy) =>
+                // The setter already proved one accepted write non-equivalent. Only a second write
+                // can return to the original equivalence class and requires another comparison.
+                if (needsEndpointComparison && policy.equivalent(previous, storedValue)) {
+                    return false
+                }
+            case None => ()
+        }
+        notify(previous, storedValue)
+        true
+    }
+
+    /* Package-private invariant probe used by notification mutation tests. */
+    func listenerSlotCount(): Int64 {
+        listeners.size
     }
 
     private func compactListeners(): Unit {
@@ -201,9 +363,14 @@ public class State<T> <: Bindable<T> {
             }
             i -= 1
         }
+        needsListenerCompaction = false
     }
 
     private func removeListener(listener: StateListener<T>): Unit {
+        if (notificationDepth > 0) {
+            needsListenerCompaction = true
+            return
+        }
         var i = listeners.size - 1
         while (i >= 0) {
             if (sameListener(listeners[i], listener)) {
@@ -235,241 +402,4 @@ extend<T> State<T> where T <: Equatable<T> {
         value = next
         true
     }
-}
-
-/**
- * Retains explicitly keyed local state across declarative tree rebuilds. Entries that
- * are not visited during a completed build are removed, matching view unmount semantics.
- */
-public class StateStore {
-    let entries = HashMap<String, Any>()
-    let retainedEntries = HashMap<String, RetainedRecord>()
-    let automaticEntries = HashMap<String, AutomaticCompositionRecord>()
-    let automaticPaintBudget = AutomaticPaintBudget()
-    let lifecycleEffects = HashMap<String, LifecycleEffectRecord>()
-    let rootMountScope = StateMountScope()
-    let mountBuilds = ArrayList<StateMountBuild>()
-    let activeMountBuilds = ArrayList<StateMountBuild>()
-    let stateAddedDuringBuild = ArrayList<String>()
-    let retainedAddedDuringBuild = ArrayList<String>()
-    let automaticAddedDuringBuild = ArrayList<String>()
-    let retainedReplacements = ArrayList<PendingRetainedReplacement>()
-    let automaticReplacements = ArrayList<PendingAutomaticCompositionReplacement>()
-    let pendingLifecycleEffects = ArrayList<PendingLifecycleEffect>()
-    let lifecycleEffectRemovals = ArrayList<String>()
-    let failedLifecycleCleanups = ArrayList<Resource>()
-    let frameSubscribers = ArrayList<FrameSubscriber>()
-    var forceFullRetainedExecution = false
-    var automaticCompositionEnabled = false
-    var acceptingBuildDeclarations = false
-    let scopes = ArrayList<String>()
-    private let controlIdCounts = HashMap<String, Int64>()
-    let automaticScopeCounts = HashMap<String, Int64>()
-    private let focusRegistry = FocusRegistry()
-    var pendingRetainedDamage: ?Rect = None
-    var fullRetainedDamagePending = true
-    var rootLayoutDependencies: ?PhaseStateDependencies = None
-    var rootPaintDependencies: ?PhaseStateDependencies = None
-
-    /**
-     * Returns the state at the current scope and key, creating it on first use.
-     * Throws `IllegalArgumentException` for an empty key and `IllegalStateException`
-     * for a duplicate key or a key whose value type changed.
-     */
-    public func remember<T>(key: String, initial: () -> T): State<T> {
-        validateKey(key)
-        let path = scopedKey(key)
-        visitRememberedState(this, path, key)
-
-        match (entries.get(path)) {
-            case Some(stored) => match (stored as State<T>) {
-                case Some(state) => state
-                case None => throw IllegalStateException("Remembered state key '${key}' changed value type")
-            }
-            case None =>
-                let state = State<T>(initial())
-                let _ = entries.add(path, state) // cjcheck-ignore: ignore-result # key was just checked absent; no displaced value exists
-                recordStateInsertion(this, path)
-                state
-        }
-    }
-
-    /** Removes every retained state value. */
-    public func clear(): Unit {
-        let effectFailure = clearLifecycleEffects(this)
-        clearMountedState(this)
-        clearRetainedDamageTracking(this)
-        match (effectFailure) {
-            case Some(error) => throw error
-            case None => ()
-        }
-    }
-
-    // Builds run every frame, so the per-build bookkeeping reuses its collections
-    // instead of allocating fresh ones.
-    func beginBuild(): Unit {
-        acceptingBuildDeclarations = true
-        beginMountBuild(this)
-        beginStateReadCollection()
-        beginLifecycleEffectBuild(this)
-        scopes.clear()
-        controlIdCounts.clear()
-        automaticScopeCounts.clear()
-        focusRegistry.clear()
-        frameSubscribers.clear()
-    }
-
-    func finishBuildBody(): Unit {
-        if (!acceptingBuildDeclarations) {
-            throw IllegalStateException("UI build body was already finished")
-        }
-        endStateReadCollection()
-        acceptingBuildDeclarations = false
-    }
-
-    func finishBuild(): ?Exception {
-        if (acceptingBuildDeclarations) {
-            throw IllegalStateException("UI build body must finish before commit")
-        }
-        prepareLifecycleEffectBuild(this)
-        finishMountBuild(this)
-        scopes.clear()
-        commitLifecycleEffectBuild(this)
-    }
-
-    /** Rolls back state created by a build that threw partway through. */
-    func cancelBuild(): ?Exception {
-        if (acceptingBuildDeclarations) {
-            endStateReadCollection()
-            acceptingBuildDeclarations = false
-        }
-        let effectFailure = cancelLifecycleEffectBuild(this)
-        cancelMountBuild(this)
-        frameSubscribers.clear()
-        scopes.clear()
-        effectFailure
-    }
-
-    func pushScope(key: String): Unit {
-        validateKey(key)
-        scopes.add(key)
-    }
-
-    func popScope(): Unit {
-        if (!scopes.isEmpty()) {
-            scopes.remove(at: scopes.size - 1)
-        }
-    }
-
-    /*
-     * A stable identity for a control that declared no explicit id. The identity is the
-     * control's default name inside the current `Keyed` scope; repeated names receive a
-     * build-order suffix. The counters reset each build, so identities stay stable while
-     * the declared tree keeps its shape — this is what lets two icon-only buttons in one
-     * row own separate focus and press state.
-     */
-    func uniqueControlId(base: String): String {
-        let path = scopedKey(base)
-        let seen = match (controlIdCounts.get(path)) {
-            case Some(count) => count
-            case None => 0
-        }
-        let _ = controlIdCounts.add(path, seen + 1) // cjcheck-ignore: ignore-result # displaced count is `seen`, already read above
-        if (seen == 0) {
-            path
-        } else {
-            "${path}#${seen + 1}"
-        }
-    }
-
-    /*
-     * Records a control that can hold keyboard focus, in build (declaration) order. The
-     * shell reads this list after each build to move focus with Tab / Shift+Tab. Like the
-     * control-id counters it is rebuilt every frame, so the traversal order tracks the
-     * declared tree without any retained widget references.
-     */
-    func registerFocusable(id: String): Unit {
-        focusRegistry.register(id)
-    }
-
-    /*
-     * Replaces a previously registered focus id with an explicit one. A control registers
-     * its build-order id in its constructor; a chained `.key(...)` overrides that id and
-     * calls this so the ring stays consistent with what the control checks in `hasFocus`.
-     * The auto id is almost always the last entry, so the search from the end is O(1).
-     */
-    func reregisterFocusable(previous: String, replacement: String): Unit {
-        focusRegistry.reregister(previous, replacement)
-    }
-
-    /** Removes `id` from this build's ring — a control disabled by `.enabled(false)` leaves Tab traversal. */
-    func unregisterFocusable(id: String): Unit {
-        focusRegistry.unregister(id)
-    }
-
-    /** The focusable control ids gathered by the most recent build, in traversal order. */
-    protected func focusRing(): Array<String> {
-        focusRegistry.ring()
-    }
-
-    /** Number of focus stops registered so far in this build; see `focusablesFrom`. */
-    func focusableCount(): Int64 {
-        focusRegistry.size
-    }
-
-    /*
-     * The focus stops registered at or after `start`, in declaration order. An overlay
-     * host (Modal) snapshots the count before building its subtree and takes this slice
-     * after, giving it the focus stops that live inside the dialog — the scope its Tab
-     * trap cycles through.
-     */
-    func focusablesFrom(start: Int64): Array<String> {
-        focusRegistry.from(start)
-    }
-
-    func scopedKey(key: String): String {
-        let result = StringBuilder()
-        for (scope in scopes) {
-            appendKeySegment(result, scope)
-        }
-        appendKeySegment(result, key)
-        result.toString()
-    }
-
-    func diagnosticScopedKey(key: String): String {
-        let result = StringBuilder()
-        for (scope in scopes) {
-            if (scope.startsWith("@")) {
-                continue
-            }
-            result.append(scope)
-            result.append(" / ")
-        }
-        result.append(key)
-        result.toString()
-    }
-
-    private func appendKeySegment(result: StringBuilder, value: String): Unit {
-        result.append(value.size)
-        result.append(":")
-        result.append(value)
-        result.append(";")
-    }
-
-    /** Throws `IllegalArgumentException` when a state identity key is empty. */
-    func validateKey(key: String): Unit {
-        if (key.isEmpty()) {
-            throw IllegalArgumentException("State key must not be empty")
-        }
-    }
-}
-
-/**
- * Returns local state retained by the active `DesktopApp` build. Place repeated or
- * conditionally mounted state inside `Keyed` so its identity is independent of position.
- * Throws `IllegalArgumentException` for an empty key and `IllegalStateException` when
- * called outside an active build, or when key identity rules are violated.
- */
-public func rememberState<T>(key: String, initial: () -> T): State<T> {
-    currentStateStore().remember<T>(key, initial)
 }

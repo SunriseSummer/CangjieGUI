@@ -195,6 +195,18 @@ func stepperClampsRangeWithoutIntegerOverflow(): Unit {
     @Expect(value.value, Int64(7))
 }
 
+@Test
+func stepperConstructorRejectsNonPositiveIncrement(): Unit {
+    let value = State<Int64>(0)
+    var rejected = false
+    try {
+        let _ = Stepper(value, key: "invalid-step", step: 0)
+    } catch (error: IllegalArgumentException) {
+        rejected = error.message == "Stepper step must be greater than zero"
+    }
+    @Expect(rejected)
+}
+
 // A range pressed against the Int64 extremes must not overflow when stepping: the guard saturates
 // at the type bound before clamping to the range, so `lowerBound + step` / `upperBound - step` are
 // never evaluated into an over/underflow.

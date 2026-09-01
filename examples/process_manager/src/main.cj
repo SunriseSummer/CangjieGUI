@@ -17,11 +17,14 @@ import cui.{DesktopApp, FrameHandler, WindowSpec}
 
 main(): Int64 {
     let model = ProcessModel()
-    // Snapshot E2E runs inject stable source data while still exercising the real background
-    // worker/mailbox path; interactive runs continue to query the live operating system.
-    let worker = RefreshWorker(snapshotFixture: processSnapshotFixture(getCommandLine()))
+    // Snapshot E2E runs inject stable source data through the same mailbox-consumption path;
+    // interactive runs continue to query the live operating system on a background worker.
+    let snapshotFixture = processSnapshotFixture(getCommandLine())
+    let worker = RefreshWorker(snapshotFixture: snapshotFixture)
     // 启动立即拉取第一份快照，首帧就有内容可以等待，而不是干等 5 秒间隔。
-    worker.request()
+    if (snapshotFixture.isNone()) {
+        worker.request()
+    }
     // 硬件与电源事实在应用生命周期内几乎不变，启动时查询一次即可。
     let facts = systemFacts()
     let app = DesktopApp(WindowSpec("CUI 进程管理器", 940, 620, scale: 1.0), metadata: Some(processMetadata()),

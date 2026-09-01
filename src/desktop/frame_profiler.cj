@@ -16,15 +16,26 @@ class FramePhaseTimes {
     let build: UInt64
     let layout: UInt64
     let event: UInt64
+    let semantics: UInt64
     let begin: UInt64
     let tree: UInt64
     let resolve: UInt64
     let present: UInt64
 
-    init(build: UInt64, layout: UInt64, event: UInt64, begin: UInt64, tree: UInt64, resolve: UInt64, present: UInt64) {
+    init(
+        build: UInt64,
+        layout: UInt64,
+        event: UInt64,
+        semantics: UInt64,
+        begin: UInt64,
+        tree: UInt64,
+        resolve: UInt64,
+        present: UInt64
+    ) {
         this.build = build
         this.layout = layout
         this.event = event
+        this.semantics = semantics
         this.begin = begin
         this.tree = tree
         this.resolve = resolve
@@ -32,7 +43,7 @@ class FramePhaseTimes {
     }
 
     func total(): UInt64 {
-        build + layout + event + begin + tree + resolve + present
+        build + layout + event + semantics + begin + tree + resolve + present
     }
 }
 
@@ -96,8 +107,8 @@ class FrameProfileSample {
 /*
  * Per-phase frame timing for the desktop loop, enabled with the `--profile` command-line flag so it
  * costs nothing in a normal run (no flag, no profiler instance, no clock reads). It splits the frame
- * into its real phases — tree rebuild, layout, event dispatch, scene setup, tree draw, supersample
- * resolve, and present — and prints the averages every `interval` frames, so a slow frame can be
+ * into its real phases — tree rebuild, layout, event dispatch, semantics/platform commit, scene
+ * setup, tree draw, supersample resolve, and present — and prints the averages every `interval` frames, so a slow frame can be
  * attributed to a specific phase instead of guessed at. DesktopApp avoids these clock reads entirely
  * when profiling is disabled.
  */
@@ -107,6 +118,7 @@ class FrameProfiler {
     private var buildNs: UInt64 = 0
     private var layoutNs: UInt64 = 0
     private var eventNs: UInt64 = 0
+    private var semanticsNs: UInt64 = 0
     private var beginNs: UInt64 = 0
     private var treeNs: UInt64 = 0
     private var resolveNs: UInt64 = 0
@@ -150,6 +162,7 @@ class FrameProfiler {
         buildNs += phases.build
         layoutNs += phases.layout
         eventNs += phases.event
+        semanticsNs += phases.semantics
         beginNs += phases.begin
         treeNs += phases.tree
         resolveNs += phases.resolve
@@ -202,7 +215,7 @@ class FrameProfiler {
 
     private func report(): Unit {
         let n = UInt64(frames)
-        let total = buildNs + layoutNs + eventNs + beginNs + treeNs + resolveNs + presentNs
+        let total = buildNs + layoutNs + eventNs + semanticsNs + beginNs + treeNs + resolveNs + presentNs
         let ordered = frameTotals.toArray()
         sort(ordered)
         let p50 = percentileOfSorted(ordered, PERCENTILE_50)
@@ -211,7 +224,7 @@ class FrameProfiler {
         let p99 = percentileOfSorted(ordered, PERCENTILE_99)
         let maximum = maxSample(ordered)
         println(
-            "[profile] 每帧均值（${frames} 帧）：总 ${ms(total, n)} ＝ 构建 ${ms(buildNs, n)} ｜ 布局 ${ms(layoutNs, n)} ｜ 事件 ${ms(eventNs, n)} ｜ 起帧 ${ms(beginNs, n)} ｜ 绘树 ${ms(treeNs, n)} ｜ 降采样 ${ms(resolveNs, n)} ｜ 呈现 ${ms(presentNs, n)}")
+            "[profile] 每帧均值（${frames} 帧）：总 ${ms(total, n)} ＝ 构建 ${ms(buildNs, n)} ｜ 布局 ${ms(layoutNs, n)} ｜ 事件 ${ms(eventNs, n)} ｜ 语义提交 ${ms(semanticsNs, n)} ｜ 起帧 ${ms(beginNs, n)} ｜ 绘树 ${ms(treeNs, n)} ｜ 降采样 ${ms(resolveNs, n)} ｜ 呈现 ${ms(presentNs, n)}")
         println(
             "[profile] 延迟分布：P50 ${ms(p50, UInt64(1))} ｜ P90 ${ms(p90, UInt64(1))} ｜ P95 ${ms(p95, UInt64(1))} ｜ P99 ${ms(p99, UInt64(1))} ｜ 最大 ${ms(maximum, UInt64(1))} ｜ 稳定化 ${fixedAverage(stabilizationPasses, frames)} 次/帧（最大 ${maxStabilizationPasses}）")
         println(
@@ -221,7 +234,7 @@ class FrameProfiler {
         println(
             "[profile] 文本/帧：度量 ${integerAverage(textMeasures, n)} ｜ 实算 ${integerAverage(textComputes, n)} ｜ 塑形 ${integerAverage(textShapes, n)} ｜ 绘制 ${integerAverage(textDraws, n)}")
         println(
-            "@@FRAME_PROFILE|frames=${frames}|total_avg_ns=${integerAverage(total, n)}|p50_ns=${p50}|p90_ns=${p90}|p95_ns=${p95}|p99_ns=${p99}|max_ns=${maximum}|build_avg_ns=${integerAverage(buildNs, n)}|layout_avg_ns=${integerAverage(layoutNs, n)}|event_avg_ns=${integerAverage(eventNs, n)}|begin_avg_ns=${integerAverage(beginNs, n)}|tree_avg_ns=${integerAverage(treeNs, n)}|resolve_avg_ns=${integerAverage(resolveNs, n)}|present_avg_ns=${integerAverage(presentNs, n)}|stabilization_passes=${stabilizationPasses}|max_stabilization_passes=${maxStabilizationPasses}|input_frames=${inputFrames}|state_frames=${stateFrames}|timer_frames=${timerFrames}|resize_frames=${resizeFrames}|forced_frames=${forcedFrames}|frame_subscribers=${frameSubscribers}|partial_damage_frames=${partialDamageFrames}|text_measures=${textMeasures}|text_computes=${textComputes}|text_shapes=${textShapes}|text_draws=${textDraws}")
+            "@@FRAME_PROFILE|frames=${frames}|total_avg_ns=${integerAverage(total, n)}|p50_ns=${p50}|p90_ns=${p90}|p95_ns=${p95}|p99_ns=${p99}|max_ns=${maximum}|build_avg_ns=${integerAverage(buildNs, n)}|layout_avg_ns=${integerAverage(layoutNs, n)}|event_avg_ns=${integerAverage(eventNs, n)}|semantics_avg_ns=${integerAverage(semanticsNs, n)}|begin_avg_ns=${integerAverage(beginNs, n)}|tree_avg_ns=${integerAverage(treeNs, n)}|resolve_avg_ns=${integerAverage(resolveNs, n)}|present_avg_ns=${integerAverage(presentNs, n)}|stabilization_passes=${stabilizationPasses}|max_stabilization_passes=${maxStabilizationPasses}|input_frames=${inputFrames}|state_frames=${stateFrames}|timer_frames=${timerFrames}|resize_frames=${resizeFrames}|forced_frames=${forcedFrames}|frame_subscribers=${frameSubscribers}|partial_damage_frames=${partialDamageFrames}|text_measures=${textMeasures}|text_computes=${textComputes}|text_shapes=${textShapes}|text_draws=${textDraws}")
     }
 
     private func reset(): Unit {
@@ -229,6 +242,7 @@ class FrameProfiler {
         buildNs = 0
         layoutNs = 0
         eventNs = 0
+        semanticsNs = 0
         beginNs = 0
         treeNs = 0
         resolveNs = 0

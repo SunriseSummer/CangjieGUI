@@ -1,6 +1,6 @@
 package cui.core
 
-import sdl.{Color, Rect, Size, SdlWindow, UiEvent, WindowSpec}
+import sdl.{Color, Rect, Renderer, Size, SdlWindow, UiEvent, WindowSpec}
 
 private class RetainedProbe <: Widget {
     private let measures: BuildCounter
@@ -34,6 +34,12 @@ private class RetainedProbe <: Widget {
 
 private class BuildCounter {
     var value: Int64 = 0
+}
+
+private class RetainedDeclarationCounter {
+    var outerBuilds: Int64 = 0
+    var retainedBuilds: Int64 = 0
+    var revision: UInt64 = UInt64(0)
 }
 
 private class CommandPaintProbe <: Widget {
@@ -85,6 +91,22 @@ private class RetainedOverlayProbe <: Widget {
 
     public func layout(ctx: UiContext, _: Rect): Unit {
         ctx.setOverlay(Overlay(handleEvent: {_, _ => false}, render: {_ => ()}, owner: "retained-probe"))
+    }
+
+    public func draw(_: UiContext): Unit {}
+
+    public func handle(_: UiContext, _: UiEvent): Bool {
+        false
+    }
+}
+
+private class RetainedSemanticClipProbe <: Widget {
+    public func measure(_: UiContext, available: Size): Size {
+        available
+    }
+
+    public func layout(ctx: UiContext, rect: Rect): Unit {
+        ctx.registerSemantics(SemanticsNode("retained-clip-probe", Semantics(label: "Retained clip probe"), rect))
     }
 
     public func draw(_: UiContext): Unit {}
@@ -155,6 +177,74 @@ func retainedSubtreeSkipsBuildMeasureAndLayoutButReplaysDraw(): Unit {
     let stats = captured.value.getOrThrow().cacheStats()
     @Expect(stats.buildHits, UInt64(1))
     @Expect(stats.layoutHits, UInt64(1))
+}
+
+@Test
+func keyOnlyRetainedDoesNotPreventCleanAutomaticAncestorHit(): Unit {
+    let store = StateStore()
+    enableAutomaticComposition(store)
+    let counter = RetainedDeclarationCounter()
+    let body: () -> Unit = {
+        => counter.outerBuilds += 1
+        RetainedSubtree("pane") {
+            counter.retainedBuilds += 1
+            Spacer()
+        }
+    }
+
+    let _ = buildRoot(body, store)
+    let _ = buildRoot(body, store)
+
+    @Expect(counter.outerBuilds, Int64(1))
+    @Expect(counter.retainedBuilds, Int64(1))
+}
+
+@Test
+func explicitRevisionRetainedStillReplaysAutomaticAncestor(): Unit {
+    let store = StateStore()
+    enableAutomaticComposition(store)
+    let counter = RetainedDeclarationCounter()
+    let body: () -> Unit = {
+        => counter.outerBuilds += 1
+        RetainedSubtree("pane", counter.revision) {
+            counter.retainedBuilds += 1
+            Spacer()
+        }
+    }
+
+    let _ = buildRoot(body, store)
+    counter.revision = UInt64(1)
+    let _ = buildRoot(body, store)
+
+    @Expect(counter.outerBuilds, Int64(2))
+    @Expect(counter.retainedBuilds, Int64(2))
+}
+
+@Test
+func cachedKeyOnlyRetainedUnmountsAndRemountsAfterStateBranchChange(): Unit {
+    let store = StateStore()
+    enableAutomaticComposition(store)
+    let visible = State<Bool>(true)
+    let retainedBuilds = BuildCounter()
+    let body: () -> Unit = {
+        => if (visible.value) {
+            let _ = RetainedSubtree("pane") {
+                retainedBuilds.value += 1
+                Spacer()
+            }
+        } else {
+            let _ = Spacer()
+        }
+    }
+
+    let _ = buildRoot(body, store)
+    let _ = buildRoot(body, store)
+    visible.value = false
+    let _ = buildRoot(body, store)
+    visible.value = true
+    let _ = buildRoot(body, store)
+
+    @Expect(retainedBuilds.value, Int64(2))
 }
 
 @Test
@@ -313,8 +403,10 @@ func retainedLayoutReplaysOverlayRegistrationsOnCacheHit(): Unit {
 
     ctx.clearActiveOverlay()
     let second = buildRoot({=> RetainedSubtree("overlay", UInt64(0)) {RetainedOverlayProbe()}}, store)
+    let replayVisitsBefore = overlayFragmentReplayVisits(ctx)
     second.layout(ctx, rect)
     @Expect(ctx.overlayCount(), Int64(1))
+    @Expect(overlayFragmentReplayVisits(ctx), replayVisitsBefore)
 }
 
 @Test
@@ -412,6 +504,67 @@ func retainedPaintCommandBufferReplacesSecondTreeDraw(): Unit {
         store.clear() // cached texture must be released before its renderer
         window.close()
     }
+}
+
+@Test
+func retainedLayoutCacheUsesElementSpatialVisibilityKey(): Unit {
+    let context = UiContext(Renderer.headless(), Theme.light())
+    let record = RetainedRecord(UInt64(0), false, RetainedSemanticClipProbe())
+    let bounds = Rect(0.0, 0.0, 100.0, 100.0)
+
+    context.clearSemantics()
+    context.withSemanticClip(Rect(0.0, 0.0, 100.0, 40.0)) {=> record.layout(context, bounds)}
+    context.commitSemantics()
+    @Expect(context.semanticsTreeSnapshot().node("retained-clip-probe").getOrThrow().visibleBounds.bottom(),
+        Float32(40.0))
+
+    context.clearSemantics()
+    context.withSemanticClip(Rect(0.0, 0.0, 100.0, 60.0)) {=> record.layout(context, bounds)}
+    context.commitSemantics()
+    @Expect(context.semanticsTreeSnapshot().node("retained-clip-probe").getOrThrow().visibleBounds.bottom(),
+        Float32(60.0))
+
+    context.clearSemantics()
+    context.withSemanticClip(Rect(0.0, 0.0, 100.0, 60.0)) {=> record.layout(context, bounds)}
+    context.commitSemantics()
+    @Expect(record.stats().layoutHits, UInt64(1))
+    record.close()
+}
+
+@Test
+func retainedPaintPublishesElementSceneSlotAndInvalidatesStaleParentOnClose(): Unit {
+    let context = UiContext(Renderer.headless(), Theme.light())
+    let draws = BuildCounter()
+    let record = RetainedRecord(UInt64(0), true, CommandPaintProbe(draws))
+    record.layout(context, Rect(0.0, 0.0, 100.0, 50.0))
+
+    let parent = context.renderer.recordCommands {record.draw(context)}
+    @Expect(parent.stats().commandCount, Int64(1))
+    @Expect(record.stats().paintCommandCount, Int64(1))
+    @Expect(parent.replay(context.renderer))
+
+    record.close()
+    @Expect(!parent.replay(context.renderer))
+    record.close()
+}
+
+@Test
+func layoutEnvironmentChangeInvalidatesRetainedPaintCommands(): Unit {
+    let renderer = Renderer.headless()
+    let first = UiContext(renderer, Theme.light())
+    let second = UiContext(renderer, Theme.light())
+    let draws = BuildCounter()
+    let record = RetainedRecord(UInt64(0), true, CommandPaintProbe(draws))
+    let rect = Rect(0.0, 0.0, 100.0, 50.0)
+
+    record.layout(first, rect)
+    record.draw(first)
+    @Expect(draws.value, Int64(1))
+
+    record.layout(second, rect)
+    record.draw(second)
+    @Expect(draws.value, Int64(2))
+    record.close()
 }
 
 @Test

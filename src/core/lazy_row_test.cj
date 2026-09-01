@@ -3,6 +3,19 @@ package cui.core
 import sdl.{Rect, UiEvent}
 
 @Test
+func lazyRowRejectsAmbiguousScrollOwner(): Unit {
+    let scroll = State<Float32>(0.0)
+    let controller = LazyViewportController()
+    var rejected = false
+    try {
+        let _ = LazyRow(1, 20.0, scroll: scroll, controller: controller, id: "ambiguous.row") {_ => ()}
+    } catch (error: IllegalArgumentException) {
+        rejected = error.message == "LazyRow accepts either scroll or controller, not both"
+    }
+    @Expect(rejected)
+}
+
+@Test
 func lazyRowMaterializesOnlyAScreenful(): Unit {
     let counter = LazyBuildCounter()
     // A thousand columns, but only the default-viewport window (720px / 100px + overscan) is built.
@@ -45,6 +58,29 @@ func lazyRowOfVirtualizesOverData(): Unit {
     @Expect(counter.count > 0, true)
     @Expect(counter.count < 20, true) // windowed, not all 1000 built
     @Expect(row.isFlexible(), true)
+}
+
+@Test
+func lazyRowObservableDataAnchorsAcrossInsertWithoutManualRevision(): Unit {
+    let store = StateStore()
+    let controller = LazyViewportController()
+    let data = State<Array<String>>(["k0", "k1", "k2", "k3", "k4", "k5", "k6", "k7", "k8", "k9"])
+    let body: () -> Unit = {
+        => LazyRow.of<String>(data, 20.0, key: {value => value}, id: "row.observable",
+            controller: controller) {_ => emit(Spacer())}
+    }
+    let first = buildRoot(body, store)
+    first.layout(testContext(), Rect(0.0, 0.0, 80.0, 120.0))
+
+    controller.scrollToKey("k5", alignment: LazyScrollAlignment.Start)
+    let revealed = buildRoot(body, store)
+    revealed.layout(testContext(), Rect(0.0, 0.0, 80.0, 120.0))
+    @Expect(controller.offset, Float32(100.0))
+
+    data.value = ["x", "y", "k0", "k1", "k2", "k3", "k4", "k5", "k6", "k7", "k8", "k9"]
+    let inserted = buildRoot(body, store)
+    inserted.layout(testContext(), Rect(0.0, 0.0, 80.0, 120.0))
+    @Expect(controller.offset, Float32(140.0))
 }
 
 @Test

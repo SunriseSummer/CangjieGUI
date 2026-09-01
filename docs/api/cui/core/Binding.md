@@ -4,7 +4,7 @@
 
 `cui.core` 包中的 public class
 
-指向另一个可绑定值中某个字段的双向绑定，用 [`Bindable.project`](Bindable.md#project) 创建。读取时从原值取出该字段；写入时用新字段值重建原值并写回，因此数据源始终只有一个。没有公开构造函数。
+指向另一个可绑定值中某个字段的双向绑定，用 [`Bindable.project`](Bindable.md#project) 或 Store 的 `binding` 创建。读取时从原值取出该字段；写入时用 Lens 或 Action 回到原值，因此数据源始终只有一个。策略重载可让读取侧只观察焦点值的等价类，而不削弱写权限边界。没有公开构造函数。
 
 ## 声明
 
@@ -54,6 +54,7 @@ main(): Unit {
 
 | 成员 | 说明 |
 |---|---|
+| [`update(transform: (T) -> T)`](#update) | 用一次根模型更新变换绑定字段。 |
 | [`observe(callback: (T, T) -> Unit)`](#observe) | 观察后续变化并返回可取消的订阅。 |
 
 ## 属性
@@ -68,7 +69,7 @@ public mut prop value: T
 
 ### revision
 
-源的修订号。只读；源的任何赋值（包括其它成分的变化）都会推进它。
+读取投影的修订号。默认 Binding 与源同步，源的任何赋值（包括其它成分的变化）都会推进；由带 `policy` 的 `project`/Store `binding` 创建时，只有焦点值跨越策略等价类才推进。
 
 ```cangjie
 public prop revision: UInt64
@@ -78,9 +79,23 @@ public prop revision: UInt64
 
 ## 方法
 
+### update
+
+用 `transform` 修改当前字段。对于链式 `project` 产生的嵌套 Binding，框架组合所有投影 setter，并只读取、写入根
+Bindable 一次；通过组合 Lens 创建时则复用 Lens 的逐层一次 endomorphism 路径。同一次修改因此基于一个模型快照，
+不会因 Lens 深度重复读取前缀。变换或任一投影抛异常时根值不写回。
+
+```cangjie
+public func update(transform: (T) -> T): Unit
+```
+
+**参数**
+
+- `transform`: `(T) -> T` — 字段当前值到字段下一值的变换。
+
 ### observe
 
-观察后续变化并返回可取消的订阅。回调收到字段的 `(旧值, 新值)`；原值每次被赋值都会触发回调，即使这个字段没有变化。只关心字段真正变化时，请在回调中比较两个值。
+观察后续变化并返回可取消的订阅。回调收到字段的 `(旧值, 新值)`。默认 Binding 在原值每次被接受赋值时触发；策略 Binding 只在字段跨越显式等价类时触发，等价候选也不会替换缓存代表元。策略必须快速、确定、无副作用并满足等价关系。
 
 ```cangjie
 public func observe(callback: (T, T) -> Unit): StateObservation<T>

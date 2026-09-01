@@ -25,8 +25,9 @@ public struct RetainedSubtreeStats {
 ```
 
 `buildHits` 表示声明体复用，`layoutHits` 表示相同几何下跳过布局，`paintHits` 表示
-`cachePaint: true` 后重放透明绘制命令而不再执行子树 draw。`buildDependencyCount` 是当前 body 实际读取的不同 State
-数量；`buildInvalidations` 是该边界由干净转为待重建的累计次数，同一帧/事务内的多次写入会合并。
+`cachePaint: true` 后重放透明绘制命令而不再执行子树 draw。`buildDependencyCount` 是当前 body 提交的直接响应式
+依赖边数；稳定 `DerivedState` 无论有多少传递源都占一条边，声明 body 内创建的短命 State-backed 派生则保留
+可跨重建复用的直接 State 源边。`buildInvalidations` 是该边界由干净转为待重建的累计次数，同一帧/事务内的多次写入会合并。
 `frameSubscriberCount` 是边界后代的显式 Frame 回调数；其余三个依赖字段分别给出 measure、layout 与命令缓存
 paint 的 State 依赖数。`paintCommandCount` 与 `paintEstimatedBytes` 给出当前 display list 的命令数及保守内存
 估算；动态绘制安全检查绕过缓存或尚未录制时为 0。它们用于定位依赖过宽、意外高频重建、动画订阅和过大的

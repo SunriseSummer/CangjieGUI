@@ -117,12 +117,14 @@ public class MenuBar <: Widget {
     }
 
     private func isOpen(): Bool {
-        openIndex.value >= 0 && openIndex.value < menus.size
+        let index = openIndex.value
+        index >= 0 && index < menus.size
     }
 
     private func currentItems(): Array<MenuItem> {
-        if (isOpen()) {
-            menus[openIndex.value].items
+        let index = openIndex.value
+        if (index >= 0 && index < menus.size) {
+            menus[index].items
         } else {
             []
         }
@@ -196,8 +198,11 @@ public class MenuBar <: Widget {
             // shape through the menu (the move still falls through for the bar's own hover).
             ctx.claimHover(overlayOwner, CursorShape.Default)
             let index = menuItemIndexAt(popup, y)
-            if (index >= 0 && index < currentItems().size && currentItems()[index].isSelectable()) {
-                highlight.value = index
+            if (index >= 0) {
+                let items = currentItems()
+                if (index < items.size && items[index].isSelectable()) {
+                    highlight.value = index
+                }
             }
             return
         }
@@ -275,11 +280,12 @@ public class MenuBar <: Widget {
     // flipped above the bar when there is no room below.
     private func currentPopup(ctx: UiContext): Rect {
         let titles = titleRects(ctx)
-        if (!isOpen() || openIndex.value >= titles.size) {
+        let index = openIndex.value
+        if (index < 0 || index >= menus.size || index >= titles.size) {
             return Rect.zero()
         }
-        let title = titles[openIndex.value]
-        let items = menus[openIndex.value].items
+        let title = titles[index]
+        let items = menus[index].items
         let w = menuPreferredWidth(ctx, items)
         let h = menuContentHeight(items)
         let x = clampF32(title.x, MENU_BAR_MARGIN, max(MENU_BAR_MARGIN, ctx.viewportWidth - w - MENU_BAR_MARGIN))

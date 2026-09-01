@@ -57,6 +57,31 @@ func tooltipRequestsFramesWhileRevealPending(): Unit {
 }
 
 @Test
+func tooltipDwellRestartsAfterLayoutMovesItOutsidePaintVisibility(): Unit {
+    let ctx = testContext()
+    ctx.mouseX = 25.0
+    ctx.mouseY = 15.0
+    ctx.frame = FrameInfo(UInt64(100), UInt64(0))
+    let tip = Tooltip(text: "提示") {
+        Label("x")
+    }
+    tip.layout(ctx, Rect(0.0, 0.0, 50.0, 30.0))
+    tip.draw(ctx)
+
+    // A scroll layout moves the tooltip out of view. Its draw may now be culled, so layout must
+    // close the old dwell interval before the anchor later becomes visible again.
+    tip.layout(ctx, Rect(0.0, -100.0, 50.0, 30.0))
+    ctx.frame = FrameInfo(UInt64(700), UInt64(0))
+    tip.layout(ctx, Rect(0.0, 0.0, 50.0, 30.0))
+    let _ = ctx.takeFrameSchedule()
+    tip.draw(ctx)
+    ctx.frame = FrameInfo(UInt64(800), UInt64(0))
+    tip.draw(ctx)
+    @Expect(ctx.tooltipText.isEmpty())
+    @Expect(ctx.takeFrameSchedule().deadlineMs.getOrThrow(), UInt64(1200))
+}
+
+@Test
 func frameScheduleCoalescesToEarliestDeadlineAndPreservesImmediateRequest(): Unit {
     let ctx = testContext()
     ctx.requestFrameAt(UInt64(900))

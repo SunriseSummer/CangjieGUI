@@ -12,7 +12,9 @@ import sdl.{Rect, Size, UiEvent}
  * while an item is on screen and is dropped when it scrolls off; hoist any state that must outlive
  * scrolling into the application model. The scroll offset may be owned externally (via `scroll`) or a
  * `LazyViewportController`; stable-key anchoring and adaptive pixel overscan match `LazyColumn`. The
- * mouse wheel scrolls it horizontally; a bar rides the bottom edge on overflow.
+ * mouse wheel scrolls it horizontally; a bar rides the bottom edge on overflow. Scrolling inside
+ * the materialized interval is a layout/paint transform; crossing its boundary schedules one
+ * stabilization rebuild.
  */
 public class LazyRow <: Widget {
     private let count: Int64
@@ -22,11 +24,18 @@ public class LazyRow <: Widget {
     private let keyForIndex: (Int64) -> String
     private let viewportMemory: LazyViewportMemory
     private let scrollBar: HScrollBar
+    private let overscan: Float32
     // Columns materialized this frame, each paired with its absolute index for positioning and events.
     private let visibleItems: Array<(Int64, Widget)>
-    // The scroll offset snapshotted for the whole frame so build, layout and draw agree.
-    private let frameScroll: Float32
+    private let paintOverflow: PaintOutset
+    private let materializedFirst: Int64
+    private let materializedLast: Int64
+    private let builtMaterializationGeneration: UInt64
+    private let builtScrollRevision: UInt64
+    // Layout updates the live transform; draw and events consume the same committed value.
+    private var frameScroll: Float32
     private var frame = Rect.zero()
+    private var spatialClip = exactSpatialClip(Rect.zero())
 
     /**
      * The index form: `count` columns built on demand by index. `id` is the optional container identity
@@ -34,6 +43,8 @@ public class LazyRow <: Widget {
      * logical pixels. `key` optionally gives each item a stable identity string (so its per-item state
      * follows the item across inserts/reorders); when omitted, items are keyed by index — see
      * `LazyRow.of` for the data-driven form.
+     * Throws `IllegalArgumentException` when an explicit `id` is empty or both `scroll` and
+     * `controller` are provided.
      */
     public init(
         count: Int64,
@@ -53,6 +64,7 @@ public class LazyRow <: Widget {
         this.count = max(0, count)
         this.itemWidth = resolvedItemWidth
         this.spacing = resolvedSpacing
+        this.overscan = max(0.0, overscan)
         if (scroll.isSome() && controller.isSome()) {
             throw IllegalArgumentException("LazyRow accepts either scroll or controller, not both")
         }
@@ -68,19 +80,26 @@ public class LazyRow <: Widget {
         this.viewportMemory = localState<LazyViewportMemory>("LazyRow:${ident}:viewport") {
             LazyViewportMemory(revision)
         }.value
+        this.builtMaterializationGeneration = this.viewportMemory.buildMaterializationGeneration()
         this.scrollBar = HScrollBar("LazyRow:${ident}:thumb")
         // lazyContentHeight computes count*(item+spacing)-spacing along any axis; here it is the width.
         let content = lazyContentHeight(this.count, resolvedItemWidth, resolvedSpacing)
-        let current = clampScrollOffset(this.scrollStateValue.value, content, this.viewportMemory.viewportExtent)
+        let (scrollSnapshot, scrollRevision) = this.scrollStateValue.phaseHintValueRevisionSnapshot()
+        this.builtScrollRevision = scrollRevision
+        let current = clampScrollOffset(scrollSnapshot, content, this.viewportMemory.viewportExtent)
         let geometry = LazyItemGeometry(this.count, resolvedKey,
             {index => lazyFixedItemTop(index, resolvedItemWidth, resolvedSpacing)}, {_ => resolvedItemWidth}, content)
         let anchored = lazyResolveAnchoredScroll(this.viewportMemory, revision, revision, current, geometry)
         this.frameScroll = lazyResolveControllerScroll(controller, this.viewportMemory, anchored, geometry)
-        let insets = lazyAdaptiveOverscan(overscan, this.frameScroll, this.viewportMemory.previousScroll,
-            this.viewportMemory.viewportExtent)
+        let insets = lazyAdaptiveOverscan(this.overscan, this.frameScroll,
+            this.viewportMemory.materializationOriginScroll, this.viewportMemory.viewportExtent)
         let (first, last) = lazyFixedVisibleRange(this.frameScroll, this.viewportMemory.viewportExtent,
             resolvedItemWidth, resolvedSpacing, this.count, insets)
+        this.materializedFirst = first
+        this.materializedLast = last
         this.visibleItems = buildLazyChildren("LazyRow:${ident}", first, last, resolvedKey, item)
+        this.paintOverflow = aggregateLazyPaintOutsets(visibleItems)
+        this.viewportMemory.materializationOriginScroll = this.frameScroll
         emit(this)
     }
 
@@ -116,15 +135,37 @@ public class LazyRow <: Widget {
         }
     }
 
+    /** Observable-data form with automatic State-revision anchoring across structural changes. */
+    public static func of<T>( // cjcheck-ignore: param-count # observable data removes a revision parameter while preserving named viewport controls
+        data: State<Array<T>>,
+        itemWidth: Float32,
+        spacing!: Float32 = 0.0,
+        scroll!: ?State<Float32> = None,
+        key!: ?((T) -> String) = None,
+        id!: ?String = None,
+        controller!: ?LazyViewportController = None,
+        overscan!: Float32 = LAZY_DEFAULT_OVERSCAN_PIXELS,
+        item!: (T) -> Unit
+    ): LazyRow {
+        let (snapshot, revision) = data.valueRevisionSnapshot()
+        LazyRow.of(snapshot, itemWidth, spacing: spacing, scroll: scroll, key: key, id: id, revision: revision,
+            controller: controller, overscan: overscan, item: item)
+    }
+
     public func measure(_: UiContext, available: Size): Size {
         Size(available.w, available.h)
     }
 
     public func layout(ctx: UiContext, rect: Rect): Unit {
         frame = rect
+        spatialClip = horizontalViewportSpatialClip(rect, paintOverflow)
         viewportMemory.viewportExtent = rect.w
         let content = lazyContentHeight(count, itemWidth, spacing)
-        if (lazyFloatChanged(frameScroll, scrollStateValue.value)) {
+        let (requestedScroll, scrollRevision) = scrollStateValue.valueRevisionSnapshot()
+        if (scrollRevision != builtScrollRevision) {
+            frameScroll = clampScrollOffset(requestedScroll, content, rect.w)
+        }
+        if (lazyFloatChanged(frameScroll, requestedScroll)) {
             scrollStateValue.value = frameScroll
         }
         let stride = itemWidth + spacing
@@ -134,31 +175,45 @@ public class LazyRow <: Widget {
         } else {
             rect.h
         }
-        for (pair in visibleItems) {
-            let (index, widget) = pair
-            let x = rect.x - frameScroll + Float32(index) * stride
-            widget.layout(ctx, Rect(x, rect.y, itemWidth, contentHeight))
+        ctx.withSpatialClip(spatialClip) {
+            => for (pair in visibleItems) {
+                let (index, widget) = pair
+                let x = rect.x - frameScroll + Float32(index) * stride
+                widget.layout(ctx, Rect(x, rect.y, itemWidth, contentHeight))
+            }
         }
+        requestMaterializationIfNeeded(rect.w)
         lazyRememberAnchor(viewportMemory, frameScroll, count, {offset => Int64(max(0.0, offset) / stride)}, keyForIndex,
             {index => lazyFixedItemTop(index, itemWidth, spacing)})
+    }
+
+    private func requestMaterializationIfNeeded(viewportExtent: Float32): Unit {
+        if (builtMaterializationGeneration != viewportMemory.currentMaterializationGeneration()) {
+            return
+        }
+        let insets = lazyAdaptiveOverscan(overscan, frameScroll, viewportMemory.materializationOriginScroll,
+            viewportExtent)
+        let (desiredFirst, desiredLast) = lazyFixedVisibleRange(frameScroll, viewportExtent, itemWidth, spacing, count,
+            insets)
+        if (desiredFirst < materializedFirst || desiredLast > materializedLast) {
+            viewportMemory.requestMaterialization()
+        }
     }
 
     public func draw(ctx: UiContext): Unit {
         let content = lazyContentHeight(count, itemWidth, spacing)
         let stride = itemWidth + spacing
-        // Exact on the scroll axis, shadow clearance on the cross axis (see CUI_SHADOW_CLEARANCE).
-        ctx.renderer.pushClip(Rect(frame.x, frame.y - CUI_SHADOW_CLEARANCE, frame.w, frame.h + 2.0 * CUI_SHADOW_CLEARANCE))
-        for (pair in visibleItems) {
-            let (index, widget) = pair
-            // Clip each column to its own bounds plus shadow clearance, so a card column's soft halo
-            // wraps its corners; an item wider than the cleared bounds is still truncated rather than
-            // bleeding far over its neighbour (and the strip's own clip bounds the scroll axis).
-            let colRect = Rect(frame.x - frameScroll + Float32(index) * stride, frame.y, itemWidth, frame.h)
-            ctx.renderer.pushClip(colRect.inset(-CUI_SHADOW_CLEARANCE))
-            widget.draw(ctx)
-            ctx.renderer.popClip()
+        // Exact on the scroll axis; cross-axis overflow comes from visible widget declarations.
+        ctx.drawWithinSpatialClip(spatialClip) {
+            => for (pair in visibleItems) {
+                let (index, widget) = pair
+                // Clip each column to its declared paint bounds; the strip still bounds the scroll axis.
+                let colRect = Rect(frame.x - frameScroll + Float32(index) * stride, frame.y, itemWidth, frame.h)
+                ctx.drawWithinSpatialClip(exactSpatialClip(widget.paintOutset().expand(colRect))) {
+                    => widget.draw(ctx)
+                }
+            }
         }
-        ctx.renderer.popClip()
         drawHorizontalScrollBar(ctx, frame, frameScroll, content, frame.w, active: scrollBar.dragging(ctx))
     }
 
@@ -177,7 +232,7 @@ public class LazyRow <: Widget {
                 // wheel) drives it directly; otherwise the vertical wheel is remapped so a plain mouse
                 // scrolls too — wheel toward the user (scroll down) advances the strip right.
                 // Content that fits leaves the wheel to an enclosing scroller (no dead zone).
-                if (frame.contains(pointerX, pointerY) && maxScrollOffset(content, viewportW) > 0.0) {
+                if (spatialClip.contains(pointerX, pointerY) && maxScrollOffset(content, viewportW) > 0.0) {
                     let delta = if (wheelX != 0.0) {
                         -wheelX
                     } else {
@@ -190,7 +245,7 @@ public class LazyRow <: Widget {
                 if (scrollBar.press(ctx, frame, scrollStateValue, content, viewportW, x, y)) {
                     return true
                 }
-                if (!frame.contains(x, y)) {
+                if (!spatialClip.contains(x, y)) {
                     return false
                 }
             case UiEvent.MouseMove(x, y) =>
@@ -198,11 +253,11 @@ public class LazyRow <: Widget {
                     return true
                 }
                 // While a child drag is live, track the pointer past the edge to the release.
-                if (!frame.contains(x, y) && ctx.dragId.isEmpty()) {
+                if (!spatialClip.contains(x, y) && ctx.dragId.isEmpty()) {
                     return false
                 }
             case UiEvent.MouseUp(_, x, y) =>
-                if (!frame.contains(x, y) && ctx.dragId.isEmpty()) {
+                if (!spatialClip.contains(x, y) && ctx.dragId.isEmpty()) {
                     return false
                 }
             case _ => ()
@@ -225,5 +280,9 @@ public class LazyRow <: Widget {
 
     public func focusableIds(): Array<String> {
         collectLazyFocusableIds(visibleItems)
+    }
+
+    public func paintOutset(): PaintOutset {
+        paintOverflow.verticalOnly()
     }
 }

@@ -14,18 +14,40 @@ protected let CUI_GAP: Float32 = 8.0
  * widget in declaration order. The committed tree runs `measure` (preferred size within `available`),
  * `layout` (assigns the frame), `draw`, and `handle`; synthesized frame ticks use the explicit
  * subscription registry (`FrameHandler` / `subscribeFrame`) instead of traversing every widget.
- * `handle` returns whether input was consumed, which stops dispatch to the widgets behind it. The default `width`/`padding`/... modifiers
- * wrap the widget in a `ModifiedWidget` and return the wrapper for chaining.
+ * `handle` consumption stops dispatch behind it; default modifiers wrap the widget for chaining.
  */
 public interface Widget {
     /** Returns the preferred size within `available` space; must not exceed it unless unavoidable. */
     func measure(ctx: UiContext, available: Size): Size
     /** Assigns the widget's on-screen frame; children are positioned inside `rect` here. */
     func layout(ctx: UiContext, rect: Rect): Unit
-    /** Paints the widget into its laid-out frame using the context's renderer. */
+    /** Paints the laid-out frame; disjoint `layout + paintOutset` may be skipped, so lifecycle work belongs in State/effects/frame subscriptions. */
     func draw(ctx: UiContext): Unit
     /** Processes one input event; returning true consumes it and stops dispatch behind this widget. */
     func handle(ctx: UiContext, event: UiEvent): Bool
+
+    /**
+     * Whether pointer handlers in this subtree are confined to the rectangle its parent assigned.
+     * The compatibility default is `Unbounded`; return `LayoutBounds` to let indexed containers
+     * prune the subtree for spatially disjoint pointer events. Active pointer capture bypasses the
+     * index, so drags and releases still reach their owner outside the original bounds.
+     */
+    func pointerEventScope(): PointerEventScope {
+        PointerEventScope.Unbounded
+    }
+
+    /**
+     * Conservative paint overflow beyond the rectangle assigned by `layout`. Focusable leaves get
+     * the framework focus-ring allowance by default; custom drawing that extends further should
+     * override this method or use the fluent `paintOutset` modifier.
+     */
+    func paintOutset(): PaintOutset {
+        if (focusableId().isSome()) {
+            PaintOutset.all(4.0)
+        } else {
+            PaintOutset()
+        }
+    }
 
     /**
      * A flexible widget receives a share of its stack's leftover space instead of the
@@ -49,6 +71,11 @@ public interface Widget {
     /** Whether this node occupies a position in its parent layout. */
     func participatesInLayout(): Bool {
         true
+    }
+
+    /** Whether a zero-space node still needs a layout callback for portal/registration side effects. */
+    func needsDetachedLayout(): Bool {
+        false
     }
 
     /*
@@ -253,6 +280,16 @@ public interface Widget {
         shadow(layers, radius: vpLength(radius))
     }
 
+    /** Declares equal custom paint overflow without changing layout size or drawing. */
+    func paintOutset(value: Float32): Widget {
+        applyModifier(this, WidgetModifier.PaintOverflow(PaintOutset.all(value)))
+    }
+
+    /** Declares asymmetric custom paint overflow without changing layout size or drawing. */
+    func paintOutset(value: PaintOutset): Widget {
+        applyModifier(this, WidgetModifier.PaintOverflow(value))
+    }
+
     /** Strokes a 1-pixel square-cornered border on top of this widget. */
     func border(color: Color): Widget {
         applyModifier(this, WidgetModifier.Border(color, 1.0, vpLength(0.0)))
@@ -327,6 +364,54 @@ public interface Widget {
         }
         applyModifier(this, WidgetModifier.Enabled(isEnabled))
     }
+
+    /** Adds platform-independent accessibility properties with an automatically derived identity. */
+    func semantics(properties: Semantics): Widget {
+        let id = match (focusableId()) {
+            case Some(focusId) => focusId
+            case None => controlIdentity("Semantics:${properties.label}")
+        }
+        applyModifier(this, WidgetModifier.Accessibility(id, properties))
+    }
+
+    /** Adds platform-independent accessibility properties with an explicit stable identity. */
+    func semantics(properties: Semantics, key!: String): Widget {
+        requireControlId(key, "Semantics")
+        applyModifier(this, WidgetModifier.Accessibility(key, properties))
+    }
+
+    /** Applies a reusable Modifier pipeline to this Widget. */
+    func modifier(value: Modifier): Widget {
+        value.applyTo(this)
+    }
+
+    /** Adds a capture, target, or bubble listener without introducing an application component. */
+    func onEvent(handler!: (UiContext, UiEvent) -> EventOutcome): Widget {
+        applyEventListener(this, EventPhase.Bubble, EventScope.Subtree, handler)
+    }
+
+    /** Adds an event listener at the requested phase with subtree targeting. */
+    func onEvent(phase!: EventPhase, handler!: (UiContext, UiEvent) -> EventOutcome): Widget {
+        applyEventListener(this, phase, EventScope.Subtree, handler)
+    }
+
+    /** Adds an event listener at the requested phase and targeting scope. */
+    func onEvent(
+        phase!: EventPhase,
+        scope!: EventScope,
+        handler!: (UiContext, UiEvent) -> EventOutcome
+    ): Widget {
+        applyEventListener(this, phase, scope, handler)
+    }
+
+    /**
+     * Certifies that this subtree observes pointer events only inside its assigned layout rectangle.
+     * Indexed multi-child containers can then skip it for disjoint points. Active pointer capture
+     * still bypasses spatial pruning. Use only when custom handlers honour this boundary.
+     */
+    func pointerEventsWithinLayout(): Widget {
+        applyModifier(this, WidgetModifier.PointerLayoutBounds)
+    }
 }
 
 /*
@@ -338,6 +423,13 @@ public interface Widget {
  */
 public func broadcastEvent(widget: Widget, ctx: UiContext, event: UiEvent): Unit {
     let _ = widget.handle(ctx, event) // cjcheck-ignore: ignore-result # broadcast semantics: consumed flag is meaningless for fan-out (see function comment)
+}
+
+/** Delivers a zero-space layout callback to a detached portal/registration node when requested. */
+protected func layoutDetachedIfNeeded(widget: Widget, ctx: UiContext): Unit {
+    if (widget.needsDetachedLayout()) {
+        widget.layout(ctx, Rect.zero())
+    }
 }
 
 /** A layout direction: stacks lay out along one axis; stretch rules are asked per axis. */

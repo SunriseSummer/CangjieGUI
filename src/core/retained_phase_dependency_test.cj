@@ -48,6 +48,59 @@ private class PhaseDependencyProbe <: Widget {
     }
 }
 
+private class RetainedMeasureEnvironmentProbe <: Widget {
+    private let visits: PhaseVisitCounter
+    var fail = false
+
+    init(visits: PhaseVisitCounter) {
+        this.visits = visits
+    }
+
+    public func measure(ctx: UiContext, available: Size): Size {
+        visits.measures += 1
+        if (fail) {
+            throw IllegalStateException("retained measure failed")
+        }
+        Size(min(ctx.resolve(Length(12.0, LengthUnit.Fp)), available.w), min(12.0, available.h))
+    }
+
+    public func layout(_: UiContext, _: Rect): Unit {
+        visits.layouts += 1
+    }
+
+    public func draw(_: UiContext): Unit {}
+
+    public func handle(_: UiContext, _: UiEvent): Bool {
+        false
+    }
+}
+
+private class SelfWritingMeasureProbe <: Widget {
+    private let source: State<Int64>
+    private let visits: PhaseVisitCounter
+
+    init(source: State<Int64>, visits: PhaseVisitCounter) {
+        this.source = source
+        this.visits = visits
+    }
+
+    public func measure(_: UiContext, available: Size): Size {
+        visits.measures += 1
+        if (source.value == 0) {
+            source.value = 1
+        }
+        available
+    }
+
+    public func layout(_: UiContext, _: Rect): Unit {}
+
+    public func draw(_: UiContext): Unit {}
+
+    public func handle(_: UiContext, _: UiEvent): Bool {
+        false
+    }
+}
+
 private class TransactionalLayoutProbe <: Widget {
     private let primary: State<Int64>
     private let abandoned: State<Int64>
@@ -83,6 +136,79 @@ private class TransactionalLayoutProbe <: Widget {
     public func handle(_: UiContext, _: UiEvent): Bool {
         false
     }
+}
+
+@Test
+func retainedMeasureCacheKeysContextIdentityAndScaleRevision(): Unit {
+    let visits = PhaseVisitCounter()
+    let record = RetainedRecord(UInt64(0), false, RetainedMeasureEnvironmentProbe(visits))
+    let available = Size(100.0, 40.0)
+    let rect = Rect(0.0, 0.0, 100.0, 40.0)
+    let firstContext = testContext()
+
+    @Expect(record.measure(firstContext, available).w, Float32(12.0))
+    record.layout(firstContext, rect)
+    @Expect(record.measure(firstContext, available).w, Float32(12.0))
+    record.layout(firstContext, rect)
+    @Expect(visits.measures, Int64(1))
+    @Expect(visits.layouts, Int64(1))
+
+    firstContext.fontScale = 2.0
+    @Expect(record.measure(firstContext, available).w, Float32(24.0))
+    record.layout(firstContext, rect)
+    @Expect(record.measure(firstContext, available).w, Float32(24.0))
+    @Expect(visits.measures, Int64(2))
+    @Expect(visits.layouts, Int64(2))
+
+    let secondContext = testContext()
+    secondContext.fontScale = 2.0
+    @Expect(record.measure(secondContext, available).w, Float32(24.0))
+    record.layout(secondContext, rect)
+    @Expect(visits.measures, Int64(3))
+    @Expect(visits.layouts, Int64(3))
+    record.close()
+}
+
+@Test
+func failedRetainedMeasurePreservesCommittedElementMemo(): Unit {
+    let visits = PhaseVisitCounter()
+    let probe = RetainedMeasureEnvironmentProbe(visits)
+    let record = RetainedRecord(UInt64(0), false, probe)
+    let context = testContext()
+    let committedAvailable = Size(100.0, 40.0)
+    @Expect(record.measure(context, committedAvailable).w, Float32(12.0))
+
+    probe.fail = true
+    var failed = false
+    try {
+        let _ = record.measure(context, Size(80.0, 40.0))
+    } catch (_: IllegalStateException) {
+        failed = true
+    }
+    @Expect(failed)
+
+    probe.fail = false
+    @Expect(record.measure(context, committedAvailable).w, Float32(12.0))
+    @Expect(visits.measures, Int64(2))
+    record.close()
+}
+
+@Test
+func stateWriteDuringMeasureCannotPublishStaleElementMemo(): Unit {
+    let source = State<Int64>(0)
+    let visits = PhaseVisitCounter()
+    let record = RetainedRecord(UInt64(0), false, SelfWritingMeasureProbe(source, visits))
+    let context = testContext()
+    let available = Size(100.0, 40.0)
+
+    let _ = record.measure(context, available)
+    @Expect(source.value, Int64(1))
+    @Expect(visits.measures, Int64(1))
+    let _ = record.measure(context, available)
+    @Expect(visits.measures, Int64(2))
+    let _ = record.measure(context, available)
+    @Expect(visits.measures, Int64(2))
+    record.close()
 }
 
 private class SelfWritingLayoutProbe <: Widget {
@@ -263,6 +389,25 @@ func stateWriteDuringLayoutPreventsFalseCacheHit(): Unit {
     widget.layout(ctx, rect)
 
     @Expect(visits.layouts, Int64(2))
+}
+
+@Test
+func stateWriteDuringRetainedLayoutDoesNotPublishUncommittedElementGeometry(): Unit {
+    let arena = ElementArena()
+    let owner = arena.mount("retained-layout-transaction", arena.rootId, ElementKind.Retained)
+    let sceneNode = arena.sceneFacet(owner).acquire(0)
+    let source = State<Int64>(0)
+    let visits = PhaseVisitCounter()
+    let record = RetainedRecord(UInt64(0), false, SelfWritingLayoutProbe(source, visits), StateMountScope(), [],
+        emptyFrameSubscriptionSnapshot(), sceneNode)
+    let context = testContext()
+
+    record.layout(context, Rect(10.0, 20.0, 100.0, 40.0))
+
+    let snapshot = arena.spaceFacet(owner).resolveScene(sceneNode.id).getOrThrow().snapshot()
+    @Expect(sameAutomaticRect(snapshot.layoutBounds, Rect.zero()))
+    record.close()
+    arena.release(owner)
 }
 
 @Test

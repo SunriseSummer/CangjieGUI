@@ -17,3 +17,4 @@ __pycache__/
 cjpm.lock
 .cjcheck-baseline.json
 .cjcheck.json
+cangjie-format.toml

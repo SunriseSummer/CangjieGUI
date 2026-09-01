@@ -64,6 +64,23 @@ private class CountingMeasureProbe <: Widget {
     }
 }
 
+private class EnvironmentCountingMeasureProbe <: Widget {
+    var calls: Int64 = 0
+
+    public func measure(ctx: UiContext, available: Size): Size {
+        calls += 1
+        Size(min(ctx.resolve(Length(10.0, LengthUnit.Fp)), available.w), min(20.0, available.h))
+    }
+
+    public func layout(_: UiContext, _: Rect): Unit {}
+
+    public func draw(_: UiContext): Unit {}
+
+    public func handle(_: UiContext, _: UiEvent): Bool {
+        false
+    }
+}
+
 @Test
 func stackReusesExactMeasureBetweenMeasureAndLayout(): Unit {
     let ctx = testContext()
@@ -79,6 +96,25 @@ func stackReusesExactMeasureBetweenMeasureAndLayout(): Unit {
     // A changed constraint must miss rather than reuse stale geometry.
     view.layout(ctx, Rect(0.0, 0.0, 180.0, 100.0))
     @Expect(child.calls, 2)
+}
+
+@Test
+func stackMeasureCacheMissesWhenMeasurementEnvironmentChanges(): Unit {
+    let ctx = testContext()
+    let child = EnvironmentCountingMeasureProbe()
+    let view = VStack {
+        emit(child)
+    }.flexible(false)
+    let available = Size(200.0, 100.0)
+
+    @Expect(view.measure(ctx, available).w, Float32(10.0))
+    view.layout(ctx, Rect(0.0, 0.0, available.w, available.h))
+    @Expect(child.calls, Int64(1))
+
+    ctx.fontScale = 2.0
+    @Expect(view.measure(ctx, available).w, Float32(20.0))
+    view.layout(ctx, Rect(0.0, 0.0, available.w, available.h))
+    @Expect(child.calls, Int64(2))
 }
 
 @Test

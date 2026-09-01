@@ -11,10 +11,10 @@ import sdl.{FrameInfo, Rect, Size, UiEvent}
  */
 public class EventHandler <: Widget {
     private let child: Widget
-    private let onEvent: (UiContext, UiEvent) -> Bool
+    private let listener: (UiContext, UiEvent) -> Bool
 
     public init(onEvent!: (UiEvent) -> Bool, body!: () -> Unit) {
-        this.onEvent = {_, event => onEvent(event)}
+        this.listener = {_, event => onEvent(event)}
         registerFrameSubscriber({
             _, info => let _ = onEvent(UiEvent.Frame(info))
         })
@@ -23,7 +23,7 @@ public class EventHandler <: Widget {
     }
 
     public init(onEvent!: (UiContext, UiEvent) -> Bool, body!: () -> Unit) {
-        this.onEvent = onEvent
+        this.listener = onEvent
         registerFrameSubscriber({
             ctx, info => let _ = onEvent(ctx, UiEvent.Frame(info))
         })
@@ -47,12 +47,12 @@ public class EventHandler <: Widget {
         match (event) {
             case UiEvent.Frame(_) =>
                 // Direct-call compatibility: a Frame tick cannot be intercepted by the hook.
-                let _ = onEvent(ctx, event) // cjcheck-ignore: ignore-result # broadcast semantics: a frame tick must not be intercepted by the hook
+                let _ = listener(ctx, event) // cjcheck-ignore: ignore-result # broadcast semantics: a frame tick must not be intercepted by the hook
                 broadcastEvent(child, ctx, event)
                 return false
             case _ => ()
         }
-        if (onEvent(ctx, event)) {
+        if (listener(ctx, event)) {
             return true
         }
         child.handle(ctx, event)
@@ -72,6 +72,14 @@ public class EventHandler <: Widget {
 
     public func participatesInLayout(): Bool {
         child.participatesInLayout()
+    }
+
+    public func paintOutset(): PaintOutset {
+        child.paintOutset()
+    }
+
+    public func needsDetachedLayout(): Bool {
+        child.needsDetachedLayout()
     }
 
     public func focusableId(): ?String {
@@ -131,6 +139,14 @@ public class FrameHandler <: Widget {
         }
     }
 
+    public func pointerEventScope(): PointerEventScope {
+        child.pointerEventScope()
+    }
+
+    public func paintOutset(): PaintOutset {
+        child.paintOutset()
+    }
+
     public func isFlexible(): Bool {
         child.isFlexible()
     }
@@ -145,6 +161,10 @@ public class FrameHandler <: Widget {
 
     public func participatesInLayout(): Bool {
         child.participatesInLayout()
+    }
+
+    public func needsDetachedLayout(): Bool {
+        child.needsDetachedLayout()
     }
 
     public func focusableId(): ?String {

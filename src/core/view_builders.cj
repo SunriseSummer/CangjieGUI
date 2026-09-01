@@ -16,7 +16,8 @@ public class VStack <: Widget {
         flexible!: Bool = true,
         body!: () -> Unit
     ) {
-        stack = Stack(Axis.Vertical, buildChildren("VStack", body), spacing: spacing, padding: padding, flexible: flexible)
+        stack = Stack(Axis.Vertical, buildChildren("VStack", body), spacing: spacing, padding: padding,
+            flexible: flexible)
         emit(this)
     }
 
@@ -25,6 +26,7 @@ public class VStack <: Widget {
     }
 
     public func layout(ctx: UiContext, rect: Rect): Unit {
+        stack.bindEventTopology(this)
         stack.layout(ctx, rect)
     }
 
@@ -34,6 +36,14 @@ public class VStack <: Widget {
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
         stack.handle(ctx, event)
+    }
+
+    public func pointerEventScope(): PointerEventScope {
+        stack.pointerEventScope()
+    }
+
+    public func paintOutset(): PaintOutset {
+        stack.paintOutset()
     }
 
     public func isFlexible(): Bool {
@@ -98,7 +108,8 @@ public class HStack <: Widget {
         flexible!: Bool = true,
         body!: () -> Unit
     ) {
-        stack = Stack(Axis.Horizontal, buildChildren("HStack", body), spacing: spacing, padding: padding, flexible: flexible)
+        stack = Stack(Axis.Horizontal, buildChildren("HStack", body), spacing: spacing, padding: padding,
+            flexible: flexible)
         emit(this)
     }
 
@@ -107,6 +118,7 @@ public class HStack <: Widget {
     }
 
     public func layout(ctx: UiContext, rect: Rect): Unit {
+        stack.bindEventTopology(this)
         stack.layout(ctx, rect)
     }
 
@@ -116,6 +128,14 @@ public class HStack <: Widget {
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
         stack.handle(ctx, event)
+    }
+
+    public func pointerEventScope(): PointerEventScope {
+        stack.pointerEventScope()
+    }
+
+    public func paintOutset(): PaintOutset {
+        stack.paintOutset()
     }
 
     public func isFlexible(): Bool {
@@ -204,6 +224,14 @@ public class Flexible <: Widget {
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
         child.handle(ctx, event)
+    }
+
+    public func pointerEventScope(): PointerEventScope {
+        child.pointerEventScope()
+    }
+
+    public func paintOutset(): PaintOutset {
+        child.paintOutset()
     }
 
     public func isFlexible(): Bool {

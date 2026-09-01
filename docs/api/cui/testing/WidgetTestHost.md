@@ -18,6 +18,9 @@ public class WidgetTestHost {
     public func frameRecords(rect: Rect, elapsedMs!: UInt64 = 0, deltaMs!: UInt64 = 0,
         events!: Array<UiEventRecord> = [], damage!: ?Rect = None, body!: () -> Unit): TestFrameResult
     public func retainedDiagnostics(): RetainedGraphDiagnostics
+    public func focusGraphRevision(): UInt64
+    public func frameSubscriptionSnapshotCreations(): UInt64
+    public func overlayFragmentReplayVisits(): UInt64
     public func batch(action: () -> Unit): Unit
     public func reset(): Unit
 }
@@ -27,6 +30,12 @@ public class WidgetTestHost {
 `reset` 卸载全部局部/保留状态，并清空焦点、悬停、按压、拖拽、浮层、关闭标记和遗留帧请求。
 宿主不创建 SDL 窗口，适合单元、集成和 headless 性能测试；GPU、字体光栅与呈现性能仍应由显示基准验证。`frameRecords` 与 `frame` 执行同一事务，但允许注入 timestamp/window/key/modifier 元数据，用于稳定测试 Ctrl/Command/Shift 快捷键与延迟派发；测试不再依赖机器当前全局键盘状态。
 `retainedDiagnostics` 不运行新帧，返回最近一次已提交执行图的结构化快照和稳定文本摘要。
+`focusGraphRevision` 返回测试宿主当前采用的焦点声明图 revision；稳定 Automatic/retained 片段命中应保持不变，
+可用于断言优化确实生效，而不依赖易受调度影响的耗时阈值。
+`frameSubscriptionSnapshotCreations` 返回该宿主累计创建的不可变订阅片段数；预热后的干净帧应保持不变，适合
+为订阅注册簿的 O(1) adopt 建立确定性门禁。失败构建也计入尝试创建量，因此测试应在预热或成功重建后取差值。
+`overlayFragmentReplayVisits` 返回 overlay 片段因无法直接采用而逐项组合的累计声明数；单一干净根的稳定帧差值
+应为 0，多片段连接或动态追加则允许增长。
 
 默认 Renderer 为 headless；传入真实 `SdlWindow.renderer` 可让同一宿主执行字体、命令重放与像素级 E2E。
 `damage: Some(rect)` 请求局部帧：Renderer 能保留目标时只绘制与区域相交的干净 retained 边界，否则安全回退

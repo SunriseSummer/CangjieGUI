@@ -83,9 +83,9 @@ public struct Corners {
  * Apply one to any widget with the `shadow` modifier; it paints a soft halo behind the widget, so it
  * is normally chained after a rounded `background` and shares its corner radius.
  *
- * Larger shadows extend further beyond the widget; inside a scrolling container a very large blur or
- * spread may be clipped at the viewport edge (the framework reserves a fixed shadow clearance), so
- * keep card elevations modest — the `elevation` presets stay within it at their lower levels.
+ * Larger shadows extend further beyond the widget. The modifier publishes an asymmetric PaintOutset
+ * derived from offset, blur and spread, so scrolling and retained damage preserve the full halo while
+ * keeping the scroll axis clipped to its viewport.
  */
 public struct Shadow {
     public let offsetX: Float32
@@ -154,12 +154,9 @@ protected func drawConfigurableShadow(ctx: UiContext, rect: Rect, radius: Float3
     let spreadRadius = max(0.0, radius + shadow.spread)
     ctx
         .renderer
-        .fillRoundedRectSoft(base.inset(-feather * 0.25), spreadRadius + feather * 0.25, shadow
-            .color
-            .withAlpha(alpha * 3 / 5), feather: feather)
-    ctx
-        .renderer
-        .fillRoundedRectSoft(base, spreadRadius, shadow.color.withAlpha(alpha / 2), feather: feather * 0.55)
+        .fillRoundedRectSoft(base.inset(-feather * 0.25), spreadRadius + feather * 0.25,
+            shadow.color.withAlpha(alpha * 3 / 5), feather: feather)
+    ctx.renderer.fillRoundedRectSoft(base, spreadRadius, shadow.color.withAlpha(alpha / 2), feather: feather * 0.55)
 }
 
 /*

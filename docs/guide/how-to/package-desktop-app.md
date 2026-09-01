@@ -12,7 +12,7 @@
 
 ## 准备工作
 
-确认目标机器的操作系统和处理器架构与构建产物一致。先在项目内运行首窗口，再找到 `cjpm build` 生成的可执行文件；SDL 动态库名称因平台不同，Windows 常见为 `SDL3.dll`，Linux 为对应的 `.so`。
+确认目标机器的操作系统和处理器架构与构建产物一致。先在项目内运行首窗口，再找到 `cjpm build` 生成的可执行文件；SDL 动态库名称因平台不同，Windows 常见为 `SDL3.dll`，Linux 为对应的 `.so`。从源码构建 Windows 包时先运行 `.devtools/build_windows_uia.ps1` 生成同架构 UI Automation 桥。
 
 ## 操作步骤
 
@@ -33,7 +33,7 @@ let app = DesktopApp(WindowSpec(
 
 ### 2. 建立干净目录
 
-交付目录至少包含可执行文件和匹配架构的 SDL 运行库。应用运行时读取的字体、图像或配置也按程序约定的相对路径复制。不要把整个源码仓库、编译缓存和测试快照一起打包。
+交付目录至少包含可执行文件和匹配架构的 SDL 运行库。Windows 还要复制 `target/native/windows/<arch>/cui_uia.dll`；其源码位于 `platform/windows/accessibility/uia/`，由 `.devtools/build_windows_uia.ps1` 独立构建。框架在运行时动态加载 DLL，缺少时应用仍能启动，但原生 UI Automation provider 不可用。应用运行时读取的字体、图像或配置也按程序约定的相对路径复制。不要把整个源码仓库、编译缓存和测试快照一起打包。
 
 ```cangjie role=variation
 // 资源路径以可执行文件所在目录为基准时，集中定义一次：
@@ -54,7 +54,7 @@ func releaseCard(): Unit {
 
 ### 4. 记录平台边界
 
-Windows 检查 DLL 架构与安全软件拦截；Linux 同时检查 SDL 及系统 PCRE2 等动态依赖，并在与目标发行版相近的环境验证。签名、安装位置权限、沙箱和文件对话框行为都属于平台测试，不能由开发机一次启动代替。
+Windows 检查 SDL 与 `cui_uia.dll` 的架构、安全软件拦截，并用 Narrator/Inspect 或自动化客户端实际读取控件和执行一次动作；Linux 同时检查 SDL 及系统 PCRE2 等动态依赖，并在与目标发行版相近的环境验证。签名、安装位置权限、沙箱和文件对话框行为都属于平台测试，不能由开发机一次启动代替。
 
 ## 确认结果
 
@@ -62,7 +62,7 @@ Windows 检查 DLL 架构与安全软件拦截；Linux 同时检查 SDL 及系�
 
 ## 常见错误
 
-- 只复制可执行文件：目标机提示找不到 SDL 动态库。
+- 只复制可执行文件：目标机提示找不到 SDL 或 Windows UIA 动态库。
 - 从项目根启动冒烟：程序悄悄读到源码树中的资源。
 - 混用不同架构的 DLL：文件存在但加载失败。
 - 把 `cjpm run` 成功当成交付验证：它仍处在开发环境中。

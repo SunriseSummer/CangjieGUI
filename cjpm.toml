@@ -7,4 +7,4 @@ description = "Declarative desktop GUI framework for Cangjie"
 compile-option = "-O2"
 
 [dependencies]
-sdl = { git = "https://github.com/SunriseSummer/CangjieSDL.git" }
+sdl = { path = "../CangjieSDL" }

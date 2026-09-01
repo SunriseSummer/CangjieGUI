@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "cangjie": {
+    "version": "1.0.5",
+    "artifacts": {
+      "windows-x86_64": {
+        "filename": "cangjie-sdk-windows-x64-1.0.5.zip",
+        "url": "https://cangjie-lang.cn/v1/files/auth/downLoad?nsId=142267&fileName=cangjie-sdk-windows-x64-1.0.5.zip&objectKey=698acebfbd66ae22b62330af",
+        "sha256": "08c6c1dd0de73396f63ac85085d635e79ce84fef98d330cb00869b4fc8f1cb2e",
+        "size": 297274602
+      },
+      "macos-arm64": {
+        "filename": "cangjie-sdk-mac-aarch64-1.0.5.tar.gz",
+        "url": "https://cangjie-lang.cn/v1/files/auth/downLoad?nsId=142267&fileName=cangjie-sdk-mac-aarch64-1.0.5.tar.gz&objectKey=698acea5bd66ae22b62330ae",
+        "sha256": "e07d22584237f065b30a771b7110a87a8931334c40be3a148090944ae916ed1f",
+        "size": 186714867
+      },
+      "linux-arm64": {
+        "filename": "cangjie-sdk-linux-aarch64-1.0.5.tar.gz",
+        "url": "https://cangjie-lang.cn/v1/files/auth/downLoad?nsId=142267&fileName=cangjie-sdk-linux-aarch64-1.0.5.tar.gz&objectKey=698acfa3bd66ae22b62330b1",
+        "sha256": "c0dc48b8851fd87853308bf0ef5cce7040f8681ae8a53005d5dac81657745a35",
+        "size": 281794014
+      },
+      "linux-x86_64": {
+        "filename": "cangjie-sdk-linux-x64-1.0.5.tar.gz",
+        "url": "https://cangjie-lang.cn/v1/files/auth/downLoad?nsId=142267&fileName=cangjie-sdk-linux-x64-1.0.5.tar.gz&objectKey=698acf46bd66ae22b62330b0",
+        "sha256": "bacad84df8e0281c5395bab4c40e481e3ea6cc712eed5c953903b0d561a14562",
+        "size": 281715855
+      }
+    }
+  },
+  "sdl": {
+    "version": "3.4.12",
+    "artifact": {
+      "filename": "SDL3-3.4.12.tar.gz",
+      "url": "https://github.com/libsdl-org/SDL/releases/download/release-3.4.12/SDL3-3.4.12.tar.gz",
+      "sha256": "f07b958a9ac5020fb7a44cadb957f658b2149c3c8abb4f63145fac9303249db7",
+      "size": 15629574
+    }
+  },
+  "sdlTtf": {
+    "version": "3.2.2",
+    "artifact": {
+      "filename": "SDL3_ttf-3.2.2.tar.gz",
+      "url": "https://github.com/libsdl-org/SDL_ttf/releases/download/release-3.2.2/SDL3_ttf-3.2.2.tar.gz",
+      "sha256": "63547d58d0185c833213885b635a2c0548201cc8f301e6587c0be1a67e1e045d",
+      "size": 1545950
+    }
+  }
+}

@@ -114,6 +114,21 @@ func labelMultiLineMeasureReportsCachedWidestLine(): Unit {
 }
 
 @Test
+func labelMetricsCacheDoesNotCrossMeasurementContexts(): Unit {
+    let firstContext = UiContext(Renderer.headless(), Theme.light())
+    let label = Label("measurement environment")
+    let _ = label.measure(firstContext, Size(1000.0, 100.0))
+
+    let secondRenderer = Renderer.headless()
+    let secondContext = UiContext(secondRenderer, Theme.light())
+    secondRenderer.resetTextMeasureCount()
+    let _ = label.measure(secondContext, Size(1000.0, 100.0))
+
+    // textHeight + textWidth: the width must be recomputed by the second renderer, not borrowed.
+    @Expect(secondRenderer.textMeasureCount(), UInt64(2))
+}
+
+@Test
 func controlIdentityIsUniquePerBuildAndStableAcrossBuilds(): Unit {
     let store = StateStore()
     let first = State<String>("")

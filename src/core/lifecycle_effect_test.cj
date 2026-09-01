@@ -2,7 +2,7 @@ package cui.core
 
 import std.collection.ArrayList
 
-private class EffectProbe <: Resource {
+class EffectProbe <: Resource {
     let name: String
     let log: ArrayList<String>
     var failuresRemaining: Int64
@@ -34,6 +34,13 @@ private class EffectProbe <: Resource {
     }
 }
 
+private class LifecycleBuildCounter {
+    var builds: Int64 = 0
+    var revision: UInt64 = UInt64(0)
+    var externallyRevisioned = true
+    var reject = false
+}
+
 @Test
 func mountEffectCommitsOnceAndClosesOnUnmount(): Unit {
     let store = StateStore()
@@ -49,6 +56,103 @@ func mountEffectCommitsOnceAndClosesOnUnmount(): Unit {
 
     let _ = buildRoot({=> Spacer()}, store)
     @Expect(log.toArray(), ["mount:listener", "close:listener"])
+}
+
+@Test
+func mountEffectDoesNotPreventCleanAutomaticAncestorHit(): Unit {
+    let store = StateStore()
+    enableAutomaticComposition(store)
+    let log = ArrayList<String>()
+    let counter = LifecycleBuildCounter()
+    let body: () -> Unit = {
+        => counter.builds += 1
+        mountEffect("listener", {=> EffectProbe("listener", log)})
+        Spacer()
+    }
+
+    let _ = buildRoot(body, store)
+    let _ = buildRoot(body, store)
+
+    @Expect(counter.builds, Int64(1))
+    @Expect(log.toArray(), ["mount:listener"])
+}
+
+@Test
+func cachedMountEffectClosesAfterStateDrivenRemoval(): Unit {
+    let store = StateStore()
+    enableAutomaticComposition(store)
+    let visible = State<Bool>(true)
+    let log = ArrayList<String>()
+    let body: () -> Unit = {
+        => if (visible.value) {
+            mountEffect("listener", {=> EffectProbe("listener", log)})
+        }
+        Spacer()
+    }
+
+    let _ = buildRoot(body, store)
+    let _ = buildRoot(body, store)
+    visible.value = false
+    let _ = buildRoot(body, store)
+
+    @Expect(log.toArray(), ["mount:listener", "close:listener"])
+}
+
+@Test
+func revisionedLifecycleEffectStillReplaysAutomaticAncestor(): Unit {
+    let store = StateStore()
+    enableAutomaticComposition(store)
+    let log = ArrayList<String>()
+    let counter = LifecycleBuildCounter()
+    let body: () -> Unit = {
+        => counter.builds += 1
+        lifecycleEffect("listener", counter.revision, {=> EffectProbe("${counter.revision}", log)})
+        Spacer()
+    }
+
+    let _ = buildRoot(body, store)
+    counter.revision = UInt64(1)
+    let _ = buildRoot(body, store)
+
+    @Expect(counter.builds, Int64(2))
+    @Expect(log.toArray(), ["mount:0", "mount:1", "close:0"])
+}
+
+@Test
+func failedBuildCannotDowngradeCommittedDeclarationReplayRequirement(): Unit {
+    let store = StateStore()
+    enableAutomaticComposition(store)
+    let log = ArrayList<String>()
+    let counter = LifecycleBuildCounter()
+    let body: () -> Unit = {
+        => counter.builds += 1
+        if (counter.externallyRevisioned) {
+            lifecycleEffect("listener", UInt64(0), {=> EffectProbe("listener", log)})
+        } else {
+            mountEffect("listener", {=> EffectProbe("listener", log)})
+        }
+        if (counter.reject) {
+            throw IllegalStateException("reject declaration classification")
+        }
+        Spacer()
+    }
+
+    let _ = buildRoot(body, store)
+    counter.externallyRevisioned = false
+    counter.reject = true
+    var rejected = false
+    try {
+        let _ = buildRoot(body, store)
+    } catch (_: IllegalStateException) {
+        rejected = true
+    }
+    counter.reject = false
+    let _ = buildRoot(body, store)
+    let _ = buildRoot(body, store)
+
+    @Expect(rejected)
+    @Expect(counter.builds, Int64(3))
+    @Expect(log.toArray(), ["mount:listener"])
 }
 
 @Test

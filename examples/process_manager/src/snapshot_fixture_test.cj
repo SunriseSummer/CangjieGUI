@@ -14,3 +14,14 @@ func processSnapshotFixtureActivatesOnlyForSnapshotRuns(): Unit {
         case None => @Expect(false)
     }
 }
+
+@Test
+func snapshotWorkerSeedsTheMailboxBeforeItsFirstFrame(): Unit {
+    let fixture = processSnapshotFixture(["app", "--snapshot", "result.bmp"])
+    let worker = RefreshWorker(snapshotFixture: fixture)
+    match (worker.collect()) {
+        case Some(snapshot) => @Expect(parseProcessRows(snapshot).size, Int64(16))
+        case None => @Expect(false)
+    }
+    @Expect(worker.isBusy(), false)
+}

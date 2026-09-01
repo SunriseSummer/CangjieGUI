@@ -1,6 +1,6 @@
 package cui.core
 
-import sdl.{Rect, RenderCommandBuffer, Size, UiEvent}
+import sdl.{Rect, Size}
 
 // A dynamic draw is sampled again after a short delay in case it becomes static. Repeated dynamic
 // results exponentially reduce recorder overhead, but every invalidation resets the latch promptly.
@@ -13,16 +13,10 @@ class RetainedRecord {
     private var cachePaint: Bool
     var child: Widget
     var focusableIds: Array<String>
-    var frameSubscribers: Array<FrameSubscriber>
-    private var measuredAvailable = Size.zero()
-    private var measured = Size.zero()
-    private var measureValid = false
-    private var laidOutRect = Rect.zero()
-    private var layoutValid = false
-    private var layoutOverlays: Array<Overlay> = []
+    var focusFragment: FocusSnapshot
+    var frameSubscribers: FrameSubscriptionSnapshot
     let mountScope: StateMountScope
-    private var paintCommands: ?RenderCommandBuffer = None
-    private var paintBounds: ?Rect = None
+    private let sceneNode: ElementSceneNode
     private var damageSink: ?((Rect) -> Unit) = None
     private var measureDependencies: ?PhaseStateDependencies = None
     private var layoutDependencies: ?PhaseStateDependencies = None
@@ -36,13 +30,16 @@ class RetainedRecord {
     private var paintBypassFrames: UInt64 = 0
     private var paintBypassWindow: Int64 = 0
     private var paintBypassRemaining: Int64 = 0
+    private var closed = false
 
     init(revision: UInt64, cachePaint: Bool, child: Widget) {
-        this(revision, cachePaint, child, StateMountScope(), [])
+        this(revision, cachePaint, child, StateMountScope(), detachedFocusTargets(child.focusableIds()),
+            emptyFrameSubscriptionSnapshot())
     }
 
     init(revision: UInt64, cachePaint: Bool, child: Widget, mountScope: StateMountScope) {
-        this(revision, cachePaint, child, mountScope, [])
+        this(revision, cachePaint, child, mountScope, detachedFocusTargets(child.focusableIds()),
+            emptyFrameSubscriptionSnapshot())
     }
 
     init(
@@ -50,13 +47,41 @@ class RetainedRecord {
         cachePaint: Bool,
         child: Widget,
         mountScope: StateMountScope,
-        frameSubscribers: Array<FrameSubscriber>
+        focusTargets: Array<FocusTarget>,
+        frameSubscribers: FrameSubscriptionSnapshot
+    ) {
+        this(revision, cachePaint, child, mountScope, focusTargets, frameSubscribers, detachedElementSceneNode())
+    }
+
+    init(
+        revision: UInt64,
+        cachePaint: Bool,
+        child: Widget,
+        mountScope: StateMountScope,
+        focusTargets: Array<FocusTarget>,
+        frameSubscribers: FrameSubscriptionSnapshot,
+        sceneNode: ElementSceneNode
+    ) {
+        this(revision, cachePaint, child, mountScope, focusSnapshotFromDeclarations(focusTargets), frameSubscribers,
+            sceneNode)
+    }
+
+    init(
+        revision: UInt64,
+        cachePaint: Bool,
+        child: Widget,
+        mountScope: StateMountScope,
+        focusFragment: FocusSnapshot,
+        frameSubscribers: FrameSubscriptionSnapshot,
+        sceneNode: ElementSceneNode
     ) {
         this.revision = revision
         this.cachePaint = cachePaint
         this.child = child
         this.mountScope = mountScope
+        this.sceneNode = sceneNode
         this.focusableIds = child.focusableIds()
+        this.focusFragment = focusFragment
         this.frameSubscribers = frameSubscribers
         this.measureDependencies = Some(PhaseStateDependencies({=> invalidateMeasure()}))
         this.layoutDependencies = Some(PhaseStateDependencies({=> invalidateLayout()}))
@@ -72,7 +97,8 @@ class RetainedRecord {
         revision: UInt64,
         cachePaint: Bool,
         child: Widget,
-        frameSubscribers: Array<FrameSubscriber>
+        focusFragment: FocusSnapshot,
+        frameSubscribers: FrameSubscriptionSnapshot
     ): Unit {
         notePaintDamage()
         clearPaintCommands()
@@ -81,17 +107,21 @@ class RetainedRecord {
         this.cachePaint = cachePaint
         this.child = child
         this.focusableIds = child.focusableIds()
+        this.focusFragment = focusFragment
         this.frameSubscribers = frameSubscribers
-        measureValid = false
-        layoutValid = false
-        layoutOverlays = []
+        sceneNode.invalidateMeasure()
         lastInvalidationReason = "build output replaced"
     }
 
     func close(): Unit {
+        if (closed) {
+            return
+        }
         notePaintDamage()
         clearPaintCommands()
         closePhaseDependencies()
+        sceneNode.close()
+        closed = true
     }
 
     func recordBuildHit(): Unit {
@@ -107,77 +137,87 @@ class RetainedRecord {
     }
 
     func measure(ctx: UiContext, available: Size): Size {
-        if (measureValid && sameSize(measuredAvailable, available)) {
-            return measured
+        let environment = ctx.uiEnvironmentKey()
+        if (sceneNode.measureMatches(available, environment)) {
+            return sceneNode.measuredSize()
         }
-        clearPaintCommands()
-        measuredAvailable = available
+        let hadCommittedMeasure = sceneNode.hasMeasure()
         let dependencies = measureStateDependencies()
-        measured = collectPhaseStateReads(dependencies, {=> child.measure(ctx, available)})
-        measureValid = !dependencies.collectionWasInvalidated
-        layoutValid = false
+        let measured = collectPhaseStateReads(dependencies, {=> child.measure(ctx, available)})
+        if (hadCommittedMeasure) {
+            notePaintDamage()
+            clearPaintCommands()
+        }
+        if (!dependencies.collectionWasInvalidated) {
+            sceneNode.publishMeasure(available, environment, measured)
+        } else {
+            sceneNode.invalidateMeasure()
+        }
         measured
     }
 
     func layout(ctx: UiContext, rect: Rect): Unit {
-        if (layoutValid && sameRect(laidOutRect, rect)) {
-            for (overlay in layoutOverlays) {
-                ctx.setOverlay(overlay)
-            }
+        let spatialVisibility = ctx.currentSpatialVisibility()
+        let paintOutset = child.paintOutset()
+        let environment = ctx.uiEnvironmentKey()
+        if (sceneNode.layoutMatches(rect, spatialVisibility, paintOutset, environment)) {
+            sceneNode.replayLayout(ctx)
             layoutHits += UInt64(1)
             return
         }
+        let paintEnvironmentChanged = if (sceneNode.hasLayout()) {
+            !sceneNode.layoutEnvironmentMatches(environment)
+        } else {
+            false
+        }
         let overlayStart = ctx.overlayRegistrationCount()
+        let semanticStart = ctx.semanticRegistrationCount()
         let dependencies = layoutStateDependencies()
         collectPhaseStateReads(dependencies, {=> child.layout(ctx, rect)})
-        let geometryChanged = !sameRect(laidOutRect, rect)
-        if (geometryChanged) {
-            notePaintDamage()
-            clearPaintCommands()
+        if (!dependencies.collectionWasInvalidated) {
+            let geometryChanged = !sceneNode.paintGeometryMatches(rect, paintOutset)
+            let paintInputsChanged = geometryChanged || paintEnvironmentChanged
+            if (paintInputsChanged) {
+                notePaintDamage()
+                clearPaintCommands()
+            }
+            sceneNode.publishLayout(
+                ElementLayoutCommit(rect, spatialVisibility, paintOutset, environment,
+                    ElementLayoutEffects(ctx.overlaySnapshotIfAnyFrom(overlayStart),
+                        ctx.semanticFragmentIfAnyFrom(semanticStart))))
+            if (paintInputsChanged) {
+                notePaintDamage()
+            }
+        } else {
+            sceneNode.invalidateLayout()
         }
-        laidOutRect = rect
-        if (geometryChanged) {
-            notePaintDamage()
-        }
-        layoutValid = !dependencies.collectionWasInvalidated
-        layoutOverlays = ctx.overlayRegistrationsFrom(overlayStart)
     }
 
     func draw(ctx: UiContext): Unit {
-        if (cachePaint && paintCommands.isSome() && !ctx.retainedPaintIntersects(laidOutRect)) {
+        if (cachePaint && sceneNode.hasCommands() && !ctx.retainedPaintIntersects(sceneNode.paintBounds())) {
             return
         }
-        match (paintCommands) {
-            case Some(commands) =>
-                if (commands.replay(ctx.renderer)) {
-                    paintHits += UInt64(1)
-                } else {
-                    paintCommands = None
-                    recordAndDraw(ctx)
-                }
-            case None =>
-                if (cachePaint) {
-                    if (paintBypassRemaining > 0) {
-                        drawDuringPaintBypass(ctx)
-                    } else {
-                        recordAndDraw(ctx)
-                    }
-                } else {
-                    child.draw(ctx)
-                }
+        if (sceneNode.hasCommands()) {
+            if (sceneNode.replay(ctx.renderer, ctx.retainedDamageRegion())) {
+                paintHits += UInt64(1)
+            } else {
+                sceneNode.invalidateCommands(resetBounds: false)
+                recordAndDraw(ctx)
+            }
+        } else if (cachePaint) {
+            if (paintBypassRemaining > 0) {
+                drawDuringPaintBypass(ctx)
+            } else {
+                recordAndDraw(ctx)
+            }
+        } else {
+            child.draw(ctx)
         }
     }
 
     func stats(): RetainedSubtreeStats {
-        let paintCommandCount = match (paintCommands) {
-            case Some(commands) => commands.stats().commandCount
-            case None => 0
-        }
-        let paintEstimatedBytes = match (paintCommands) {
-            case Some(commands) => commands.stats().estimatedBytes
-            case None => UInt64(0)
-        }
-        RetainedSubtreeStats(buildHits, layoutHits, paintHits, mountScope.buildDependencies.size,
+        let (paintCommandCount, paintEstimatedBytes) = sceneNode.commandStats()
+        RetainedSubtreeStats(buildHits, layoutHits, paintHits, mountScope.buildDependencyCount(),
             mountScope.buildInvalidations, frameSubscribers.size, measureStateDependencies().size,
             layoutStateDependencies().size, paintStateDependencies().size, paintCommandCount: paintCommandCount,
             paintEstimatedBytes: paintEstimatedBytes, paintRecordAttempts: paintRecordAttempts,
@@ -193,13 +233,18 @@ class RetainedRecord {
                 collectPhaseStateReads(dependencies, {=> child.draw(ctx)})
             }
         }
-        paintBounds = commands.paintBounds()
-        let replayed = commands.replay(ctx.renderer)
-        if (layoutValid && !dependencies.collectionWasInvalidated && dynamicReason.isNone() && replayed) {
-            paintCommands = Some(commands)
+        sceneNode.observePaintBounds(commands.paintBounds())
+        if (sceneNode.hasLayout() && !dependencies.collectionWasInvalidated && dynamicReason.isNone() &&
+            commands.isReplayable(ctx.renderer)) {
+            sceneNode.publish(commands)
             resetPaintBypass()
+            if (!sceneNode.replay(ctx.renderer, ctx.retainedDamageRegion())) {
+                sceneNode.invalidateCommands(resetBounds: false)
+                collectPhaseStateReads(dependencies, {=> child.draw(ctx)})
+            }
         } else {
-            paintCommands = None
+            sceneNode.invalidateCommands(resetBounds: false)
+            let replayed = commands.replay(ctx.renderer)
             match (dynamicReason) {
                 case Some(reason) =>
                     schedulePaintBypass()
@@ -238,19 +283,17 @@ class RetainedRecord {
     }
 
     private func clearPaintCommands(): Unit {
-        paintCommands = None
+        sceneNode.invalidateCommands(resetBounds: false)
         resetPaintBypass()
     }
 
     private func notePaintDamage(): Unit {
-        if (laidOutRect.w <= 0.0 || laidOutRect.h <= 0.0) {
+        let layoutBounds = sceneNode.layoutBounds()
+        if (layoutBounds.w <= 0.0 || layoutBounds.h <= 0.0) {
             return
         }
-        let layoutDamage = laidOutRect.inset(-CUI_SHADOW_CLEARANCE)
-        let damage = match (paintBounds) {
-            case Some(paint) => unionRect(layoutDamage, paint.inset(-1.0))
-            case None => layoutDamage
-        }
+        let layoutDamage = child.paintOutset().expand(layoutBounds)
+        let damage = unionRect(layoutDamage, sceneNode.paintBounds().inset(-1.0))
         match (damageSink) {
             case Some(sink) => sink(damage)
             case None => ()
@@ -259,15 +302,14 @@ class RetainedRecord {
 
     func invalidateDescendantMeasure(): Unit {
         notePaintDamage()
-        measureValid = false
-        layoutValid = false
+        sceneNode.invalidateMeasure()
         clearPaintCommands()
         lastInvalidationReason = "descendant measure invalidated"
     }
 
     func invalidateDescendantLayout(): Unit {
         notePaintDamage()
-        layoutValid = false
+        sceneNode.invalidateLayout()
         clearPaintCommands()
         lastInvalidationReason = "descendant layout invalidated"
     }
@@ -297,15 +339,15 @@ class RetainedRecord {
     }
 
     func diagnosticMeasureDirty(): Bool {
-        !measureValid
+        !sceneNode.hasMeasure()
     }
 
     func diagnosticLayoutDirty(): Bool {
-        !layoutValid
+        !sceneNode.hasLayout()
     }
 
     func diagnosticPaintDirty(): Bool {
-        cachePaint && paintCommands.isNone() && paintBypassRemaining <= 0
+        cachePaint && !sceneNode.hasCommands() && paintBypassRemaining <= 0
     }
 
     func diagnosticInvalidationReason(): String {
@@ -313,7 +355,7 @@ class RetainedRecord {
     }
 
     func diagnosticBounds(): Rect {
-        laidOutRect
+        sceneNode.layoutBounds()
     }
 
     private func closePhaseDependencies(): Unit {
@@ -342,164 +384,4 @@ class RetainedRecord {
     private func paintStateDependencies(): PhaseStateDependencies {
         requiredPhaseStateDependencies(paintDependencies, "Retained paint")
     }
-}
-
-/** Cache-hit counters for diagnostics and performance tests. */
-public struct RetainedSubtreeStats {
-    public let buildHits: UInt64
-    public let layoutHits: UInt64
-    public let paintHits: UInt64
-    public let buildDependencyCount: Int64
-    public let buildInvalidations: UInt64
-    public let frameSubscriberCount: Int64
-    public let measureDependencyCount: Int64
-    public let layoutDependencyCount: Int64
-    public let paintDependencyCount: Int64
-    public let paintCommandCount: Int64
-    public let paintEstimatedBytes: UInt64
-    public let paintRecordAttempts: UInt64
-    public let paintDynamicBypasses: UInt64
-    public let paintBypassFrames: UInt64
-    public let paintBypassRemaining: Int64
-
-    public init(buildHits: UInt64, layoutHits: UInt64, paintHits: UInt64) {
-        this(buildHits, layoutHits, paintHits, 0, UInt64(0))
-    }
-
-    public init(
-        buildHits: UInt64,
-        layoutHits: UInt64,
-        paintHits: UInt64,
-        buildDependencyCount: Int64,
-        buildInvalidations: UInt64
-    ) {
-        this(buildHits, layoutHits, paintHits, buildDependencyCount, buildInvalidations, 0, 0, 0, 0,
-            paintCommandCount: 0, paintEstimatedBytes: UInt64(0))
-    }
-
-    public init(
-        buildHits: UInt64,
-        layoutHits: UInt64,
-        paintHits: UInt64,
-        buildDependencyCount: Int64,
-        buildInvalidations: UInt64,
-        measureDependencyCount: Int64,
-        layoutDependencyCount: Int64,
-        paintDependencyCount: Int64
-    ) {
-        this(buildHits, layoutHits, paintHits, buildDependencyCount, buildInvalidations, 0, measureDependencyCount,
-            layoutDependencyCount, paintDependencyCount, paintCommandCount: 0, paintEstimatedBytes: UInt64(0))
-    }
-
-    public init(
-        buildHits: UInt64,
-        layoutHits: UInt64,
-        paintHits: UInt64,
-        buildDependencyCount: Int64,
-        buildInvalidations: UInt64,
-        frameSubscriberCount: Int64,
-        measureDependencyCount: Int64,
-        layoutDependencyCount: Int64,
-        paintDependencyCount: Int64,
-        paintCommandCount!: Int64 = 0,
-        paintEstimatedBytes!: UInt64 = UInt64(0),
-        paintRecordAttempts!: UInt64 = UInt64(0),
-        paintDynamicBypasses!: UInt64 = UInt64(0),
-        paintBypassFrames!: UInt64 = UInt64(0),
-        paintBypassRemaining!: Int64 = 0
-    ) {
-        this.buildHits = buildHits
-        this.layoutHits = layoutHits
-        this.paintHits = paintHits
-        this.buildDependencyCount = buildDependencyCount
-        this.buildInvalidations = buildInvalidations
-        this.frameSubscriberCount = frameSubscriberCount
-        this.measureDependencyCount = measureDependencyCount
-        this.layoutDependencyCount = layoutDependencyCount
-        this.paintDependencyCount = paintDependencyCount
-        this.paintCommandCount = paintCommandCount
-        this.paintEstimatedBytes = paintEstimatedBytes
-        this.paintRecordAttempts = paintRecordAttempts
-        this.paintDynamicBypasses = paintDynamicBypasses
-        this.paintBypassFrames = paintBypassFrames
-        this.paintBypassRemaining = paintBypassRemaining
-    }
-}
-
-/**
- * A retained build boundary inside CUI's declarative tree. The key-only initializer tracks State
- * values read while executing the body and rebuilds when one changes. The revision initializer adds
- * an explicit invalidation input for ordinary captured values and non-build phase dependencies.
- * A stable boundary reuses the widget subtree and can skip unchanged measure/layout as well.
- * Remembered state, focus stops, events, and overlays remain live.
- * `cachePaint: true` records value-based renderer commands and transparently replays them on later
- * draws. State reads during recording invalidate only paint; explicit revision remains available for
- * ordinary captured values and resource changes.
- */
-public class RetainedSubtree <: Widget {
-    private let record: RetainedRecord
-
-    /** Creates a boundary whose build-phase State reads automatically invalidate its body. */
-    public init(key: String, cachePaint!: Bool = false, body!: () -> Unit) {
-        this.record = buildRetainedChild(key, UInt64(0), cachePaint, body)
-        emit(this)
-    }
-
-    public init(key: String, revision: UInt64, cachePaint!: Bool = false, body!: () -> Unit) {
-        this.record = buildRetainedChild(key, revision, cachePaint, body)
-        emit(this)
-    }
-
-    /** Cache hits accumulated by this retained identity since it was first mounted. */
-    public func cacheStats(): RetainedSubtreeStats {
-        record.stats()
-    }
-
-    public func measure(ctx: UiContext, available: Size): Size {
-        record.measure(ctx, available)
-    }
-
-    public func layout(ctx: UiContext, rect: Rect): Unit {
-        record.layout(ctx, rect)
-    }
-
-    public func draw(ctx: UiContext): Unit {
-        record.draw(ctx)
-    }
-
-    public func handle(ctx: UiContext, event: UiEvent): Bool {
-        record.child.handle(ctx, event)
-    }
-
-    public func isFlexible(): Bool {
-        record.child.isFlexible()
-    }
-
-    public func flexWeight(): Float32 {
-        record.child.flexWeight()
-    }
-
-    public func acceptsStretch(axis: Axis): Bool {
-        record.child.acceptsStretch(axis)
-    }
-
-    public func participatesInLayout(): Bool {
-        record.child.participatesInLayout()
-    }
-
-    public func focusableId(): ?String {
-        record.child.focusableId()
-    }
-
-    public func focusableIds(): Array<String> {
-        record.focusableIds
-    }
-}
-
-private func sameSize(left: Size, right: Size): Bool {
-    left.w == right.w && left.h == right.h
-}
-
-private func sameRect(left: Rect, right: Rect): Bool {
-    left.x == right.x && left.y == right.y && left.w == right.w && left.h == right.h
 }

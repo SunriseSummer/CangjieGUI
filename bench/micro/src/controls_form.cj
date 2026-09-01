@@ -13,7 +13,7 @@ import bench_harness.{printSection, report, timeit}
 public func runControlsFormBench(): Unit {
     printSection("控件密集表单")
     measureForm("12 分区", 12, 200)
-    measureForm("40 分区", 40, 60)
+    measureForm("40 分区", 40, 600)
 }
 
 private func measureForm(name: String, sections: Int64, frames: Int64): Unit {
@@ -21,13 +21,22 @@ private func measureForm(name: String, sections: Int64, frames: Int64): Unit {
     let rect = Rect(0.0, 0.0, 560.0, 720.0)
     let form = settingsForm(sections)
     form.layout(ctx, rect)
-    report("frame", "控件密集表单", timeit(name, frames, {=>
-        ctx.renderer.beginScene(rect.w, rect.h, ctx.theme.bg)
-        form.layout(ctx, rect)
-        form.draw(ctx)
-        ctx.renderer.endScene()
-        0
-    }))
+    report(
+        "frame",
+        "控件密集表单",
+        timeit(
+            name,
+            frames,
+            {
+                =>
+                    ctx.renderer.beginScene(rect.w, rect.h, ctx.theme.bg)
+                    form.layout(ctx, rect)
+                    form.draw(ctx)
+                    ctx.renderer.endScene()
+                    0
+            }
+        )
+    )
 }
 
 private func settingsForm(sections: Int64): Widget {

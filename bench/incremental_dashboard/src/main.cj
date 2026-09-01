@@ -8,6 +8,7 @@ package bench_incremental_dashboard
 import cui.{Color, Grid, Rect, RetainedScopeDiagnostics, RetainedSubtree, RetainedTestMode, SdlWindow, Size, State,
     UiContext, UiEvent, Widget, WidgetTestHost, WindowSpec, emit}
 import bench_harness.{SampledBenchResult, report, reportBenchmarkEnvironment, reportFrameDistribution, sampleFrames}
+import std.env.getCommandLine
 
 private let WIDTH: Int32 = 960
 private let HEIGHT: Int32 = 720
@@ -71,8 +72,15 @@ main(): Int64 {
         WindowSpec("CUI bench: incremental dashboard", WIDTH, HEIGHT, resizable: false, vsync: false, supersample: 1))
     let viewport = Rect(0.0, 0.0, Float32(WIDTH), Float32(HEIGHT))
     try {
-        runFullTree(window, viewport)
-        runIncremental(window, viewport)
+        if (reverseArgument()) {
+            runDamage(window, viewport)
+            runCommandReplay(window, viewport)
+            runFullTree(window, viewport)
+        } else {
+            runFullTree(window, viewport)
+            runCommandReplay(window, viewport)
+            runDamage(window, viewport)
+        }
     } finally {
         window.close()
     }
@@ -102,15 +110,13 @@ private func runFullTree(window: SdlWindow, viewport: Rect): Unit {
     host.reset()
 }
 
-private func runIncremental(window: SdlWindow, viewport: Rect): Unit {
+private func runCommandReplay(window: SdlWindow, viewport: Rect): Unit {
     let host = WidgetTestHost(renderer: window.renderer)
     let states = Array<State<Int64>>(REGIONS, {_ => State<Int64>(0)})
     let driver = CellDriver(REGIONS)
     let body: () -> Unit = {=> dashboard(states)}
     let _ = host.frame(viewport, body: body)
     window.renderer.present()
-    let damageRects = retainedBounds(host.retainedDiagnostics().scopes)
-
     warm(host, window, viewport, states, driver, body, None)
     reportSample(
         window,
@@ -126,7 +132,17 @@ private func runIncremental(window: SdlWindow, viewport: Rect): Unit {
             }
         )
     )
+    host.reset()
+}
 
+private func runDamage(window: SdlWindow, viewport: Rect): Unit {
+    let host = WidgetTestHost(renderer: window.renderer)
+    let states = Array<State<Int64>>(REGIONS, {_ => State<Int64>(0)})
+    let driver = CellDriver(REGIONS)
+    let body: () -> Unit = {=> dashboard(states)}
+    let _ = host.frame(viewport, body: body)
+    window.renderer.present()
+    let damageRects = retainedBounds(host.retainedDiagnostics().scopes)
     warm(host, window, viewport, states, driver, body, Some(damageRects))
     reportSample(
         window,
@@ -143,6 +159,15 @@ private func runIncremental(window: SdlWindow, viewport: Rect): Unit {
         )
     )
     host.reset()
+}
+
+private func reverseArgument(): Bool {
+    for (argument in getCommandLine()) {
+        if (argument == "reverse") {
+            return true
+        }
+    }
+    false
 }
 
 private func reportSample(window: SdlWindow, sample: SampledBenchResult): Unit {

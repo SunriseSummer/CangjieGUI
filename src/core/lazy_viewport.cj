@@ -12,16 +12,23 @@ public enum LazyScrollAlignment {
     | Nearest
 }
 
+enum LazyViewportTarget {
+    | NoTarget
+    | StableKey(String)
+    | ItemIndex(Int64)
+}
+
 /**
  * External scroll owner for lazy viewports. It exposes a bindable offset and can reveal an item by
- * stable key without requiring the caller to know its current index or accumulated extent.
- * `scrollToKey` schedules a frame through observable state; the attached viewport resolves the key
- * on that frame. Keep one controller in the application model rather than recreating it per build.
+ * current index or stable key without requiring the caller to know its accumulated extent. Index
+ * navigation avoids constructing the key inverse; key navigation preserves identity across reorder.
+ * Requests schedule a frame through observable state. Keep one controller in the application model
+ * rather than recreating it per build.
  */
 public class LazyViewportController {
     private let offsetState: State<Float32>
     private let requestSignal = State<Int64>(0)
-    private var targetKey: String = ""
+    private var target: LazyViewportTarget = LazyViewportTarget.NoTarget
     private var targetAlignment: LazyScrollAlignment = LazyScrollAlignment.Nearest
     private var targetFound: Bool = true
 
@@ -43,23 +50,45 @@ public class LazyViewportController {
 
     /** Jumps to an absolute logical-pixel offset; the viewport clamps it to current content. */
     public func jumpTo(offset: Float32): Unit {
-        targetKey = ""
+        assertControllerAccess()
+        target = LazyViewportTarget.NoTarget
+        targetFound = true
         offsetState.value = max(0.0, offset)
     }
 
-    /** Requests that the item with `key` be revealed at `alignment` on the next frame. */
+    /**
+     * Requests that the item with `key` be revealed at `alignment` on the next frame.
+     * Throws `IllegalArgumentException` when `key` is empty.
+     */
     public func scrollToKey(key: String, alignment!: LazyScrollAlignment = LazyScrollAlignment.Nearest): Unit {
+        assertControllerAccess()
         if (key.isEmpty()) {
             throw IllegalArgumentException("Lazy viewport target key must not be empty")
         }
-        targetKey = key
+        target = LazyViewportTarget.StableKey(key)
         targetAlignment = alignment
         targetFound = false
         requestSignal.value += 1
     }
 
-    /** Whether the most recently processed key request matched the attached viewport. */
+    /**
+     * Requests that the item at `index` be revealed without constructing a stable-key index.
+     * Throws `IllegalArgumentException` when `index` is negative.
+     */
+    public func scrollToIndex(index: Int64, alignment!: LazyScrollAlignment = LazyScrollAlignment.Nearest): Unit {
+        assertControllerAccess()
+        if (index < 0) {
+            throw IllegalArgumentException("Lazy viewport target index must not be negative")
+        }
+        target = LazyViewportTarget.ItemIndex(index)
+        targetAlignment = alignment
+        targetFound = false
+        requestSignal.value += 1
+    }
+
+    /** Whether the most recently processed key or index request matched the attached viewport. */
     public func lastTargetFound(): Bool {
+        assertControllerAccess()
         targetFound
     }
 
@@ -67,8 +96,8 @@ public class LazyViewportController {
         requestSignal.revision
     }
 
-    func requestedKey(): String {
-        targetKey
+    func requestedTarget(): LazyViewportTarget {
+        target
     }
 
     func requestedAlignment(): LazyScrollAlignment {
@@ -82,13 +111,21 @@ public class LazyViewportController {
     func markTargetMissing(): Unit {
         targetFound = false
     }
+
+    private func assertControllerAccess(): Unit {
+        offsetState.assertThreadAccess()
+        requestSignal.assertThreadAccess()
+    }
 }
 
 // Persistent, non-observable viewport facts. Mutating these during layout does not schedule a
 // stabilization rebuild; the next independently requested frame consumes them.
 class LazyViewportMemory {
+    private let materializationSignal = State<UInt64>(UInt64(0))
+    private var materializationGenerationValue = UInt64(0)
     var viewportExtent: Float32 = LAZY_DEFAULT_VIEWPORT
     var previousScroll: Float32 = 0.0
+    var materializationOriginScroll: Float32 = 0.0
     var contentRevision: UInt64
     var structuralRevision: UInt64
     var controllerRevision: UInt64 = UInt64(0)
@@ -103,6 +140,19 @@ class LazyViewportMemory {
     init(contentRevision: UInt64) {
         this.contentRevision = contentRevision
         this.structuralRevision = contentRevision
+    }
+
+    func buildMaterializationGeneration(): UInt64 {
+        materializationSignal.value
+    }
+
+    func currentMaterializationGeneration(): UInt64 {
+        materializationGenerationValue
+    }
+
+    func requestMaterialization(): Unit {
+        materializationGenerationValue = nextRevision(materializationGenerationValue)
+        materializationSignal.value = materializationGenerationValue
     }
 }
 
@@ -235,6 +285,20 @@ internal func lazyResolveAnchoredScroll(
     current
 }
 
+/* Reprojects the remembered key after a non-structural visible-row measurement changed prefixes. */
+internal func lazyResolveMeasuredAnchor(
+    memory: LazyViewportMemory,
+    current: Float32,
+    geometry: LazyItemGeometry
+): Float32 {
+    let index = memory.anchorIndex
+    if (memory.anchorKey.isEmpty() || index < 0 || index >= geometry.count || geometry.key(index) != memory.anchorKey) {
+        return current
+    }
+    let within = min(memory.anchorWithinItem, max(0.0, geometry.itemExtent(index)))
+    clampScrollOffset(geometry.itemTop(index) + within, geometry.contentExtent, memory.viewportExtent)
+}
+
 internal func lazyResolveControllerScroll(
     controller: ?LazyViewportController,
     memory: LazyViewportMemory,
@@ -247,18 +311,35 @@ internal func lazyResolveControllerScroll(
             if (revision == memory.controllerRevision) {
                 return current
             }
-            memory.controllerRevision = revision
-            let target = value.requestedKey()
-            rebuildLazyKeyIndexIfNeeded(memory, geometry)
-            match (memory.keyIndex.get(target)) {
-                case Some(index) =>
+            let resolved = match (value.requestedTarget()) {
+                case LazyViewportTarget.NoTarget =>
                     value.markTargetFound()
-                    return lazyScrollForItem(current, geometry.itemTop(index), geometry.itemExtent(index),
-                        geometry.contentExtent, memory.viewportExtent, value.requestedAlignment())
-                case None => ()
+                    current
+                case LazyViewportTarget.ItemIndex(index) =>
+                    if (index >= geometry.count) {
+                        value.markTargetMissing()
+                        current
+                    } else {
+                        value.markTargetFound()
+                        lazyScrollForItem(current, geometry.itemTop(index), geometry.itemExtent(index),
+                            geometry.contentExtent, memory.viewportExtent, value.requestedAlignment())
+                    }
+                case LazyViewportTarget.StableKey(target) =>
+                    rebuildLazyKeyIndexIfNeeded(memory, geometry)
+                    match (memory.keyIndex.get(target)) {
+                        case Some(index) =>
+                            value.markTargetFound()
+                            lazyScrollForItem(current, geometry.itemTop(index), geometry.itemExtent(index),
+                                geometry.contentExtent, memory.viewportExtent, value.requestedAlignment())
+                        case None =>
+                            value.markTargetMissing()
+                            current
+                    }
             }
-            value.markTargetMissing()
-            current
+            // Publish consumption only after key/index resolution and every user key callback
+            // completed. A throwing resolver leaves the request pending for the next frame.
+            memory.controllerRevision = revision
+            resolved
         case None => current
     }
 }

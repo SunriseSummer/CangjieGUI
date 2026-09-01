@@ -4,7 +4,7 @@
 
 `cui.core` 包中的 public class
 
-行高由 `heightOf` 逐行给定的惰性垂直滚动列表，是 [`LazyColumn`](LazyColumn.md) 的变高对应物。聊天气泡、评论、带折行文本的卡片这类"行高随内容"的列表，构建、布局与绘制同样只花一屏的成本。
+可由高度模型或可见行自测量驱动的惰性垂直列表，是 [`LazyColumn`](LazyColumn.md) 的变高对应物。聊天气泡、评论、带折行文本的卡片这类“行高随内容”的列表，构建、布局与绘制同样只花一屏的成本。
 
 ## 声明
 
@@ -18,9 +18,11 @@ LazyList <: [`Widget`](Widget.md)
 
 ## 说明
 
-行偏移保存在 Fenwick extent 索引中，前缀定位与单点高度更新为 O(log N)。兼容的 `heightOf` 形式在未给 `revision` 时每次构建扫描全部高度，确保任意闭包变化仍正确；若高度和 key 顺序在版本不变期间稳定，传 `revision` 后只在版本变化时重建索引。高频单行变高使用 [`LazyListExtents`](LazyListExtents.md)，其 `update` 不扫描其余行。
+行偏移保存在 Fenwick extent 索引中，前缀定位与单点高度更新为 O(log N)。`measured` 形式只要求一个初始估计高度：行进入预取窗口后，框架测量 intrinsic height，并把整批可见结果合并为一次稳定化更新；宽度、字体或显示环境变化会自动清除旧测量。业务不再维护逐行高度数组。给出唯一稳定 key 后，插入、删除或重排还会把已经学到的高度按 key 迁移到新索引；稳定帧不扫描全量 key，只有结构版本改变时做一次 O(N) 重索引。
 
-`heightOf` 必须返回已存或预估高度，不能现场测量文本，并须与实际行槽一致。像素预取、稳定 key 锚定、[`LazyViewportController`](LazyViewportController.md)、局部状态卸载和滚动条语义与 [`LazyColumn`](LazyColumn.md) 相同。
+兼容的 `heightOf` 形式在未给 `revision` 时每次构建扫描全部高度，确保任意闭包变化仍正确；它也保留随滚动重建的兼容语义，因为框架无法观察闭包捕获的高度是否变化。若高度和 key 顺序在版本不变期间稳定，传 `revision` 后只在版本变化时重建索引，并像固定高度列表一样把区间内滚动降为布局变换。`State<Array<T>>`、[`LazyListExtents`](LazyListExtents.md) 与 `measured` 形式均具有可观察版本，自动使用相位分离；`LazyListExtents.update` 不扫描其余行。
+
+`heightOf` 必须返回已存或预估高度，不能现场测量文本，并须与实际行槽一致。`measured` 行必须能在有限宽度、无界高度约束下报告有限 intrinsic height；不要把 `.fillHeight()` 或裸 `Spacer` 作为行根。像素预取、稳定 key 锚定、[`LazyViewportController`](LazyViewportController.md)、局部状态卸载和滚动条语义与 [`LazyColumn`](LazyColumn.md) 相同。
 
 ## 示例
 
@@ -65,8 +67,9 @@ main(): Unit {
 |---|---|
 | [`static of(...)`](#of) | 数据驱动形式：由 `Array<T>`、每条目的高度提取器与构建器建列表。 |
 | [`static ofExtents(...)`](#ofextents) | 数据数组与 `LazyListExtents` 组合的高频变高形式。 |
+| [`static measured(...)`](#measured) | 自测量形式：只给初始估计，不维护逐行高度模型。 |
 | [`measure(...)`](#measure) | 恒占满全部可用空间：列表填满父容器分配的区域。 |
-| [`layout(...)`](#layout) | 记录视口高度供下一帧构建、把滚动偏移限制在有效范围，并按前缀和偏移逐行摆放已构建行。 |
+| [`layout(...)`](#layout) | 按 extent 前缀平移已物化行；可观察 extent 形式仅在越过物化边界时请求重建。 |
 | [`draw(...)`](#draw) | 裁剪到视口逐行绘制，内容溢出时在右缘画滚动条。 |
 | [`handle(...)`](#handle) | 滚轮滚动列表、滚动条按下/拖拽优先处理，其余事件从视觉最上层的行开始分发。 |
 | [`isFlexible()`](#isflexible) | 恒返回 `true`：列表吸收所在栈的剩余空间。 |
@@ -128,6 +131,59 @@ public init(
 
 ## 方法
 
+### measured
+
+自测量形式使用 `estimatedHeight` 计算尚未出现的行；进入视口/预取区后以组件真实 intrinsic height 替换估计。一次布局中所有可见变化只发布一次，顶部稳定 key 在前序行变高时保持原屏幕位置。数据本来就在 `State<Array<T>>` 中时直接传 State：框架在一次读取中取得一致的数组/revision 快照，插入、删除或重排无需手工版本。Array 兼容形态仍需递增 `revision`。普通可见内容的 State 变化会随测量依赖自动更新，无需手工改 extent。
+
+```cangjie
+public static func measured(
+    count: Int64,
+    estimatedHeight!: Float32 = 64.0,
+    spacing!: Float32 = 0.0,
+    scroll!: ?State<Float32> = None,
+    key!: ?((Int64) -> String) = None,
+    id!: ?String = None,
+    revision!: UInt64 = 0,
+    controller!: ?LazyViewportController = None,
+    overscan!: Float32 = 144.0,
+    item!: (Int64) -> Unit
+): LazyList
+
+public static func measured<T>(
+    data: Array<T>,
+    estimatedHeight!: Float32 = 64.0,
+    spacing!: Float32 = 0.0,
+    scroll!: ?State<Float32> = None,
+    key!: ?((T) -> String) = None,
+    id!: ?String = None,
+    revision!: UInt64 = 0,
+    controller!: ?LazyViewportController = None,
+    overscan!: Float32 = 144.0,
+    item!: (T) -> Unit
+): LazyList
+
+public static func measured<T>(
+    data: State<Array<T>>,
+    estimatedHeight!: Float32 = 64.0,
+    spacing!: Float32 = 0.0,
+    scroll!: ?State<Float32> = None,
+    key!: ?((T) -> String) = None,
+    id!: ?String = None,
+    controller!: ?LazyViewportController = None,
+    overscan!: Float32 = 144.0,
+    item!: (T) -> Unit
+): LazyList
+```
+
+```cangjie
+LazyList.measured(messageState, estimatedHeight: 72.0,
+    key: {message => message.id}, id: "thread") {
+    message => MessageBubble(message)
+}
+```
+
+估计值只影响尚未测量区域的初始滚动条和预取范围，不会强制行高。首次发现内容是否需要滚动条时最多经历“初始宽度、滚动条宽度、稳定证明”三次同帧稳定化 pass；之后稳定可见行命中缓存。精确固定高度场景继续使用开销最低的 [`LazyColumn`](LazyColumn.md)。
+
 ### of
 
 数据驱动形式：由 `Array<T>`、每条目的高度提取器与构建器建列表。`heightOf` 须为 O(1)（存好的或预计算的高度）；`key` 给条目稳定标识，省略则按索引键控。
@@ -145,11 +201,23 @@ public static func of<T>(
     overscan!: Float32 = 144.0,
     item!: (T) -> Unit
 ): LazyList
+
+public static func of<T>(
+    data: State<Array<T>>,
+    heightOf: (T) -> Float32,
+    spacing!: Float32 = 0.0,
+    scroll!: ?State<Float32> = None,
+    key!: ?((T) -> String) = None,
+    id!: ?String = None,
+    controller!: ?LazyViewportController = None,
+    overscan!: Float32 = 144.0,
+    item!: (T) -> Unit
+): LazyList
 ```
 
 **参数**
 
-- `data`: `Array<T>` — 数据源；行数即 `data.size`。
+- `data`: `Array<T>` 或 [`State`](State.md)`<Array<T>>` — 数据源；State 形态自动捕获一致的值/版本并省略 `revision`。
 - `heightOf`: `(T) -> Float32` — 每条目的高度提取器，逻辑像素。
 - `spacing!`: `Float32` — 行间距；默认 `0.0`。
 - `scroll!`: `?`[`State`](State.md)`<Float32>` — 外部滚动偏移；默认 `None`。
@@ -214,7 +282,7 @@ public func layout(ctx: UiContext, rect: Rect): Unit
 
 ### draw
 
-裁剪到视口逐行绘制，内容溢出时在右缘画滚动条。每行的裁剪矩形外扩一圈阴影余量，卡片行的柔和投影不会在槽位边界被切成硬边。
+裁剪到视口逐行绘制，内容溢出时在右缘画滚动条。每行按照组件声明的 `paintOutset` 扩张裁剪范围，因此阴影等合法外溢可见，未声明的任意越界仍被截断。
 
 ```cangjie
 public func draw(ctx: UiContext): Unit

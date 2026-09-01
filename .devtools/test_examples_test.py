@@ -2,6 +2,7 @@
 """Standard-library tests for the examples E2E runner itself."""
 
 import importlib.util
+import argparse
 import sys
 import tempfile
 import time
@@ -63,6 +64,15 @@ class ExamplesRunnerTest(unittest.TestCase):
         self.assertIn("--skip-build", forced)
         self.assertIn('--snapshot "result.full-retained.bmp"', forced[-1])
         self.assertIn("--cui-force-full-retained", forced[-1])
+
+    def test_full_and_snapshot_reports_do_not_overwrite_each_other(self):
+        base = argparse.Namespace(smoke_snapshots=False, snapshot=False)
+        snapshot = argparse.Namespace(smoke_snapshots=False, snapshot=True)
+        smoke = argparse.Namespace(smoke_snapshots=True, snapshot=True)
+
+        self.assertEqual(runner.report_filename(base), "report.json")
+        self.assertEqual(runner.report_filename(snapshot), "snapshot-report.json")
+        self.assertEqual(runner.report_filename(smoke), "smoke-report.json")
 
 
 if __name__ == "__main__":

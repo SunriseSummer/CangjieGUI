@@ -24,4 +24,4 @@ public enum LazyScrollAlignment {
 
 ## 另请参阅
 
-- [LazyViewportController](LazyViewportController.md) — 通过 `scrollToKey` 使用本枚举。
+- [LazyViewportController](LazyViewportController.md) — 通过 `scrollToIndex` 或 `scrollToKey` 使用本枚举。

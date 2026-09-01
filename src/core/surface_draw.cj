@@ -3,13 +3,10 @@ package cui.core
 import sdl.{Pen, Rect, SurfaceStyle, clampF32}
 
 /*
- * How far a surface's soft shadow can paint beyond the surface bounds: the widest halo is
- * spread * 0.3 (ambient inset) + spread / 2 (feather fade) with spread capped at 13, plus a few
- * pixels of shadow offset — under 16 in every style the framework draws. Containers that clip
- * children defensively (per-row, per-column, viewport cross-axis) widen their clip by this
- * clearance so a child card's halo wraps its rounded corners instead of being sliced into
- * hard-edged bands at the clip boundary; pushClip intersects with the enclosing clip, so the
- * scroll axis stays exactly bounded by the ancestor that owns it.
+ * Maximum fallback overflow for theme-dependent built-in surfaces whose concrete SurfaceStyle is
+ * resolved only during draw. Generic containers no longer apply this value to every child: static
+ * modifiers and custom widgets publish a precise PaintOutset, while Panel/ReorderableList use this
+ * bound only for their late-bound theme surface.
  */
 protected let CUI_SHADOW_CLEARANCE: Float32 = 16.0
 

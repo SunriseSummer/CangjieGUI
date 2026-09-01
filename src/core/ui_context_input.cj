@@ -41,10 +41,12 @@ extend UiContext {
 
     protected func beginEvent(metadata: UiEventMetadata): Unit {
         currentEventMetadata = metadata
+        beginNativeEventPropagation()
     }
 
     protected func endEvent(): Unit {
         currentEventMetadata = UiEventMetadata()
+        endNativeEventPropagation()
     }
 
     /** Updates IME pre-edit state when `id` is the focused text control. */

@@ -6,6 +6,8 @@
 
 在子树收到事件之前先把每个事件交给回调的透明包装组件，回调返回 `true` 即消费该事件。布局、绘制与弹性行为全部转发给子树，因此把它包在任意位置都不改变界面，只改变事件路由。
 
+这是兼容且低仪式成本的 Bool API。需要区分捕获/冒泡，或把“已处理”与“停止传播”独立组合时，使用 [`EventListener`](EventListener.md) 与 [`EventOutcome`](EventOutcome.md)。
+
 ## 声明
 
 ```cangjie
@@ -220,5 +222,6 @@ public func focusableIds(): Array<String>
 ## 另请参阅
 
 - [FrameHandler](FrameHandler.md) — 按帧回调的姊妹包装，用于动画与帧内轮询。
+- [EventListener](EventListener.md) — 分相、可组合的新事件传播 API。
 - [Widget](Widget.md) — 事件派发与消费语义的协议定义。
 - [UiContext](UiContext.md#eventmetadata--eventmodifiers) — 回调或自定义组件读取事件时刻修饰键与原始键元数据。

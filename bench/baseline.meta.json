@@ -1,23 +1,25 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-24T12:41:48+08:00",
+  "generatedAt": "2026-08-31T17:50:58+08:00",
   "samples": 5,
+  "baselineProfile": "windows-x86_64",
   "verdictMode": "gate",
   "source": {
     "cangjieGui": {
-      "commit": "dc784969cfc336dfa293377f392adcb137a9fa30",
-      "sourceDigest": "ea2f4628f6136874cf1e61877ed915d6d637a9d456863358b05949baeebefcfc",
+      "commit": "2a30cb82b3cbeed73ded432daa9e44a234cbd623",
+      "sourceDigest": "3e554f76fcb3b5f46eb4379e2cf868ab1d7f66aede4fe136d0bb631c3a83794c",
       "dirty": true,
-      "fileCount": 219
+      "fileCount": 349
     },
     "cangjieSdl": {
-      "commit": "2c134456510666698e1a8be2371bc7c3a2ae35ae",
-      "sourceDigest": "07eca667721971b8e1feddcc1fac4c4ce924dcec4f9d9bd574f326b19d6ab64d",
+      "commit": "098e4819594b2f55ff9667d93c41df452c17b96c",
+      "sourceDigest": "59e38ae4b0e214930a1c192187d85affd0279c3bd922117db1b514f6bb1c7de2",
       "dirty": true,
-      "fileCount": 107
+      "fileCount": 112
     }
   },
   "hostEnvironment": {
+    "system": "Windows",
     "platform": "Windows-11-10.0.26200-SP0",
     "machine": "AMD64",
     "processor": "Intel64 Family 6 Model 189 Stepping 1, GenuineIntel",
@@ -34,7 +36,18 @@
         "DriverVersion": "32.0.101.6737",
         "CurrentRefreshRate": 120
       }
-    ]
+    ],
+    "benchmarkAffinity": {
+      "policy": "windows-highest-efficiency-class",
+      "mask": "0xF",
+      "logicalProcessors": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "efficiencyClass": 1
+    }
   },
   "displayEnvironments": {
     "原语提交（上机实测）|2048 rect 单条提交": {
@@ -60,6 +73,11 @@
     "内容页滚动（上机实测）|16 区块 ss2x": {
       "driver": "direct3d11",
       "supersample": 2,
+      "vsync": 0
+    },
+    "内容页滚动（上机实测）|16 区块 Auto": {
+      "driver": "direct3d11",
+      "supersample": 1,
       "vsync": 0
     },
     "内容页滚动（上机实测）|16 区块 ss1x": {
@@ -97,14 +115,19 @@
       "supersample": 2,
       "vsync": 0
     },
-    "大表绘制（上机实测）|500 行窗口化": {
+    "控件密集表单（上机实测）|40 分区 自测量 ss2x": {
       "driver": "direct3d11",
       "supersample": 2,
       "vsync": 0
     },
+    "大表绘制（上机实测）|500 行窗口化": {
+      "driver": "direct3d11",
+      "supersample": 1,
+      "vsync": 0
+    },
     "大表绘制（上机实测）|5000 行窗口化": {
       "driver": "direct3d11",
-      "supersample": 2,
+      "supersample": 1,
       "vsync": 0
     },
     "增量仪表盘（真实渲染）|96 区域强制全量": {
@@ -126,1557 +149,5906 @@
   "sampleStability": [
     {
       "kind": "frame",
+      "group": "派生依赖收集",
+      "name": "1 源依赖收集重登记",
+      "samplesNs": [
+        4769,
+        4479,
+        4326,
+        4568,
+        5370
+      ],
+      "medianNs": 4568,
+      "minNs": 4326,
+      "maxNs": 5370,
+      "relativeRange": 0.22854640980735552,
+      "relativeMad": 0.04400175131348511
+    },
+    {
+      "kind": "frame",
+      "group": "派生依赖收集",
+      "name": "256 源依赖收集重登记",
+      "samplesNs": [
+        4626,
+        4705,
+        4287,
+        4224,
+        4527
+      ],
+      "medianNs": 4527,
+      "minNs": 4224,
+      "maxNs": 4705,
+      "relativeRange": 0.10625138060525735,
+      "relativeMad": 0.03931963772918047
+    },
+    {
+      "kind": "frame",
+      "group": "派生依赖收集",
+      "name": "1 源 remember 稳定派生",
+      "samplesNs": [
+        5173,
+        5217,
+        5169,
+        4904,
+        4950
+      ],
+      "medianNs": 5169,
+      "minNs": 4904,
+      "maxNs": 5217,
+      "relativeRange": 0.06055329851035016,
+      "relativeMad": 0.009286128845037725
+    },
+    {
+      "kind": "frame",
+      "group": "派生依赖收集",
+      "name": "256 源 remember 稳定派生",
+      "samplesNs": [
+        6383,
+        6925,
+        5308,
+        5220,
+        5162
+      ],
+      "medianNs": 5308,
+      "minNs": 5162,
+      "maxNs": 6925,
+      "relativeRange": 0.33214016578749056,
+      "relativeMad": 0.027505651846269782
+    },
+    {
+      "kind": "frame",
+      "group": "派生依赖收集",
+      "name": "1 源内联擦除派生",
+      "samplesNs": [
+        6198,
+        6144,
+        6405,
+        7302,
+        6345
+      ],
+      "medianNs": 6345,
+      "minNs": 6144,
+      "maxNs": 7302,
+      "relativeRange": 0.18250591016548465,
+      "relativeMad": 0.023167848699763592
+    },
+    {
+      "kind": "frame",
+      "group": "派生依赖收集",
+      "name": "256 源内联擦除派生",
+      "samplesNs": [
+        63905,
+        63369,
+        64022,
+        62557,
+        66212
+      ],
+      "medianNs": 63905,
+      "minNs": 62557,
+      "maxNs": 66212,
+      "relativeRange": 0.05719427274861122,
+      "relativeMad": 0.008387450121273766
+    },
+    {
+      "kind": "frame",
+      "group": "派生依赖收集",
+      "name": "1 State 内联专用派生",
+      "samplesNs": [
+        5379,
+        5828,
+        5524,
+        5111,
+        5414
+      ],
+      "medianNs": 5414,
+      "minNs": 5111,
+      "maxNs": 5828,
+      "relativeRange": 0.1324344292574806,
+      "relativeMad": 0.02031769486516439
+    },
+    {
+      "kind": "frame",
+      "group": "派生依赖收集",
+      "name": "256 State 内联专用派生",
+      "samplesNs": [
+        57813,
+        59845,
+        54552,
+        58101,
+        53591
+      ],
+      "medianNs": 57813,
+      "minNs": 53591,
+      "maxNs": 59845,
+      "relativeRange": 0.10817636171795271,
+      "relativeMad": 0.03514780412709944
+    },
+    {
+      "kind": "frame",
+      "group": "派生依赖收集",
+      "name": "1 源内联手工读取",
+      "samplesNs": [
+        4483,
+        4675,
+        4221,
+        4200,
+        4647
+      ],
+      "medianNs": 4483,
+      "minNs": 4200,
+      "maxNs": 4675,
+      "relativeRange": 0.1059558331474459,
+      "relativeMad": 0.04282846308275708
+    },
+    {
+      "kind": "frame",
+      "group": "派生依赖收集",
+      "name": "256 源内联手工读取",
+      "samplesNs": [
+        24931,
+        30658,
+        27475,
+        26836,
+        24473
+      ],
+      "medianNs": 26836,
+      "minNs": 24473,
+      "maxNs": 30658,
+      "relativeRange": 0.23047399016246833,
+      "relativeMad": 0.07098673423759129
+    },
+    {
+      "kind": "frame",
       "group": "表格排序 2000 行",
       "name": "文本列",
       "samplesNs": [
-        292103,
-        330801,
-        290340,
-        290210,
-        306851
+        33796,
+        32948,
+        35085,
+        32805,
+        34415
       ],
-      "medianNs": 292103,
-      "minNs": 290210,
-      "maxNs": 330801,
-      "relativeRange": 0.1389612568169447,
-      "relativeMad": 0.006480590750522932
+      "medianNs": 33796,
+      "minNs": 32805,
+      "maxNs": 35085,
+      "relativeRange": 0.06746360516037402,
+      "relativeMad": 0.0250917268315777
     },
     {
       "kind": "frame",
       "group": "表格排序 2000 行",
       "name": "数值列",
       "samplesNs": [
-        347980,
-        305676,
-        349808,
-        351265,
-        324633
+        32003,
+        33476,
+        34815,
+        33711,
+        40168
       ],
-      "medianNs": 347980,
-      "minNs": 305676,
-      "maxNs": 351265,
-      "relativeRange": 0.1310104028967182,
-      "relativeMad": 0.009440197712512213
+      "medianNs": 33711,
+      "minNs": 32003,
+      "maxNs": 40168,
+      "relativeRange": 0.24220580819317136,
+      "relativeMad": 0.03274895434724571
     },
     {
       "kind": "frame",
       "group": "表格排序 20000 行",
       "name": "文本列",
       "samplesNs": [
-        4390535,
-        4449320,
-        4233185,
-        4947760,
-        4187925
+        243188,
+        215142,
+        211962,
+        214206,
+        215063
       ],
-      "medianNs": 4390535,
-      "minNs": 4187925,
-      "maxNs": 4947760,
-      "relativeRange": 0.17306205280222114,
-      "relativeMad": 0.03583845704452874
+      "medianNs": 215063,
+      "minNs": 211962,
+      "maxNs": 243188,
+      "relativeRange": 0.14519466388918595,
+      "relativeMad": 0.003984878849453416
     },
     {
       "kind": "frame",
       "group": "表格排序 20000 行",
       "name": "数值列",
       "samplesNs": [
-        3615910,
-        3765430,
-        3609810,
-        3763305,
-        4048015
+        216144,
+        294245,
+        249755,
+        225667,
+        296305
       ],
-      "medianNs": 3763305,
-      "minNs": 3609810,
-      "maxNs": 4048015,
-      "relativeRange": 0.11644153211073777,
-      "relativeMad": 0.039166371048852004
+      "medianNs": 249755,
+      "minNs": 216144,
+      "maxNs": 296305,
+      "relativeRange": 0.3209585393685812,
+      "relativeMad": 0.13457588436667933
     },
     {
       "kind": "frame",
       "group": "表格排序边界",
       "name": "空表",
       "samplesNs": [
-        5607,
-        6006,
-        6130,
-        7049,
-        5893
+        3757,
+        2910,
+        3303,
+        3440,
+        3705
       ],
-      "medianNs": 6006,
-      "minNs": 5607,
-      "maxNs": 7049,
-      "relativeRange": 0.2400932400932401,
-      "relativeMad": 0.020646020646020648
+      "medianNs": 3440,
+      "minNs": 2910,
+      "maxNs": 3757,
+      "relativeRange": 0.24622093023255814,
+      "relativeMad": 0.07703488372093023
     },
     {
       "kind": "frame",
       "group": "表格排序边界",
       "name": "单行",
       "samplesNs": [
-        11625,
-        12071,
-        12133,
-        14369,
-        12117
+        4201,
+        4714,
+        5643,
+        4088,
+        3673
       ],
-      "medianNs": 12117,
-      "minNs": 11625,
-      "maxNs": 14369,
-      "relativeRange": 0.22645869439630273,
-      "relativeMad": 0.003796319220929273
+      "medianNs": 4201,
+      "minNs": 3673,
+      "maxNs": 5643,
+      "relativeRange": 0.46893596762675555,
+      "relativeMad": 0.1221137824327541
     },
     {
       "kind": "frame",
       "group": "表格排序边界",
       "name": "2000 行等键值",
       "samplesNs": [
-        312565,
-        308173,
-        317753,
-        383461,
-        316685
+        30570,
+        27936,
+        24233,
+        31925,
+        25453
       ],
-      "medianNs": 316685,
-      "minNs": 308173,
-      "maxNs": 383461,
-      "relativeRange": 0.2377378151791212,
-      "relativeMad": 0.013009773118398408
+      "medianNs": 27936,
+      "minNs": 24233,
+      "maxNs": 31925,
+      "relativeRange": 0.27534364261168387,
+      "relativeMad": 0.09428694158075601
     },
     {
       "kind": "frame",
       "group": "长列表滚动",
       "name": "5000 项",
       "samplesNs": [
-        14566,
-        15053,
-        14758,
-        18925,
-        14438
+        9117,
+        8697,
+        11165,
+        8519,
+        8116
       ],
-      "medianNs": 14758,
-      "minNs": 14438,
-      "maxNs": 18925,
-      "relativeRange": 0.3040384875999458,
-      "relativeMad": 0.01998915842255048
+      "medianNs": 8697,
+      "minNs": 8116,
+      "maxNs": 11165,
+      "relativeRange": 0.3505806599977004,
+      "relativeMad": 0.048292514660227666
     },
     {
       "kind": "frame",
       "group": "长列表滚动",
       "name": "50000 项",
       "samplesNs": [
-        14689,
-        15509,
-        14316,
-        18650,
-        14966
+        8150,
+        8042,
+        12897,
+        7689,
+        8343
       ],
-      "medianNs": 14966,
-      "minNs": 14316,
-      "maxNs": 18650,
-      "relativeRange": 0.289589736736603,
-      "relativeMad": 0.03628223974341842
+      "medianNs": 8150,
+      "minNs": 7689,
+      "maxNs": 12897,
+      "relativeRange": 0.6390184049079755,
+      "relativeMad": 0.023680981595092025
     },
     {
       "kind": "frame",
       "group": "惰性视口",
       "name": "10000 行 legacy 每帧高度扫描",
       "samplesNs": [
-        3577557,
-        3608477,
-        3540087,
-        3754030,
-        3563266
+        197255,
+        166066,
+        222436,
+        172812,
+        162590
       ],
-      "medianNs": 3577557,
-      "minNs": 3540087,
-      "maxNs": 3754030,
-      "relativeRange": 0.05980142314993164,
-      "relativeMad": 0.008642769353500168
+      "medianNs": 172812,
+      "minNs": 162590,
+      "maxNs": 222436,
+      "relativeRange": 0.34630696942341965,
+      "relativeMad": 0.05915098488530889
     },
     {
       "kind": "frame",
       "group": "惰性视口",
       "name": "10000 行 revision 缓存",
       "samplesNs": [
-        344380,
-        356072,
-        344582,
-        341695,
-        365139
+        41116,
+        41001,
+        51788,
+        41344,
+        52467
       ],
-      "medianNs": 344582,
-      "minNs": 341695,
-      "maxNs": 365139,
-      "relativeRange": 0.0680360552785694,
-      "relativeMad": 0.008378267001758652
+      "medianNs": 41344,
+      "minNs": 41001,
+      "maxNs": 52467,
+      "relativeRange": 0.2773316563467492,
+      "relativeMad": 0.00829624613003096
     },
     {
       "kind": "frame",
       "group": "文本区域滚动",
       "name": "3000 行文档",
       "samplesNs": [
-        11156,
-        9147,
-        8841,
-        8369,
-        9180
+        7563,
+        7539,
+        7104,
+        8661,
+        7010
       ],
-      "medianNs": 9147,
-      "minNs": 8369,
-      "maxNs": 11156,
-      "relativeRange": 0.30469006231551327,
-      "relativeMad": 0.033453591341423415
+      "medianNs": 7539,
+      "minNs": 7010,
+      "maxNs": 8661,
+      "relativeRange": 0.218994561612946,
+      "relativeMad": 0.05769996020692399
     },
     {
       "kind": "frame",
       "group": "文本区域滚动",
       "name": "30000 行文档",
       "samplesNs": [
-        14061,
-        19522,
-        11569,
-        11419,
-        11463
+        10527,
+        10245,
+        12690,
+        10454,
+        9911
       ],
-      "medianNs": 11569,
-      "minNs": 11419,
-      "maxNs": 19522,
-      "relativeRange": 0.7004062581035526,
-      "relativeMad": 0.012965684155933962
+      "medianNs": 10454,
+      "minNs": 9911,
+      "maxNs": 12690,
+      "relativeRange": 0.26583126076143104,
+      "relativeMad": 0.01999234742682227
     },
     {
       "kind": "frame",
       "group": "长文换行（冷）",
       "name": "2000 字",
       "samplesNs": [
-        135575,
-        107891,
-        238891,
-        103475,
-        109100
+        36841,
+        44900,
+        37100,
+        43083,
+        35591
       ],
-      "medianNs": 109100,
-      "minNs": 103475,
-      "maxNs": 238891,
-      "relativeRange": 1.2412098991750689,
-      "relativeMad": 0.05155820348304308
+      "medianNs": 37100,
+      "minNs": 35591,
+      "maxNs": 44900,
+      "relativeRange": 0.25091644204851754,
+      "relativeMad": 0.04067385444743935
     },
     {
       "kind": "frame",
       "group": "长文换行",
       "name": "2000 字",
       "samplesNs": [
-        2208,
-        1720,
-        4664,
-        1701,
-        1768
+        2407,
+        2617,
+        2401,
+        3717,
+        2367
       ],
-      "medianNs": 1768,
-      "minNs": 1701,
-      "maxNs": 4664,
-      "relativeRange": 1.6759049773755657,
-      "relativeMad": 0.03789592760180995
+      "medianNs": 2407,
+      "minNs": 2367,
+      "maxNs": 3717,
+      "relativeRange": 0.5608641462401329,
+      "relativeMad": 0.016618196925633568
     },
     {
       "kind": "frame",
       "group": "长文换行（冷）",
       "name": "20000 字",
       "samplesNs": [
-        1241083,
-        1030850,
-        1026116,
-        1069316,
-        1088783
+        303883,
+        277250,
+        296766,
+        315450,
+        369100
       ],
-      "medianNs": 1069316,
-      "minNs": 1026116,
-      "maxNs": 1241083,
-      "relativeRange": 0.20103224865240957,
-      "relativeMad": 0.03597252823300128
+      "medianNs": 303883,
+      "minNs": 277250,
+      "maxNs": 369100,
+      "relativeRange": 0.3022544861015588,
+      "relativeMad": 0.03806399173366065
     },
     {
       "kind": "frame",
       "group": "长文换行",
       "name": "20000 字",
       "samplesNs": [
-        8075,
-        6845,
-        6820,
-        6854,
-        7337
+        26683,
+        25712,
+        33091,
+        25933,
+        26066
       ],
-      "medianNs": 6854,
-      "minNs": 6820,
-      "maxNs": 8075,
-      "relativeRange": 0.18310475634665888,
-      "relativeMad": 0.004960606944849723
+      "medianNs": 26066,
+      "minNs": 25712,
+      "maxNs": 33091,
+      "relativeRange": 0.2830890815621883,
+      "relativeMad": 0.01358090999769815
     },
     {
       "kind": "frame",
       "group": "长文换行（冷）",
       "name": "混合 Unicode",
       "samplesNs": [
-        2663210,
-        2427540,
-        2130230,
-        2152420,
-        2269470
+        231510,
+        219920,
+        317290,
+        225490,
+        221950
       ],
-      "medianNs": 2269470,
-      "minNs": 2130230,
-      "maxNs": 2663210,
-      "relativeRange": 0.23484778384380495,
-      "relativeMad": 0.06135353188189313
+      "medianNs": 225490,
+      "minNs": 219920,
+      "maxNs": 317290,
+      "relativeRange": 0.4318151581001375,
+      "relativeMad": 0.02470176061022662
     },
     {
       "kind": "frame",
       "group": "长文换行",
       "name": "混合 Unicode",
       "samplesNs": [
-        2975,
-        2365,
-        2332,
-        2332,
-        2440
+        6432,
+        6397,
+        6037,
+        6590,
+        6050
       ],
-      "medianNs": 2365,
-      "minNs": 2332,
-      "maxNs": 2975,
-      "relativeRange": 0.2718816067653277,
-      "relativeMad": 0.013953488372093023
+      "medianNs": 6397,
+      "minNs": 6037,
+      "maxNs": 6590,
+      "relativeRange": 0.08644677192433954,
+      "relativeMad": 0.030170392371424104
     },
     {
       "kind": "frame",
       "group": "深层布局",
       "name": "深 12 宽 6",
       "samplesNs": [
-        93788,
-        76537,
-        81673,
-        98430,
-        76340
+        32004,
+        32085,
+        32191,
+        34492,
+        32316
       ],
-      "medianNs": 81673,
-      "minNs": 76340,
-      "maxNs": 98430,
-      "relativeRange": 0.27046882078532686,
-      "relativeMad": 0.065296976969133
+      "medianNs": 32191,
+      "minNs": 32004,
+      "maxNs": 34492,
+      "relativeRange": 0.07728868317231524,
+      "relativeMad": 0.0038830729085769316
     },
     {
       "kind": "frame",
       "group": "深层布局",
       "name": "深 20 宽 8",
       "samplesNs": [
-        147901,
-        216768,
-        145730,
-        169319,
-        150821
+        58278,
+        85790,
+        60335,
+        62664,
+        85692
       ],
-      "medianNs": 150821,
-      "minNs": 145730,
-      "maxNs": 216768,
-      "relativeRange": 0.47100867916271605,
-      "relativeMad": 0.033755246285331615
+      "medianNs": 62664,
+      "minNs": 58278,
+      "maxNs": 85790,
+      "relativeRange": 0.43903995914719773,
+      "relativeMad": 0.0699923400995787
     },
     {
       "kind": "frame",
       "group": "深层布局（逐帧重建）",
       "name": "深 12 宽 6",
       "samplesNs": [
-        222830,
-        246100,
-        217179,
-        257179,
-        220218
+        96371,
+        108685,
+        103376,
+        99106,
+        106963
       ],
-      "medianNs": 222830,
-      "minNs": 217179,
-      "maxNs": 257179,
-      "relativeRange": 0.17950904276802945,
-      "relativeMad": 0.02536014001705336
+      "medianNs": 103376,
+      "minNs": 96371,
+      "maxNs": 108685,
+      "relativeRange": 0.11911855749883919,
+      "relativeMad": 0.04130552546045504
     },
     {
       "kind": "frame",
       "group": "深层布局（逐帧重建）",
       "name": "深 20 宽 8",
       "samplesNs": [
-        447860,
-        473161,
-        433297,
-        430137,
-        441607
+        246446,
+        241325,
+        194031,
+        238743,
+        242607
       ],
-      "medianNs": 441607,
-      "minNs": 430137,
-      "maxNs": 473161,
-      "relativeRange": 0.09742599188871554,
-      "relativeMad": 0.0188176364957983
+      "medianNs": 241325,
+      "minNs": 194031,
+      "maxNs": 246446,
+      "relativeRange": 0.21719672640629856,
+      "relativeMad": 0.01069926447736455
     },
     {
       "kind": "frame",
       "group": "控件密集表单",
       "name": "12 分区",
       "samplesNs": [
-        466465,
-        474005,
-        463491,
-        491484,
-        467216
+        90527,
+        98362,
+        106494,
+        91512,
+        94232
       ],
-      "medianNs": 467216,
-      "minNs": 463491,
-      "maxNs": 491484,
-      "relativeRange": 0.05991447210711962,
-      "relativeMad": 0.00797275778226773
+      "medianNs": 94232,
+      "minNs": 90527,
+      "maxNs": 106494,
+      "relativeRange": 0.16944350114610748,
+      "relativeMad": 0.03931785380762374
     },
     {
       "kind": "frame",
       "group": "控件密集表单",
       "name": "40 分区",
       "samplesNs": [
-        1560991,
-        1581598,
-        1555580,
-        1567731,
-        1592703
+        359218,
+        352368,
+        368026,
+        362010,
+        352636
       ],
-      "medianNs": 1567731,
-      "minNs": 1555580,
-      "maxNs": 1592703,
-      "relativeRange": 0.02367944500682834,
-      "relativeMad": 0.00775069192355066
+      "medianNs": 359218,
+      "minNs": 352368,
+      "maxNs": 368026,
+      "relativeRange": 0.04358912972067101,
+      "relativeMad": 0.018323135254914844
+    },
+    {
+      "kind": "frame",
+      "group": "LazyColumn 滚动相位",
+      "name": "增量物化",
+      "samplesNs": [
+        211367,
+        207820,
+        217486,
+        205739,
+        218647
+      ],
+      "medianNs": 211367,
+      "minNs": 205739,
+      "maxNs": 218647,
+      "relativeRange": 0.06106913567396992,
+      "relativeMad": 0.02662667303789144
+    },
+    {
+      "kind": "frame",
+      "group": "LazyColumn 滚动相位",
+      "name": "强制全量",
+      "samplesNs": [
+        283856,
+        280849,
+        281703,
+        276711,
+        278282
+      ],
+      "medianNs": 280849,
+      "minNs": 276711,
+      "maxNs": 283856,
+      "relativeRange": 0.025440717253755577,
+      "relativeMad": 0.009140142923777546
     },
     {
       "kind": "frame",
       "group": "内容页滚动",
       "name": "12 区块 未窗口化",
       "samplesNs": [
-        2648790,
-        2654250,
-        2649195,
-        2676784,
-        2658427
+        397727,
+        380581,
+        370500,
+        395557,
+        399571
       ],
-      "medianNs": 2654250,
-      "minNs": 2648790,
-      "maxNs": 2676784,
-      "relativeRange": 0.010546858811340303,
-      "relativeMad": 0.0019044927945747387
+      "medianNs": 395557,
+      "minNs": 370500,
+      "maxNs": 399571,
+      "relativeRange": 0.07349383274723997,
+      "relativeMad": 0.010147715752723375
     },
     {
       "kind": "frame",
       "group": "内容页滚动",
       "name": "12 区块 LazyColumn",
       "samplesNs": [
-        619004,
-        635812,
-        614235,
-        620853,
-        624575
+        105043,
+        102976,
+        101143,
+        102808,
+        101516
       ],
-      "medianNs": 620853,
-      "minNs": 614235,
-      "maxNs": 635812,
-      "relativeRange": 0.03475379840316468,
-      "relativeMad": 0.005994977877210869
+      "medianNs": 102808,
+      "minNs": 101143,
+      "maxNs": 105043,
+      "relativeRange": 0.03793479106684305,
+      "relativeMad": 0.0125671153995798
+    },
+    {
+      "kind": "frame",
+      "group": "内容页滚动",
+      "name": "12 区块 自测量",
+      "samplesNs": [
+        183860,
+        144052,
+        151453,
+        147825,
+        148213
+      ],
+      "medianNs": 148213,
+      "minNs": 144052,
+      "maxNs": 183860,
+      "relativeRange": 0.2685864262918907,
+      "relativeMad": 0.02186043059650638
     },
     {
       "kind": "frame",
       "group": "内容页滚动",
       "name": "48 区块 未窗口化",
       "samplesNs": [
-        10513042,
-        10595030,
-        10623575,
-        10569317,
-        10543055
+        1367478,
+        1559227,
+        1320911,
+        1572785,
+        1644087
       ],
-      "medianNs": 10569317,
-      "minNs": 10513042,
-      "maxNs": 10623575,
-      "relativeRange": 0.010457913221828808,
-      "relativeMad": 0.00248473955318021
+      "medianNs": 1559227,
+      "minNs": 1320911,
+      "maxNs": 1644087,
+      "relativeRange": 0.2072668059237045,
+      "relativeMad": 0.054424403887310825
     },
     {
       "kind": "frame",
       "group": "内容页滚动",
       "name": "48 区块 LazyColumn",
       "samplesNs": [
-        714210,
-        736118,
-        729873,
-        707480,
-        711404
+        116225,
+        122107,
+        119795,
+        121437,
+        122494
       ],
-      "medianNs": 714210,
-      "minNs": 707480,
-      "maxNs": 736118,
-      "relativeRange": 0.040097450329734954,
-      "relativeMad": 0.009422998837876815
+      "medianNs": 121437,
+      "minNs": 116225,
+      "maxNs": 122494,
+      "relativeRange": 0.05162347554699145,
+      "relativeMad": 0.008704101715292702
+    },
+    {
+      "kind": "frame",
+      "group": "内容页滚动",
+      "name": "48 区块 自测量",
+      "samplesNs": [
+        207775,
+        179905,
+        191866,
+        175531,
+        183334
+      ],
+      "medianNs": 183334,
+      "minNs": 175531,
+      "maxNs": 207775,
+      "relativeRange": 0.17587572408827604,
+      "relativeMad": 0.04256166341213305
+    },
+    {
+      "kind": "frame",
+      "group": "可观察惰性数据",
+      "name": "10000 项 显式 snapshot+revision",
+      "samplesNs": [
+        5234,
+        5127,
+        5106,
+        5121,
+        5637
+      ],
+      "medianNs": 5127,
+      "minNs": 5106,
+      "maxNs": 5637,
+      "relativeRange": 0.10356933879461673,
+      "relativeMad": 0.004095962551199532
+    },
+    {
+      "kind": "frame",
+      "group": "可观察惰性数据",
+      "name": "10000 项 State 自动版本",
+      "samplesNs": [
+        4908,
+        5340,
+        5551,
+        5601,
+        5744
+      ],
+      "medianNs": 5551,
+      "minNs": 4908,
+      "maxNs": 5744,
+      "relativeRange": 0.15060349486578994,
+      "relativeMad": 0.03476851017834624
     },
     {
       "kind": "frame",
       "group": "每帧重建相分解",
       "name": "内容页 12 区块 构建",
       "samplesNs": [
-        148470,
-        90555,
-        97216,
-        94580,
-        91278
+        114402,
+        117226,
+        126180,
+        127648,
+        123301
       ],
-      "medianNs": 94580,
-      "minNs": 90555,
-      "maxNs": 148470,
-      "relativeRange": 0.6123387608373864,
-      "relativeMad": 0.034912243603298795
+      "medianNs": 123301,
+      "minNs": 114402,
+      "maxNs": 127648,
+      "relativeRange": 0.1074281635996464,
+      "relativeMad": 0.03525518852239641
     },
     {
       "kind": "frame",
       "group": "每帧重建相分解",
       "name": "内容页 12 区块 布局",
       "samplesNs": [
-        3386855,
-        2214039,
-        2261620,
-        2467743,
-        2268774
+        178295,
+        179746,
+        197725,
+        194896,
+        182772
       ],
-      "medianNs": 2268774,
-      "minNs": 2214039,
-      "maxNs": 3386855,
-      "relativeRange": 0.5169382230226546,
-      "relativeMad": 0.02412536462424199
+      "medianNs": 182772,
+      "minNs": 178295,
+      "maxNs": 197725,
+      "relativeRange": 0.10630731184207647,
+      "relativeMad": 0.02449499923401834
     },
     {
       "kind": "frame",
       "group": "每帧重建相分解",
       "name": "内容页 12 区块 绘树",
       "samplesNs": [
-        446145,
-        283920,
-        283565,
-        314023,
-        304878
+        8736,
+        8967,
+        9812,
+        9263,
+        9465
       ],
-      "medianNs": 304878,
-      "minNs": 283565,
-      "maxNs": 446145,
-      "relativeRange": 0.5332624853219976,
-      "relativeMad": 0.06874225099876016
-    },
-    {
-      "kind": "frame",
-      "group": "每帧重建相分解",
-      "name": "内容页 48 区块 构建",
-      "samplesNs": [
-        742215,
-        672717,
-        631755,
-        650115,
-        623917
-      ],
-      "medianNs": 650115,
-      "minNs": 623917,
-      "maxNs": 742215,
-      "relativeRange": 0.18196472931712082,
-      "relativeMad": 0.034766156756881474
-    },
-    {
-      "kind": "frame",
-      "group": "每帧重建相分解",
-      "name": "内容页 48 区块 布局",
-      "samplesNs": [
-        18437137,
-        15551770,
-        15100650,
-        18059457,
-        15279287
-      ],
-      "medianNs": 15551770,
-      "minNs": 15100650,
-      "maxNs": 18437137,
-      "relativeRange": 0.21454066000204478,
-      "relativeMad": 0.02900763064268569
-    },
-    {
-      "kind": "frame",
-      "group": "每帧重建相分解",
-      "name": "内容页 48 区块 绘树",
-      "samplesNs": [
-        2468155,
-        2288570,
-        2065627,
-        2249897,
-        2118795
-      ],
-      "medianNs": 2249897,
-      "minNs": 2065627,
-      "maxNs": 2468155,
-      "relativeRange": 0.1789095234137385,
-      "relativeMad": 0.058270223036876796
+      "medianNs": 9263,
+      "minNs": 8736,
+      "maxNs": 9812,
+      "relativeRange": 0.11616107092734536,
+      "relativeMad": 0.03195509014358199
     },
     {
       "kind": "frame",
       "group": "每帧重建相分解",
       "name": "控件表单 12 分区 构建",
       "samplesNs": [
-        216255,
-        219469,
-        207841,
-        240455,
-        205547
+        150960,
+        158145,
+        152373,
+        145055,
+        155690
       ],
-      "medianNs": 216255,
-      "minNs": 205547,
-      "maxNs": 240455,
-      "relativeRange": 0.1614205451897066,
-      "relativeMad": 0.038907770918591475
+      "medianNs": 152373,
+      "minNs": 145055,
+      "maxNs": 158145,
+      "relativeRange": 0.08590760830330833,
+      "relativeMad": 0.02176894856700334
     },
     {
       "kind": "frame",
       "group": "每帧重建相分解",
       "name": "控件表单 12 分区 布局",
       "samplesNs": [
-        2011119,
-        2185207,
-        1987364,
-        2330892,
-        2022100
+        113537,
+        119106,
+        114911,
+        110005,
+        115633
       ],
-      "medianNs": 2022100,
-      "minNs": 1987364,
-      "maxNs": 2330892,
-      "relativeRange": 0.16988675139706247,
-      "relativeMad": 0.017178181098857624
+      "medianNs": 114911,
+      "minNs": 110005,
+      "maxNs": 119106,
+      "relativeRange": 0.07920042467648876,
+      "relativeMad": 0.011957079826996545
     },
     {
       "kind": "frame",
       "group": "每帧重建相分解",
       "name": "控件表单 12 分区 绘树",
       "samplesNs": [
-        417679,
-        438586,
-        417480,
-        469665,
-        412757
+        11837,
+        12341,
+        11903,
+        11202,
+        13520
       ],
-      "medianNs": 417679,
-      "minNs": 412757,
-      "maxNs": 469665,
-      "relativeRange": 0.1362481714426629,
-      "relativeMad": 0.011784169182554066
+      "medianNs": 11903,
+      "minNs": 11202,
+      "maxNs": 13520,
+      "relativeRange": 0.19474082164160295,
+      "relativeMad": 0.03679744602201126
     },
     {
       "kind": "frame",
       "group": "每帧重建相分解",
       "name": "控件表单 40 分区 构建",
       "samplesNs": [
-        823482,
-        677057,
-        655377,
-        552430,
-        680570
+        523125,
+        502129,
+        498458,
+        479495,
+        526242
       ],
-      "medianNs": 677057,
-      "minNs": 552430,
-      "maxNs": 823482,
-      "relativeRange": 0.4003385239352078,
-      "relativeMad": 0.03202093767585299
+      "medianNs": 502129,
+      "minNs": 479495,
+      "maxNs": 526242,
+      "relativeRange": 0.09309759045982208,
+      "relativeMad": 0.041813956174608514
     },
     {
       "kind": "frame",
       "group": "每帧重建相分解",
       "name": "控件表单 40 分区 布局",
       "samplesNs": [
-        7455302,
-        7091655,
-        6834095,
-        6316690,
-        6668245
+        415795,
+        413191,
+        385929,
+        382539,
+        450075
       ],
-      "medianNs": 6834095,
-      "minNs": 6316690,
-      "maxNs": 7455302,
-      "relativeRange": 0.16660757569217285,
-      "relativeMad": 0.0376875065389053
+      "medianNs": 413191,
+      "minNs": 382539,
+      "maxNs": 450075,
+      "relativeRange": 0.1634498331280207,
+      "relativeMad": 0.06597917185998727
     },
     {
       "kind": "frame",
       "group": "每帧重建相分解",
       "name": "控件表单 40 分区 绘树",
       "samplesNs": [
-        1409020,
-        1530500,
-        1342060,
-        1161482,
-        1380442
+        14877,
+        13810,
+        13694,
+        13159,
+        16084
       ],
-      "medianNs": 1380442,
-      "minNs": 1161482,
-      "maxNs": 1530500,
-      "relativeRange": 0.2673187283493258,
-      "relativeMad": 0.02780413809490004
-    },
-    {
-      "kind": "frame",
-      "group": "实例复用-布局",
-      "name": "内容页 12 区块 每帧重建",
-      "samplesNs": [
-        4222521,
-        3735637,
-        4093259,
-        4593817,
-        4831213
-      ],
-      "medianNs": 4222521,
-      "minNs": 3735637,
-      "maxNs": 4831213,
-      "relativeRange": 0.2594601660950887,
-      "relativeMad": 0.08793230394828114
-    },
-    {
-      "kind": "frame",
-      "group": "实例复用-布局",
-      "name": "内容页 12 区块 复用实例",
-      "samplesNs": [
-        3775022,
-        4170835,
-        4670908,
-        3728232,
-        4017071
-      ],
-      "medianNs": 4017071,
-      "minNs": 3728232,
-      "maxNs": 4670908,
-      "relativeRange": 0.23466749778632243,
-      "relativeMad": 0.06025509631271143
-    },
-    {
-      "kind": "frame",
-      "group": "实例复用-布局",
-      "name": "内容页 48 区块 每帧重建",
-      "samplesNs": [
-        18794260,
-        18165312,
-        17505580,
-        16272440,
-        17965727
-      ],
-      "medianNs": 17965727,
-      "minNs": 16272440,
-      "maxNs": 18794260,
-      "relativeRange": 0.14036838030545604,
-      "relativeMad": 0.025612489825766582
-    },
-    {
-      "kind": "frame",
-      "group": "实例复用-布局",
-      "name": "内容页 48 区块 复用实例",
-      "samplesNs": [
-        16589557,
-        16814272,
-        17379687,
-        17187722,
-        18766735
-      ],
-      "medianNs": 17187722,
-      "minNs": 16589557,
-      "maxNs": 18766735,
-      "relativeRange": 0.12667053842271828,
-      "relativeMad": 0.0217277193568758
-    },
-    {
-      "kind": "frame",
-      "group": "实例复用-布局",
-      "name": "控件表单 12 分区 每帧重建",
-      "samplesNs": [
-        2258969,
-        2320441,
-        2004585,
-        2073701,
-        2254207
-      ],
-      "medianNs": 2254207,
-      "minNs": 2004585,
-      "maxNs": 2320441,
-      "relativeRange": 0.1401184540727626,
-      "relativeMad": 0.029382394784507368
-    },
-    {
-      "kind": "frame",
-      "group": "实例复用-布局",
-      "name": "控件表单 12 分区 复用实例",
-      "samplesNs": [
-        2089419,
-        1735398,
-        1813128,
-        2182365,
-        1953515
-      ],
-      "medianNs": 1953515,
-      "minNs": 1735398,
-      "maxNs": 2182365,
-      "relativeRange": 0.2288014169330668,
-      "relativeMad": 0.07186379423756664
-    },
-    {
-      "kind": "frame",
-      "group": "实例复用-布局",
-      "name": "控件表单 40 分区 每帧重建",
-      "samplesNs": [
-        6278447,
-        5772820,
-        6635847,
-        8003672,
-        6768167
-      ],
-      "medianNs": 6635847,
-      "minNs": 5772820,
-      "maxNs": 8003672,
-      "relativeRange": 0.33618195235664716,
-      "relativeMad": 0.05385898740582777
-    },
-    {
-      "kind": "frame",
-      "group": "实例复用-布局",
-      "name": "控件表单 40 分区 复用实例",
-      "samplesNs": [
-        5488707,
-        6962300,
-        6424630,
-        8399882,
-        7484287
-      ],
-      "medianNs": 6962300,
-      "minNs": 5488707,
-      "maxNs": 8399882,
-      "relativeRange": 0.41813409361848813,
-      "relativeMad": 0.07722591672292202
+      "medianNs": 13810,
+      "minNs": 13159,
+      "maxNs": 16084,
+      "relativeRange": 0.2118030412744388,
+      "relativeMad": 0.04713975380159305
     },
     {
       "kind": "frame",
       "group": "自动组合",
       "name": "240 分支 / 单分支变更",
       "samplesNs": [
-        3967430,
-        4292515,
-        4020794,
-        3892607,
-        3969286
+        571552,
+        578071,
+        596677,
+        579044,
+        608490
       ],
-      "medianNs": 3969286,
-      "minNs": 3892607,
-      "maxNs": 4292515,
-      "relativeRange": 0.10075061358642336,
-      "relativeMad": 0.012976641138985702
+      "medianNs": 579044,
+      "minNs": 571552,
+      "maxNs": 608490,
+      "relativeRange": 0.06379135264332245,
+      "relativeMad": 0.012938567708153438
     },
     {
       "kind": "frame",
       "group": "自动组合",
       "name": "240 分支 / 强制全重建",
       "samplesNs": [
-        6378069,
-        6044052,
-        6605854,
-        7009821,
-        6841690
+        1092147,
+        966914,
+        1069677,
+        977820,
+        969617
       ],
-      "medianNs": 6605854,
-      "minNs": 6044052,
-      "maxNs": 7009821,
-      "relativeRange": 0.14619896231433513,
-      "relativeMad": 0.035701061513015574
+      "medianNs": 977820,
+      "minNs": 966914,
+      "maxNs": 1092147,
+      "relativeRange": 0.12807367409134607,
+      "relativeMad": 0.011153382013049436
+    },
+    {
+      "kind": "frame",
+      "group": "局部状态身份",
+      "name": "256 个 keyless 位置槽",
+      "samplesNs": [
+        73106,
+        84402,
+        78679,
+        84613,
+        77141
+      ],
+      "medianNs": 78679,
+      "minNs": 73106,
+      "maxNs": 84613,
+      "relativeRange": 0.1462524943123324,
+      "relativeMad": 0.07083211530395658
+    },
+    {
+      "kind": "frame",
+      "group": "局部状态身份",
+      "name": "256 个显式字符串键",
+      "samplesNs": [
+        98597,
+        104257,
+        109792,
+        111968,
+        105463
+      ],
+      "medianNs": 105463,
+      "minNs": 98597,
+      "maxNs": 111968,
+      "relativeRange": 0.12678380095388905,
+      "relativeMad": 0.041047571186103186
     },
     {
       "kind": "frame",
       "group": "自动显示列表",
       "name": "96 绘制节点 / 自动缓存",
       "samplesNs": [
-        28567,
-        21183,
-        22145,
-        8538,
-        16216
+        2262,
+        2084,
+        3366,
+        2180,
+        2785
       ],
-      "medianNs": 21183,
-      "minNs": 8538,
-      "maxNs": 28567,
-      "relativeRange": 0.9455223528300996,
-      "relativeMad": 0.2344804796298919
+      "medianNs": 2262,
+      "minNs": 2084,
+      "maxNs": 3366,
+      "relativeRange": 0.5667550839964633,
+      "relativeMad": 0.07869142351900972
     },
     {
       "kind": "frame",
       "group": "自动显示列表",
       "name": "96 绘制节点 / 强制直绘",
       "samplesNs": [
-        266217,
-        208935,
-        267371,
-        248296,
-        240490
+        17148,
+        18784,
+        18331,
+        18360,
+        17250
       ],
-      "medianNs": 248296,
-      "minNs": 208935,
-      "maxNs": 267371,
-      "relativeRange": 0.2353481328736669,
-      "relativeMad": 0.0721759512839514
+      "medianNs": 18331,
+      "minNs": 17148,
+      "maxNs": 18784,
+      "relativeRange": 0.08924772243740112,
+      "relativeMad": 0.024712236102776716
     },
     {
       "kind": "frame",
       "group": "自动渲染边界",
       "name": "24 节点稳定兄弟 / 自动晋升",
       "samplesNs": [
-        187066,
-        160827,
-        211582,
-        151112,
-        176429
+        17527,
+        13968,
+        16367,
+        15780,
+        15587
       ],
-      "medianNs": 176429,
-      "minNs": 151112,
-      "maxNs": 211582,
-      "relativeRange": 0.3427441066944777,
-      "relativeMad": 0.08843217384897041
+      "medianNs": 15780,
+      "minNs": 13968,
+      "maxNs": 17527,
+      "relativeRange": 0.2255386565272497,
+      "relativeMad": 0.037198986058301645
     },
     {
       "kind": "frame",
       "group": "自动渲染边界",
       "name": "24 节点稳定兄弟 / 强制全量",
       "samplesNs": [
-        710287,
-        715551,
-        764150,
-        697219,
-        779375
+        58398,
+        57580,
+        52697,
+        58473,
+        56102
       ],
-      "medianNs": 715551,
-      "minNs": 697219,
-      "maxNs": 779375,
-      "relativeRange": 0.11481501667945401,
-      "relativeMad": 0.02561941776337396
+      "medianNs": 57580,
+      "minNs": 52697,
+      "maxNs": 58473,
+      "relativeRange": 0.10031260854463356,
+      "relativeMad": 0.01550885724209795
+    },
+    {
+      "kind": "frame",
+      "group": "声明重放",
+      "name": "128 静态声明",
+      "samplesNs": [
+        2546,
+        2589,
+        2586,
+        2724,
+        2927
+      ],
+      "medianNs": 2589,
+      "minNs": 2546,
+      "maxNs": 2927,
+      "relativeRange": 0.14716106604866744,
+      "relativeMad": 0.01660872923908845
+    },
+    {
+      "kind": "frame",
+      "group": "声明重放",
+      "name": "128 外部版本声明",
+      "samplesNs": [
+        29350,
+        30726,
+        30937,
+        28902,
+        34345
+      ],
+      "medianNs": 30726,
+      "minNs": 28902,
+      "maxNs": 34345,
+      "relativeRange": 0.17714639067890386,
+      "relativeMad": 0.04478292000260366
+    },
+    {
+      "kind": "frame",
+      "group": "声明重放",
+      "name": "128 keyless 静态声明",
+      "samplesNs": [
+        2463,
+        2618,
+        2442,
+        2475,
+        2442
+      ],
+      "medianNs": 2463,
+      "minNs": 2442,
+      "maxNs": 2618,
+      "relativeRange": 0.07145757206658547,
+      "relativeMad": 0.008526187576126675
+    },
+    {
+      "kind": "frame",
+      "group": "声明重放",
+      "name": "128 keyless 外部版本声明",
+      "samplesNs": [
+        20980,
+        21485,
+        19395,
+        20478,
+        19279
+      ],
+      "medianNs": 20478,
+      "minNs": 19279,
+      "maxNs": 21485,
+      "relativeRange": 0.1077253638050591,
+      "relativeMad": 0.049174724094149816
     },
     {
       "kind": "frame",
       "group": "保留子树",
       "name": "revision 命中",
       "samplesNs": [
-        508335,
-        439232,
-        294398,
-        624733,
-        388556
+        9787,
+        10504,
+        9852,
+        10252,
+        11044
       ],
-      "medianNs": 439232,
-      "minNs": 294398,
-      "maxNs": 624733,
-      "relativeRange": 0.7520740747486522,
-      "relativeMad": 0.15732687964447034
+      "medianNs": 10252,
+      "minNs": 9787,
+      "maxNs": 11044,
+      "relativeRange": 0.12261022239563012,
+      "relativeMad": 0.03901677721420211
     },
     {
       "kind": "frame",
       "group": "保留子树",
       "name": "revision 每帧变化",
       "samplesNs": [
-        16333550,
-        16961250,
-        16676316,
-        17794548,
-        19299516
+        2285465,
+        2221566,
+        2205351,
+        2286596,
+        2311245
       ],
-      "medianNs": 16961250,
-      "minNs": 16333550,
-      "maxNs": 19299516,
-      "relativeRange": 0.17486718254845604,
-      "relativeMad": 0.03700788562163756
+      "medianNs": 2285465,
+      "minNs": 2205351,
+      "maxNs": 2311245,
+      "relativeRange": 0.04633367826678597,
+      "relativeMad": 0.011279980222843053
     },
     {
       "kind": "frame",
       "group": "Frame 订阅表",
       "name": "0 个订阅",
       "samplesNs": [
-        34150,
-        46123,
-        15710,
-        17015,
-        46871
+        2471,
+        2500,
+        3405,
+        2420,
+        2372
       ],
-      "medianNs": 34150,
-      "minNs": 15710,
-      "maxNs": 46871,
-      "relativeRange": 0.9124743777452415,
-      "relativeMad": 0.37250366032210835
+      "medianNs": 2471,
+      "minNs": 2372,
+      "maxNs": 3405,
+      "relativeRange": 0.41804937272359366,
+      "relativeMad": 0.02063941723998381
     },
     {
       "kind": "frame",
       "group": "Frame 订阅表",
       "name": "512 个显式订阅",
       "samplesNs": [
-        215324,
-        208023,
-        71868,
-        201524,
-        147686
+        3550,
+        3512,
+        4028,
+        3609,
+        3580
       ],
-      "medianNs": 201524,
-      "minNs": 71868,
-      "maxNs": 215324,
-      "relativeRange": 0.711855659871777,
-      "relativeMad": 0.06847819614537226
+      "medianNs": 3580,
+      "minNs": 3512,
+      "maxNs": 4028,
+      "relativeRange": 0.1441340782122905,
+      "relativeMad": 0.008379888268156424
     },
     {
       "kind": "frame",
       "group": "生命周期 effect",
       "name": "128 个稳定 effect",
       "samplesNs": [
-        235283,
-        281362,
-        140037,
-        228912,
-        194356
+        29636,
+        29195,
+        29526,
+        33727,
+        29013
       ],
-      "medianNs": 228912,
-      "minNs": 140037,
-      "maxNs": 281362,
-      "relativeRange": 0.6173769832948907,
-      "relativeMad": 0.1509575732159083
+      "medianNs": 29526,
+      "minNs": 29013,
+      "maxNs": 33727,
+      "relativeRange": 0.15965589649800177,
+      "relativeMad": 0.011210458578879631
     },
     {
       "kind": "frame",
       "group": "生命周期 effect",
       "name": "128 个每帧替换",
       "samplesNs": [
-        380988,
-        394533,
-        381976,
-        646672,
-        331100
+        64595,
+        39782,
+        40643,
+        44695,
+        47808
       ],
-      "medianNs": 381976,
-      "minNs": 331100,
-      "maxNs": 646672,
-      "relativeRange": 0.8261566171696652,
-      "relativeMad": 0.03287379311789222
+      "medianNs": 44695,
+      "minNs": 39782,
+      "maxNs": 64595,
+      "relativeRange": 0.5551627698847745,
+      "relativeMad": 0.09065891039266137
+    },
+    {
+      "kind": "frame",
+      "group": "状态事务等价",
+      "name": "默认净零事务后帧",
+      "samplesNs": [
+        5475,
+        5233,
+        5301,
+        5460,
+        5550
+      ],
+      "medianNs": 5460,
+      "minNs": 5233,
+      "maxNs": 5550,
+      "relativeRange": 0.05805860805860806,
+      "relativeMad": 0.016483516483516484
+    },
+    {
+      "kind": "frame",
+      "group": "状态事务等价",
+      "name": "结构策略净零事务后帧",
+      "samplesNs": [
+        3482,
+        3559,
+        3623,
+        3598,
+        3502
+      ],
+      "medianNs": 3559,
+      "minNs": 3482,
+      "maxNs": 3623,
+      "relativeRange": 0.039617870188255126,
+      "relativeMad": 0.0160157347569542
+    },
+    {
+      "kind": "frame",
+      "group": "单作用域 State 扩展性",
+      "name": "1000 State 局部写+作用域重建",
+      "samplesNs": [
+        85066,
+        87991,
+        102433,
+        97766,
+        127900
+      ],
+      "medianNs": 97766,
+      "minNs": 85066,
+      "maxNs": 127900,
+      "relativeRange": 0.43812777448192625,
+      "relativeMad": 0.09998363439232454
+    },
+    {
+      "kind": "frame",
+      "group": "单作用域 State 扩展性",
+      "name": "10000 State 局部写+作用域重建",
+      "samplesNs": [
+        878235,
+        862083,
+        895385,
+        856047,
+        900374
+      ],
+      "medianNs": 878235,
+      "minNs": 856047,
+      "maxNs": 900374,
+      "relativeRange": 0.05047282333316254,
+      "relativeMad": 0.01952780292290788
+    },
+    {
+      "kind": "frame",
+      "group": "单阶段 State 扩展性",
+      "name": "1000 State 稳定节点 layout 重收集",
+      "samplesNs": [
+        85608,
+        82008,
+        92691,
+        90875,
+        82808
+      ],
+      "medianNs": 85608,
+      "minNs": 82008,
+      "maxNs": 92691,
+      "relativeRange": 0.12478973927670312,
+      "relativeMad": 0.04205214465937763
+    },
+    {
+      "kind": "frame",
+      "group": "单阶段 State 扩展性",
+      "name": "10000 State 稳定节点 layout 重收集",
+      "samplesNs": [
+        872035,
+        854321,
+        890707,
+        880739,
+        910753
+      ],
+      "medianNs": 880739,
+      "minNs": 854321,
+      "maxNs": 910753,
+      "relativeRange": 0.06407346557833819,
+      "relativeMad": 0.011317768374058602
+    },
+    {
+      "kind": "frame",
+      "group": "单阶段 State 扩展性",
+      "name": "1000 State 替换节点 layout 重收集",
+      "samplesNs": [
+        169758,
+        79208,
+        79116,
+        77116,
+        76066
+      ],
+      "medianNs": 79116,
+      "minNs": 76066,
+      "maxNs": 169758,
+      "relativeRange": 1.1842358056524598,
+      "relativeMad": 0.025279336670205772
+    },
+    {
+      "kind": "frame",
+      "group": "单阶段 State 扩展性",
+      "name": "10000 State 替换节点 layout 重收集",
+      "samplesNs": [
+        870643,
+        901203,
+        878626,
+        816253,
+        892427
+      ],
+      "medianNs": 878626,
+      "minNs": 816253,
+      "maxNs": 901203,
+      "relativeRange": 0.09668505143257769,
+      "relativeMad": 0.01570747963297239
+    },
+    {
+      "kind": "frame",
+      "group": "焦点扩展性",
+      "name": "1000 focusable 注册重建",
+      "samplesNs": [
+        352964,
+        404046,
+        351592,
+        336105,
+        308452
+      ],
+      "medianNs": 351592,
+      "minNs": 308452,
+      "maxNs": 404046,
+      "relativeRange": 0.27188900771348606,
+      "relativeMad": 0.04404821497644998
+    },
+    {
+      "kind": "frame",
+      "group": "焦点扩展性",
+      "name": "1000 focusable 稳定帧",
+      "samplesNs": [
+        13308,
+        11752,
+        12633,
+        14426,
+        13990
+      ],
+      "medianNs": 13308,
+      "minNs": 11752,
+      "maxNs": 14426,
+      "relativeRange": 0.200931770363691,
+      "relativeMad": 0.051247370003005714
+    },
+    {
+      "kind": "frame",
+      "group": "焦点扩展性",
+      "name": "1000 空节点稳定帧",
+      "samplesNs": [
+        9320,
+        8608,
+        8503,
+        8504,
+        9976
+      ],
+      "medianNs": 8608,
+      "minNs": 8503,
+      "maxNs": 9976,
+      "relativeRange": 0.17111988847583642,
+      "relativeMad": 0.012197955390334572
+    },
+    {
+      "kind": "frame",
+      "group": "焦点扩展性",
+      "name": "10000 focusable 注册重建",
+      "samplesNs": [
+        3410135,
+        3628593,
+        3932679,
+        3763360,
+        3497489
+      ],
+      "medianNs": 3628593,
+      "minNs": 3410135,
+      "maxNs": 3932679,
+      "relativeRange": 0.14400733286979278,
+      "relativeMad": 0.03714029101638018
+    },
+    {
+      "kind": "frame",
+      "group": "焦点扩展性",
+      "name": "10000 focusable 稳定帧",
+      "samplesNs": [
+        96884,
+        94285,
+        96803,
+        92736,
+        99371
+      ],
+      "medianNs": 96803,
+      "minNs": 92736,
+      "maxNs": 99371,
+      "relativeRange": 0.06854126421701806,
+      "relativeMad": 0.026011590549879653
+    },
+    {
+      "kind": "frame",
+      "group": "焦点扩展性",
+      "name": "10000 空节点稳定帧",
+      "samplesNs": [
+        64160,
+        67429,
+        67543,
+        69412,
+        67088
+      ],
+      "medianNs": 67429,
+      "minNs": 64160,
+      "maxNs": 69412,
+      "relativeRange": 0.07788933544913909,
+      "relativeMad": 0.005057171246792923
+    },
+    {
+      "kind": "frame",
+      "group": "Overlay 扩展性",
+      "name": "4000 keyed 稳定帧",
+      "samplesNs": [
+        16490,
+        15876,
+        15429,
+        20840,
+        15347
+      ],
+      "medianNs": 15876,
+      "minNs": 15347,
+      "maxNs": 20840,
+      "relativeRange": 0.3459939531368103,
+      "relativeMad": 0.03332073570168808
+    },
+    {
+      "kind": "frame",
+      "group": "PaintOutset 合成",
+      "name": "10000 节点零 overflow 全量帧",
+      "samplesNs": [
+        866074,
+        929287,
+        892684,
+        875746,
+        929442
+      ],
+      "medianNs": 892684,
+      "minNs": 866074,
+      "maxNs": 929442,
+      "relativeRange": 0.07098592559069054,
+      "relativeMad": 0.02980898055750971
+    },
+    {
+      "kind": "frame",
+      "group": "PaintOutset 合成",
+      "name": "10000 节点显式 overflow 全量帧",
+      "samplesNs": [
+        903685,
+        871099,
+        921072,
+        927869,
+        928557
+      ],
+      "medianNs": 921072,
+      "minNs": 871099,
+      "maxNs": 928557,
+      "relativeRange": 0.06238165963138604,
+      "relativeMad": 0.008126400541977174
+    },
+    {
+      "kind": "frame",
+      "group": "实例复用-布局",
+      "name": "内容页 48 区块 每帧重建",
+      "samplesNs": [
+        801047,
+        733434,
+        761017,
+        761086,
+        757276
+      ],
+      "medianNs": 761017,
+      "minNs": 733434,
+      "maxNs": 801047,
+      "relativeRange": 0.08884558426421486,
+      "relativeMad": 0.004915790317430491
+    },
+    {
+      "kind": "frame",
+      "group": "实例复用-布局",
+      "name": "内容页 48 区块 复用实例",
+      "samplesNs": [
+        761840,
+        592716,
+        704144,
+        716164,
+        619408
+      ],
+      "medianNs": 704144,
+      "minNs": 592716,
+      "maxNs": 761840,
+      "relativeRange": 0.24018382603558364,
+      "relativeMad": 0.08193778545297553
+    },
+    {
+      "kind": "frame",
+      "group": "实例复用-布局",
+      "name": "内容页 12 区块 每帧重建",
+      "samplesNs": [
+        194330,
+        176924,
+        186368,
+        173667,
+        179846
+      ],
+      "medianNs": 179846,
+      "minNs": 173667,
+      "maxNs": 194330,
+      "relativeRange": 0.11489274156778577,
+      "relativeMad": 0.034357172247367194
+    },
+    {
+      "kind": "frame",
+      "group": "实例复用-布局",
+      "name": "内容页 12 区块 复用实例",
+      "samplesNs": [
+        178475,
+        171913,
+        163473,
+        156660,
+        157730
+      ],
+      "medianNs": 163473,
+      "minNs": 156660,
+      "maxNs": 178475,
+      "relativeRange": 0.13344711359062353,
+      "relativeMad": 0.04167660714613423
+    },
+    {
+      "kind": "frame",
+      "group": "实例复用-布局",
+      "name": "控件表单 12 分区 每帧重建",
+      "samplesNs": [
+        120186,
+        110200,
+        113988,
+        115726,
+        112471
+      ],
+      "medianNs": 113988,
+      "minNs": 110200,
+      "maxNs": 120186,
+      "relativeRange": 0.08760571288205776,
+      "relativeMad": 0.015247219005509351
+    },
+    {
+      "kind": "frame",
+      "group": "实例复用-布局",
+      "name": "控件表单 12 分区 复用实例",
+      "samplesNs": [
+        110258,
+        103911,
+        110740,
+        114254,
+        108255
+      ],
+      "medianNs": 110258,
+      "minNs": 103911,
+      "maxNs": 114254,
+      "relativeRange": 0.09380725208148162,
+      "relativeMad": 0.018166482250721035
+    },
+    {
+      "kind": "frame",
+      "group": "实例复用-布局",
+      "name": "控件表单 40 分区 每帧重建",
+      "samplesNs": [
+        410670,
+        445162,
+        416394,
+        441103,
+        409695
+      ],
+      "medianNs": 416394,
+      "minNs": 409695,
+      "maxNs": 445162,
+      "relativeRange": 0.08517653952746677,
+      "relativeMad": 0.016088128071009667
+    },
+    {
+      "kind": "frame",
+      "group": "实例复用-布局",
+      "name": "控件表单 40 分区 复用实例",
+      "samplesNs": [
+        360276,
+        379704,
+        350425,
+        361217,
+        341206
+      ],
+      "medianNs": 360276,
+      "minNs": 341206,
+      "maxNs": 379704,
+      "relativeRange": 0.10685696521555696,
+      "relativeMad": 0.02734292597897168
+    },
+    {
+      "kind": "frame",
+      "group": "scrollToKey 扩展性",
+      "name": "10000 项随机 scrollToKey+帧",
+      "samplesNs": [
+        238400,
+        239960,
+        223765,
+        239215,
+        224025
+      ],
+      "medianNs": 238400,
+      "minNs": 223765,
+      "maxNs": 239960,
+      "relativeRange": 0.06793204697986577,
+      "relativeMad": 0.006543624161073826
+    },
+    {
+      "kind": "frame",
+      "group": "scrollToIndex 扩展性",
+      "name": "10000 项随机 scrollToIndex+帧",
+      "samplesNs": [
+        163630,
+        168120,
+        160745,
+        180705,
+        170915
+      ],
+      "medianNs": 168120,
+      "minNs": 160745,
+      "maxNs": 180705,
+      "relativeRange": 0.11872472043778254,
+      "relativeMad": 0.02670711396621461
+    },
+    {
+      "kind": "frame",
+      "group": "scrollToKey 扩展性",
+      "name": "100000 项随机 scrollToKey+帧",
+      "samplesNs": [
+        1518285,
+        1340383,
+        1390800,
+        1396576,
+        1374960
+      ],
+      "medianNs": 1390800,
+      "minNs": 1340383,
+      "maxNs": 1518285,
+      "relativeRange": 0.12791343111878056,
+      "relativeMad": 0.011389128559102674
+    },
+    {
+      "kind": "frame",
+      "group": "scrollToIndex 扩展性",
+      "name": "100000 项随机 scrollToIndex+帧",
+      "samplesNs": [
+        177634,
+        163542,
+        176363,
+        172473,
+        173775
+      ],
+      "medianNs": 173775,
+      "minNs": 163542,
+      "maxNs": 177634,
+      "relativeRange": 0.08109336786073947,
+      "relativeMad": 0.014892821176809092
+    },
+    {
+      "kind": "frame",
+      "group": "ModelStore selector",
+      "name": "240 投影 / 普通 selector",
+      "samplesNs": [
+        1484830,
+        1497990,
+        1610844,
+        1682663,
+        1629904
+      ],
+      "medianNs": 1610844,
+      "minNs": 1484830,
+      "maxNs": 1682663,
+      "relativeRange": 0.12281325814293625,
+      "relativeMad": 0.04458470218096849
+    },
+    {
+      "kind": "frame",
+      "group": "ModelStore selector",
+      "name": "240 投影 / 等价 selector",
+      "samplesNs": [
+        908516,
+        942675,
+        839755,
+        1003661,
+        991869
+      ],
+      "medianNs": 942675,
+      "minNs": 839755,
+      "maxNs": 1003661,
+      "relativeRange": 0.1738732861272443,
+      "relativeMad": 0.052185535842151326
+    },
+    {
+      "kind": "frame",
+      "group": "每帧重建相分解",
+      "name": "内容页 48 区块 构建",
+      "samplesNs": [
+        510988,
+        512039,
+        518042,
+        522447,
+        500157
+      ],
+      "medianNs": 512039,
+      "minNs": 500157,
+      "maxNs": 522447,
+      "relativeRange": 0.04353184034809848,
+      "relativeMad": 0.011723716357543077
+    },
+    {
+      "kind": "frame",
+      "group": "每帧重建相分解",
+      "name": "内容页 48 区块 布局",
+      "samplesNs": [
+        774309,
+        741342,
+        770561,
+        749800,
+        757366
+      ],
+      "medianNs": 757366,
+      "minNs": 741342,
+      "maxNs": 774309,
+      "relativeRange": 0.04352849216891173,
+      "relativeMad": 0.017422223865343835
+    },
+    {
+      "kind": "frame",
+      "group": "每帧重建相分解",
+      "name": "内容页 48 区块 绘树",
+      "samplesNs": [
+        13889,
+        12325,
+        13826,
+        12599,
+        12580
+      ],
+      "medianNs": 12599,
+      "minNs": 12325,
+      "maxNs": 13889,
+      "relativeRange": 0.12413683625684578,
+      "relativeMad": 0.021747757758552266
     },
     {
       "kind": "micro",
       "group": "字符串",
       "name": "split.size（3000 行）",
       "samplesNs": [
-        87483,
-        91816,
-        90601,
-        91382,
-        95823
+        91361,
+        84496,
+        87064,
+        84016,
+        83446
       ],
-      "medianNs": 91382,
-      "minNs": 87483,
-      "maxNs": 95823,
-      "relativeRange": 0.09126523823072377,
-      "relativeMad": 0.008546540894268017
+      "medianNs": 84496,
+      "minNs": 83446,
+      "maxNs": 91361,
+      "relativeRange": 0.09367307328157545,
+      "relativeMad": 0.012426623745502746
     },
     {
       "kind": "micro",
       "group": "字符串",
       "name": "手写字节扫描计行",
       "samplesNs": [
-        372530,
-        371337,
-        388814,
-        370586,
-        389876
+        206543,
+        207063,
+        211199,
+        211013,
+        197931
       ],
-      "medianNs": 372530,
-      "minNs": 370586,
-      "maxNs": 389876,
-      "relativeRange": 0.05178106461224599,
-      "relativeMad": 0.005218371674764449
+      "medianNs": 207063,
+      "minNs": 197931,
+      "maxNs": 211199,
+      "relativeRange": 0.06407711662634077,
+      "relativeMad": 0.019076319767413783
     },
     {
       "kind": "micro",
       "group": "字符串",
       "name": "插值构键",
       "samplesNs": [
-        258,
-        276,
-        273,
-        259,
-        247
+        238,
+        224,
+        218,
+        222,
+        220
       ],
-      "medianNs": 259,
-      "minNs": 247,
-      "maxNs": 276,
-      "relativeRange": 0.11196911196911197,
-      "relativeMad": 0.04633204633204633
+      "medianNs": 222,
+      "minNs": 218,
+      "maxNs": 238,
+      "relativeRange": 0.09009009009009009,
+      "relativeMad": 0.009009009009009009
     },
     {
       "kind": "micro",
       "group": "派生状态",
-      "name": "缓存命中读取",
+      "name": "1 源缓存命中读取",
       "samplesNs": [
-        308,
-        274,
-        305,
-        277,
-        299
+        325,
+        319,
+        331,
+        313,
+        314
       ],
-      "medianNs": 299,
-      "minNs": 274,
-      "maxNs": 308,
-      "relativeRange": 0.11371237458193979,
-      "relativeMad": 0.030100334448160536
+      "medianNs": 319,
+      "minNs": 313,
+      "maxNs": 331,
+      "relativeRange": 0.05642633228840126,
+      "relativeMad": 0.018808777429467086
+    },
+    {
+      "kind": "micro",
+      "group": "派生状态",
+      "name": "256 源缓存命中读取",
+      "samplesNs": [
+        317,
+        321,
+        317,
+        329,
+        333
+      ],
+      "medianNs": 321,
+      "minNs": 317,
+      "maxNs": 333,
+      "relativeRange": 0.04984423676012461,
+      "relativeMad": 0.012461059190031152
     },
     {
       "kind": "micro",
       "group": "派生状态",
       "name": "每次失效重算",
       "samplesNs": [
-        1051,
-        983,
-        1069,
-        1058,
-        1045
+        1228,
+        1205,
+        1231,
+        1226,
+        1211
       ],
-      "medianNs": 1051,
-      "minNs": 983,
-      "maxNs": 1069,
-      "relativeRange": 0.0818268315889629,
-      "relativeMad": 0.006660323501427212
+      "medianNs": 1226,
+      "minNs": 1205,
+      "maxNs": 1231,
+      "relativeRange": 0.021207177814029365,
+      "relativeMad": 0.004078303425774877
+    },
+    {
+      "kind": "micro",
+      "group": "异构派生积",
+      "name": "4 异构源嵌套 workaround 稳定读取",
+      "samplesNs": [
+        347,
+        361,
+        327,
+        336,
+        338
+      ],
+      "medianNs": 338,
+      "minNs": 327,
+      "maxNs": 361,
+      "relativeRange": 0.10059171597633136,
+      "relativeMad": 0.026627218934911243
+    },
+    {
+      "kind": "micro",
+      "group": "异构派生积",
+      "name": "4 异构源融合稳定读取",
+      "samplesNs": [
+        337,
+        334,
+        334,
+        336,
+        320
+      ],
+      "medianNs": 334,
+      "minNs": 320,
+      "maxNs": 337,
+      "relativeRange": 0.05089820359281437,
+      "relativeMad": 0.005988023952095809
+    },
+    {
+      "kind": "micro",
+      "group": "异构派生积",
+      "name": "4 异构源嵌套 workaround 失效",
+      "samplesNs": [
+        3229,
+        3268,
+        3399,
+        3210,
+        3357
+      ],
+      "medianNs": 3268,
+      "minNs": 3210,
+      "maxNs": 3399,
+      "relativeRange": 0.057833537331701344,
+      "relativeMad": 0.017747858017135864
+    },
+    {
+      "kind": "micro",
+      "group": "异构派生积",
+      "name": "4 异构源融合失效",
+      "samplesNs": [
+        2427,
+        2459,
+        2624,
+        2464,
+        2424
+      ],
+      "medianNs": 2459,
+      "minNs": 2424,
+      "maxNs": 2624,
+      "relativeRange": 0.08133387555917039,
+      "relativeMad": 0.013013420089467263
+    },
+    {
+      "kind": "micro",
+      "group": "派生结果商融合",
+      "name": "4 源 layered distinct 稳定读取",
+      "samplesNs": [
+        343,
+        348,
+        329,
+        346,
+        326
+      ],
+      "medianNs": 343,
+      "minNs": 326,
+      "maxNs": 348,
+      "relativeRange": 0.0641399416909621,
+      "relativeMad": 0.014577259475218658
+    },
+    {
+      "kind": "micro",
+      "group": "派生结果商融合",
+      "name": "4 源融合 policy 稳定读取",
+      "samplesNs": [
+        342,
+        350,
+        319,
+        341,
+        318
+      ],
+      "medianNs": 341,
+      "minNs": 318,
+      "maxNs": 350,
+      "relativeRange": 0.093841642228739,
+      "relativeMad": 0.026392961876832845
+    },
+    {
+      "kind": "micro",
+      "group": "派生结果商融合",
+      "name": "4 源 layered distinct 等价失效",
+      "samplesNs": [
+        3345,
+        3495,
+        3335,
+        3547,
+        3431
+      ],
+      "medianNs": 3431,
+      "minNs": 3335,
+      "maxNs": 3547,
+      "relativeRange": 0.061789565724278635,
+      "relativeMad": 0.025065578548528127
+    },
+    {
+      "kind": "micro",
+      "group": "派生结果商融合",
+      "name": "4 源融合 policy 等价失效",
+      "samplesNs": [
+        2601,
+        2474,
+        2561,
+        2515,
+        2498
+      ],
+      "medianNs": 2515,
+      "minNs": 2474,
+      "maxNs": 2601,
+      "relativeRange": 0.05049701789264414,
+      "relativeMad": 0.016302186878727636
+    },
+    {
+      "kind": "micro",
+      "group": "Binding 组合",
+      "name": "1 层 Binding 写入",
+      "samplesNs": [
+        924,
+        861,
+        846,
+        888,
+        860
+      ],
+      "medianNs": 861,
+      "minNs": 846,
+      "maxNs": 924,
+      "relativeRange": 0.09059233449477352,
+      "relativeMad": 0.017421602787456445
+    },
+    {
+      "kind": "micro",
+      "group": "Binding 组合",
+      "name": "1 层朴素 Lens Binding 写入",
+      "samplesNs": [
+        872,
+        937,
+        938,
+        913,
+        928
+      ],
+      "medianNs": 928,
+      "minNs": 872,
+      "maxNs": 938,
+      "relativeRange": 0.07112068965517242,
+      "relativeMad": 0.010775862068965518
+    },
+    {
+      "kind": "micro",
+      "group": "Binding 组合",
+      "name": "1 层 Lens 融合 Binding 写入",
+      "samplesNs": [
+        1204,
+        1325,
+        911,
+        1462,
+        1150
+      ],
+      "medianNs": 1204,
+      "minNs": 911,
+      "maxNs": 1462,
+      "relativeRange": 0.457641196013289,
+      "relativeMad": 0.1004983388704319
+    },
+    {
+      "kind": "micro",
+      "group": "Binding 组合",
+      "name": "8 层 Binding 写入",
+      "samplesNs": [
+        3042,
+        2634,
+        1940,
+        3230,
+        3257
+      ],
+      "medianNs": 3042,
+      "minNs": 1940,
+      "maxNs": 3257,
+      "relativeRange": 0.4329388560157791,
+      "relativeMad": 0.07067718606180144
+    },
+    {
+      "kind": "micro",
+      "group": "Binding 组合",
+      "name": "8 层朴素 Lens Binding 写入",
+      "samplesNs": [
+        3399,
+        3846,
+        2445,
+        3918,
+        3836
+      ],
+      "medianNs": 3836,
+      "minNs": 2445,
+      "maxNs": 3918,
+      "relativeRange": 0.3839937434827946,
+      "relativeMad": 0.02137643378519291
+    },
+    {
+      "kind": "micro",
+      "group": "Binding 组合",
+      "name": "8 层 Lens 融合 Binding 写入",
+      "samplesNs": [
+        2800,
+        2580,
+        1697,
+        2904,
+        2297
+      ],
+      "medianNs": 2580,
+      "minNs": 1697,
+      "maxNs": 2904,
+      "relativeRange": 0.46782945736434106,
+      "relativeMad": 0.10968992248062015
+    },
+    {
+      "kind": "micro",
+      "group": "Binding 组合",
+      "name": "32 层 Binding 写入",
+      "samplesNs": [
+        8546,
+        9922,
+        5101,
+        9913,
+        8859
+      ],
+      "medianNs": 8859,
+      "minNs": 5101,
+      "maxNs": 9922,
+      "relativeRange": 0.5441923467660007,
+      "relativeMad": 0.11897505361778982
+    },
+    {
+      "kind": "micro",
+      "group": "Binding 组合",
+      "name": "32 层朴素 Lens Binding 写入",
+      "samplesNs": [
+        34738,
+        33462,
+        24804,
+        35154,
+        34022
+      ],
+      "medianNs": 34022,
+      "minNs": 24804,
+      "maxNs": 35154,
+      "relativeRange": 0.3042149197578038,
+      "relativeMad": 0.02104520604314855
+    },
+    {
+      "kind": "micro",
+      "group": "Binding 组合",
+      "name": "32 层 Lens 融合 Binding 写入",
+      "samplesNs": [
+        8034,
+        6126,
+        4705,
+        5260,
+        6590
+      ],
+      "medianNs": 6126,
+      "minNs": 4705,
+      "maxNs": 8034,
+      "relativeRange": 0.5434214822069866,
+      "relativeMad": 0.14136467515507672
+    },
+    {
+      "kind": "micro",
+      "group": "Binding 组合",
+      "name": "1 层 Binding update",
+      "samplesNs": [
+        1022,
+        1159,
+        696,
+        699,
+        1047
+      ],
+      "medianNs": 1022,
+      "minNs": 696,
+      "maxNs": 1159,
+      "relativeRange": 0.45303326810176126,
+      "relativeMad": 0.13405088062622308
+    },
+    {
+      "kind": "micro",
+      "group": "Binding 组合",
+      "name": "1 层朴素 Lens Binding update",
+      "samplesNs": [
+        876,
+        1204,
+        778,
+        1187,
+        1046
+      ],
+      "medianNs": 1046,
+      "minNs": 778,
+      "maxNs": 1204,
+      "relativeRange": 0.4072657743785851,
+      "relativeMad": 0.15105162523900573
+    },
+    {
+      "kind": "micro",
+      "group": "Binding 组合",
+      "name": "1 层 Lens 融合 Binding update",
+      "samplesNs": [
+        895,
+        1276,
+        710,
+        1034,
+        1277
+      ],
+      "medianNs": 1034,
+      "minNs": 710,
+      "maxNs": 1277,
+      "relativeRange": 0.5483558994197292,
+      "relativeMad": 0.23404255319148937
+    },
+    {
+      "kind": "micro",
+      "group": "Binding 组合",
+      "name": "8 层 Binding update",
+      "samplesNs": [
+        2014,
+        2177,
+        1277,
+        2420,
+        2060
+      ],
+      "medianNs": 2060,
+      "minNs": 1277,
+      "maxNs": 2420,
+      "relativeRange": 0.5548543689320389,
+      "relativeMad": 0.05679611650485437
+    },
+    {
+      "kind": "micro",
+      "group": "Binding 组合",
+      "name": "8 层朴素 Lens Binding update",
+      "samplesNs": [
+        3225,
+        3460,
+        2128,
+        3030,
+        2919
+      ],
+      "medianNs": 3030,
+      "minNs": 2128,
+      "maxNs": 3460,
+      "relativeRange": 0.4396039603960396,
+      "relativeMad": 0.06435643564356436
+    },
+    {
+      "kind": "micro",
+      "group": "Binding 组合",
+      "name": "8 层 Lens 融合 Binding update",
+      "samplesNs": [
+        1806,
+        1871,
+        1431,
+        2311,
+        2470
+      ],
+      "medianNs": 1871,
+      "minNs": 1431,
+      "maxNs": 2470,
+      "relativeRange": 0.555318011758418,
+      "relativeMad": 0.23516835916622128
+    },
+    {
+      "kind": "micro",
+      "group": "Binding 组合",
+      "name": "32 层 Binding update",
+      "samplesNs": [
+        7031,
+        5709,
+        3364,
+        4973,
+        5883
+      ],
+      "medianNs": 5709,
+      "minNs": 3364,
+      "maxNs": 7031,
+      "relativeRange": 0.6423191452093187,
+      "relativeMad": 0.12891925030653353
+    },
+    {
+      "kind": "micro",
+      "group": "Binding 组合",
+      "name": "32 层朴素 Lens Binding update",
+      "samplesNs": [
+        32934,
+        36389,
+        24438,
+        33359,
+        30291
+      ],
+      "medianNs": 32934,
+      "minNs": 24438,
+      "maxNs": 36389,
+      "relativeRange": 0.36287726969089695,
+      "relativeMad": 0.08025141191473857
+    },
+    {
+      "kind": "micro",
+      "group": "Binding 组合",
+      "name": "32 层 Lens 融合 Binding update",
+      "samplesNs": [
+        5261,
+        4153,
+        3621,
+        5806,
+        9607
+      ],
+      "medianNs": 5261,
+      "minNs": 3621,
+      "maxNs": 9607,
+      "relativeRange": 1.1378065006652727,
+      "relativeMad": 0.2106063486029272
+    },
+    {
+      "kind": "micro",
+      "group": "Lens pullback",
+      "name": "1 层朴素 Lens Reducer pullback",
+      "samplesNs": [
+        337,
+        353,
+        206,
+        285,
+        392
+      ],
+      "medianNs": 337,
+      "minNs": 206,
+      "maxNs": 392,
+      "relativeRange": 0.5519287833827893,
+      "relativeMad": 0.1543026706231454
+    },
+    {
+      "kind": "micro",
+      "group": "Lens pullback",
+      "name": "1 层 Lens 融合 Reducer pullback",
+      "samplesNs": [
+        325,
+        174,
+        344,
+        385,
+        360
+      ],
+      "medianNs": 344,
+      "minNs": 174,
+      "maxNs": 385,
+      "relativeRange": 0.6133720930232558,
+      "relativeMad": 0.055232558139534885
+    },
+    {
+      "kind": "micro",
+      "group": "Lens pullback",
+      "name": "8 层朴素 Lens Reducer pullback",
+      "samplesNs": [
+        3036,
+        2606,
+        1779,
+        1895,
+        2500
+      ],
+      "medianNs": 2500,
+      "minNs": 1779,
+      "maxNs": 3036,
+      "relativeRange": 0.5028,
+      "relativeMad": 0.2144
+    },
+    {
+      "kind": "micro",
+      "group": "Lens pullback",
+      "name": "8 层 Lens 融合 Reducer pullback",
+      "samplesNs": [
+        1240,
+        1329,
+        1106,
+        2169,
+        1497
+      ],
+      "medianNs": 1329,
+      "minNs": 1106,
+      "maxNs": 2169,
+      "relativeRange": 0.799849510910459,
+      "relativeMad": 0.12641083521444696
+    },
+    {
+      "kind": "micro",
+      "group": "Lens pullback",
+      "name": "32 层朴素 Lens Reducer pullback",
+      "samplesNs": [
+        32086,
+        30247,
+        23591,
+        34587,
+        32488
+      ],
+      "medianNs": 32086,
+      "minNs": 23591,
+      "maxNs": 34587,
+      "relativeRange": 0.34270398304556504,
+      "relativeMad": 0.05731471669887178
+    },
+    {
+      "kind": "micro",
+      "group": "Lens pullback",
+      "name": "32 层 Lens 融合 Reducer pullback",
+      "samplesNs": [
+        6966,
+        5924,
+        4649,
+        8044,
+        7692
+      ],
+      "medianNs": 6966,
+      "minNs": 4649,
+      "maxNs": 8044,
+      "relativeRange": 0.4873672121734137,
+      "relativeMad": 0.14958369221935114
     },
     {
       "kind": "micro",
       "group": "惰性视口",
       "name": "100000 行单点高度更新+帧",
       "samplesNs": [
-        216419,
-        155589,
-        155279,
-        155066,
-        160174
+        35306,
+        32860,
+        35043,
+        32154,
+        32151
       ],
-      "medianNs": 155589,
-      "minNs": 155066,
-      "maxNs": 216419,
-      "relativeRange": 0.3943273624742109,
-      "relativeMad": 0.003361420151810218
+      "medianNs": 32860,
+      "minNs": 32151,
+      "maxNs": 35306,
+      "relativeRange": 0.09601339013998783,
+      "relativeMad": 0.021576384662203286
+    },
+    {
+      "kind": "micro",
+      "group": "LazyColumn 滚动构建",
+      "name": "增量物化 build",
+      "samplesNs": [
+        17456,
+        18102,
+        20121,
+        18275,
+        19979
+      ],
+      "medianNs": 18275,
+      "minNs": 17456,
+      "maxNs": 20121,
+      "relativeRange": 0.14582763337893298,
+      "relativeMad": 0.04481532147742818
+    },
+    {
+      "kind": "micro",
+      "group": "LazyColumn 滚动构建",
+      "name": "强制全量 build",
+      "samplesNs": [
+        149349,
+        146982,
+        148010,
+        145598,
+        146368
+      ],
+      "medianNs": 146982,
+      "minNs": 145598,
+      "maxNs": 149349,
+      "relativeRange": 0.02552013171680886,
+      "relativeMad": 0.006994053693649562
+    },
+    {
+      "kind": "micro",
+      "group": "自动组合构建",
+      "name": "240 分支 / 单分支变更 build",
+      "samplesNs": [
+        139627,
+        137800,
+        144527,
+        137717,
+        144899
+      ],
+      "medianNs": 139627,
+      "minNs": 137717,
+      "maxNs": 144899,
+      "relativeRange": 0.0514370429787935,
+      "relativeMad": 0.013679302713658532
+    },
+    {
+      "kind": "micro",
+      "group": "自动组合构建",
+      "name": "240 分支 / 强制全重建 build",
+      "samplesNs": [
+        462406,
+        482758,
+        500702,
+        443065,
+        436299
+      ],
+      "medianNs": 462406,
+      "minNs": 436299,
+      "maxNs": 500702,
+      "relativeRange": 0.13927803704969227,
+      "relativeMad": 0.04401326972400877
+    },
+    {
+      "kind": "micro",
+      "group": "状态等价策略",
+      "name": "默认等值写入",
+      "samplesNs": [
+        387,
+        387,
+        387,
+        390,
+        420
+      ],
+      "medianNs": 387,
+      "minNs": 387,
+      "maxNs": 420,
+      "relativeRange": 0.08527131782945736,
+      "relativeMad": 0.0
+    },
+    {
+      "kind": "micro",
+      "group": "状态等价策略",
+      "name": "结构等值写入抑制",
+      "samplesNs": [
+        310,
+        313,
+        323,
+        331,
+        337
+      ],
+      "medianNs": 323,
+      "minNs": 310,
+      "maxNs": 337,
+      "relativeRange": 0.08359133126934984,
+      "relativeMad": 0.030959752321981424
+    },
+    {
+      "kind": "micro",
+      "group": "状态等价策略",
+      "name": "闭包等值写入抑制",
+      "samplesNs": [
+        312,
+        313,
+        302,
+        303,
+        322
+      ],
+      "medianNs": 312,
+      "minNs": 302,
+      "maxNs": 322,
+      "relativeRange": 0.0641025641025641,
+      "relativeMad": 0.028846153846153848
+    },
+    {
+      "kind": "micro",
+      "group": "状态事务等价",
+      "name": "默认净零事务",
+      "samplesNs": [
+        820,
+        779,
+        795,
+        815,
+        827
+      ],
+      "medianNs": 815,
+      "minNs": 779,
+      "maxNs": 827,
+      "relativeRange": 0.05889570552147239,
+      "relativeMad": 0.014723926380368098
+    },
+    {
+      "kind": "micro",
+      "group": "状态事务等价",
+      "name": "结构策略净零事务",
+      "samplesNs": [
+        805,
+        789,
+        787,
+        786,
+        811
+      ],
+      "medianNs": 789,
+      "minNs": 786,
+      "maxNs": 811,
+      "relativeRange": 0.031685678073510776,
+      "relativeMad": 0.0038022813688212928
+    },
+    {
+      "kind": "micro",
+      "group": "状态事务等价",
+      "name": "默认净变化事务",
+      "samplesNs": [
+        856,
+        858,
+        857,
+        833,
+        878
+      ],
+      "medianNs": 857,
+      "minNs": 833,
+      "maxNs": 878,
+      "relativeRange": 0.052508751458576426,
+      "relativeMad": 0.0011668611435239206
+    },
+    {
+      "kind": "micro",
+      "group": "状态事务等价",
+      "name": "结构策略净变化事务",
+      "samplesNs": [
+        876,
+        906,
+        885,
+        904,
+        929
+      ],
+      "medianNs": 904,
+      "minNs": 876,
+      "maxNs": 929,
+      "relativeRange": 0.0586283185840708,
+      "relativeMad": 0.02101769911504425
+    },
+    {
+      "kind": "micro",
+      "group": "状态事务等价",
+      "name": "默认单写事务",
+      "samplesNs": [
+        643,
+        633,
+        622,
+        623,
+        656
+      ],
+      "medianNs": 633,
+      "minNs": 622,
+      "maxNs": 656,
+      "relativeRange": 0.053712480252764615,
+      "relativeMad": 0.01579778830963665
+    },
+    {
+      "kind": "micro",
+      "group": "状态事务等价",
+      "name": "结构策略单写事务",
+      "samplesNs": [
+        656,
+        644,
+        625,
+        645,
+        660
+      ],
+      "medianNs": 645,
+      "minNs": 625,
+      "maxNs": 660,
+      "relativeRange": 0.05426356589147287,
+      "relativeMad": 0.017054263565891473
+    },
+    {
+      "kind": "micro",
+      "group": "状态事务异常",
+      "name": "首源失败后排空 64 State",
+      "samplesNs": [
+        29920,
+        30334,
+        29468,
+        30398,
+        32434
+      ],
+      "medianNs": 30334,
+      "minNs": 29468,
+      "maxNs": 32434,
+      "relativeRange": 0.09777807081163051,
+      "relativeMad": 0.013648051691171623
+    },
+    {
+      "kind": "micro",
+      "group": "派生观察事务",
+      "name": "1 个派生观察者",
+      "samplesNs": [
+        1252,
+        1275,
+        1275,
+        1261,
+        1305
+      ],
+      "medianNs": 1275,
+      "minNs": 1252,
+      "maxNs": 1305,
+      "relativeRange": 0.04156862745098039,
+      "relativeMad": 0.010980392156862745
+    },
+    {
+      "kind": "micro",
+      "group": "派生观察事务",
+      "name": "32 个派生观察者",
+      "samplesNs": [
+        19489,
+        19455,
+        19646,
+        19449,
+        19983
+      ],
+      "medianNs": 19489,
+      "minNs": 19449,
+      "maxNs": 19983,
+      "relativeRange": 0.027400071835394325,
+      "relativeMad": 0.002052439837857253
+    },
+    {
+      "kind": "micro",
+      "group": "状态观察者",
+      "name": "单 State 1 个观察者直接通知",
+      "samplesNs": [
+        777,
+        754,
+        738,
+        753,
+        681
+      ],
+      "medianNs": 753,
+      "minNs": 681,
+      "maxNs": 777,
+      "relativeRange": 0.12749003984063745,
+      "relativeMad": 0.0199203187250996
+    },
+    {
+      "kind": "micro",
+      "group": "状态观察者",
+      "name": "单 State 256 个观察者直接通知",
+      "samplesNs": [
+        4420,
+        3560,
+        6216,
+        5458,
+        3107
+      ],
+      "medianNs": 4420,
+      "minNs": 3107,
+      "maxNs": 6216,
+      "relativeRange": 0.7033936651583711,
+      "relativeMad": 0.23484162895927602
     },
     {
       "kind": "micro",
       "group": "状态调度",
       "name": "32 次写入事务合并",
       "samplesNs": [
-        41347,
-        42869,
-        43305,
-        41019,
-        46860
+        6892,
+        9319,
+        9016,
+        10655,
+        6430
       ],
-      "medianNs": 42869,
-      "minNs": 41019,
-      "maxNs": 46860,
-      "relativeRange": 0.13625230352935688,
-      "relativeMad": 0.03550351069537428
+      "medianNs": 9016,
+      "minNs": 6430,
+      "maxNs": 10655,
+      "relativeRange": 0.46861135758651284,
+      "relativeMad": 0.18178793256433007
     },
     {
       "kind": "micro",
       "group": "状态调度",
       "name": "256 次写入事务合并",
       "samplesNs": [
-        349586,
-        318135,
-        340839,
-        331645,
-        330822
+        69953,
+        54120,
+        70459,
+        58059,
+        48829
       ],
-      "medianNs": 331645,
-      "minNs": 318135,
-      "maxNs": 349586,
-      "relativeRange": 0.09483333082060637,
-      "relativeMad": 0.027722414027046994
+      "medianNs": 58059,
+      "minNs": 48829,
+      "maxNs": 70459,
+      "relativeRange": 0.37255205911228234,
+      "relativeMad": 0.158976213851427
+    },
+    {
+      "kind": "micro",
+      "group": "状态调度",
+      "name": "单 State 32 次写入合并为 1 次通知",
+      "samplesNs": [
+        10949,
+        10970,
+        11275,
+        10119,
+        7224
+      ],
+      "medianNs": 10949,
+      "minNs": 7224,
+      "maxNs": 11275,
+      "relativeRange": 0.369988126769568,
+      "relativeMad": 0.029774408621791943
+    },
+    {
+      "kind": "micro",
+      "group": "单作用域 State 扩展性",
+      "name": "1000 State 局部写/失效",
+      "samplesNs": [
+        983,
+        916,
+        1166,
+        1066,
+        1858
+      ],
+      "medianNs": 1066,
+      "minNs": 916,
+      "maxNs": 1858,
+      "relativeRange": 0.8836772983114447,
+      "relativeMad": 0.09380863039399624
+    },
+    {
+      "kind": "micro",
+      "group": "单作用域 State 扩展性",
+      "name": "1000 State 依赖重建 build",
+      "samplesNs": [
+        80850,
+        83591,
+        96950,
+        92891,
+        116825
+      ],
+      "medianNs": 92891,
+      "minNs": 80850,
+      "maxNs": 116825,
+      "relativeRange": 0.38728186799582304,
+      "relativeMad": 0.10011734183074787
+    },
+    {
+      "kind": "micro",
+      "group": "单作用域 State 扩展性",
+      "name": "1000 State 稳定 layout",
+      "samplesNs": [
+        1475,
+        1591,
+        2008,
+        1741,
+        3425
+      ],
+      "medianNs": 1741,
+      "minNs": 1475,
+      "maxNs": 3425,
+      "relativeRange": 1.1200459506031017,
+      "relativeMad": 0.15278575531303848
+    },
+    {
+      "kind": "micro",
+      "group": "单作用域 State 扩展性",
+      "name": "1000 State 无依赖收集读取",
+      "samplesNs": [
+        25325,
+        26000,
+        26716,
+        28383,
+        32975
+      ],
+      "medianNs": 26716,
+      "minNs": 25325,
+      "maxNs": 32975,
+      "relativeRange": 0.28634526126665666,
+      "relativeMad": 0.05206617757149274
+    },
+    {
+      "kind": "micro",
+      "group": "单作用域 State 扩展性",
+      "name": "10000 State 局部写/失效",
+      "samplesNs": [
+        1535,
+        1211,
+        1298,
+        1428,
+        1973
+      ],
+      "medianNs": 1428,
+      "minNs": 1211,
+      "maxNs": 1973,
+      "relativeRange": 0.5336134453781513,
+      "relativeMad": 0.09103641456582633
+    },
+    {
+      "kind": "micro",
+      "group": "单作用域 State 扩展性",
+      "name": "10000 State 依赖重建 build",
+      "samplesNs": [
+        870085,
+        856054,
+        888905,
+        849104,
+        891692
+      ],
+      "medianNs": 870085,
+      "minNs": 849104,
+      "maxNs": 891692,
+      "relativeRange": 0.04894694196544016,
+      "relativeMad": 0.021630070625283736
+    },
+    {
+      "kind": "micro",
+      "group": "单作用域 State 扩展性",
+      "name": "10000 State 稳定 layout",
+      "samplesNs": [
+        2653,
+        2477,
+        2596,
+        3109,
+        3257
+      ],
+      "medianNs": 2653,
+      "minNs": 2477,
+      "maxNs": 3257,
+      "relativeRange": 0.2940067847719563,
+      "relativeMad": 0.06633999246136449
+    },
+    {
+      "kind": "micro",
+      "group": "单作用域 State 扩展性",
+      "name": "10000 State 无依赖收集读取",
+      "samplesNs": [
+        261273,
+        259960,
+        259510,
+        281635,
+        253702
+      ],
+      "medianNs": 259960,
+      "minNs": 253702,
+      "maxNs": 281635,
+      "relativeRange": 0.10745114633020465,
+      "relativeMad": 0.005050777042621942
+    },
+    {
+      "kind": "micro",
+      "group": "单阶段 State 扩展性",
+      "name": "1000 State 稳定节点 phase 写/失效",
+      "samplesNs": [
+        858,
+        933,
+        1233,
+        1175,
+        891
+      ],
+      "medianNs": 933,
+      "minNs": 858,
+      "maxNs": 1233,
+      "relativeRange": 0.40192926045016075,
+      "relativeMad": 0.08038585209003216
+    },
+    {
+      "kind": "micro",
+      "group": "单阶段 State 扩展性",
+      "name": "1000 State 稳定节点 phase build",
+      "samplesNs": [
+        808,
+        950,
+        1175,
+        1175,
+        841
+      ],
+      "medianNs": 950,
+      "minNs": 808,
+      "maxNs": 1175,
+      "relativeRange": 0.3863157894736842,
+      "relativeMad": 0.14947368421052631
+    },
+    {
+      "kind": "micro",
+      "group": "单阶段 State 扩展性",
+      "name": "1000 State 稳定节点 measure/layout",
+      "samplesNs": [
+        82116,
+        78450,
+        88150,
+        86641,
+        79391
+      ],
+      "medianNs": 82116,
+      "minNs": 78450,
+      "maxNs": 88150,
+      "relativeRange": 0.11812557844999756,
+      "relativeMad": 0.04464416191728774
+    },
+    {
+      "kind": "micro",
+      "group": "单阶段 State 扩展性",
+      "name": "10000 State 稳定节点 phase 写/失效",
+      "samplesNs": [
+        1821,
+        1424,
+        1611,
+        1470,
+        2028
+      ],
+      "medianNs": 1611,
+      "minNs": 1424,
+      "maxNs": 2028,
+      "relativeRange": 0.3749224084419615,
+      "relativeMad": 0.11607697082557418
+    },
+    {
+      "kind": "micro",
+      "group": "单阶段 State 扩展性",
+      "name": "10000 State 稳定节点 phase build",
+      "samplesNs": [
+        2062,
+        1783,
+        2532,
+        1976,
+        3158
+      ],
+      "medianNs": 2062,
+      "minNs": 1783,
+      "maxNs": 3158,
+      "relativeRange": 0.6668283220174588,
+      "relativeMad": 0.13530552861299708
+    },
+    {
+      "kind": "micro",
+      "group": "单阶段 State 扩展性",
+      "name": "10000 State 稳定节点 measure/layout",
+      "samplesNs": [
+        864597,
+        848113,
+        883055,
+        874025,
+        900746
+      ],
+      "medianNs": 874025,
+      "minNs": 848113,
+      "maxNs": 900746,
+      "relativeRange": 0.06021910128428821,
+      "relativeMad": 0.010786876805583365
+    },
+    {
+      "kind": "micro",
+      "group": "单阶段 State 扩展性",
+      "name": "1000 State 替换节点 phase 写/失效",
+      "samplesNs": [
+        1533,
+        491,
+        483,
+        441,
+        466
+      ],
+      "medianNs": 483,
+      "minNs": 441,
+      "maxNs": 1533,
+      "relativeRange": 2.260869565217391,
+      "relativeMad": 0.035196687370600416
+    },
+    {
+      "kind": "micro",
+      "group": "单阶段 State 扩展性",
+      "name": "1000 State 替换节点 phase build",
+      "samplesNs": [
+        2625,
+        700,
+        808,
+        691,
+        650
+      ],
+      "medianNs": 700,
+      "minNs": 650,
+      "maxNs": 2625,
+      "relativeRange": 2.8214285714285716,
+      "relativeMad": 0.07142857142857142
+    },
+    {
+      "kind": "micro",
+      "group": "单阶段 State 扩展性",
+      "name": "1000 State 替换节点 measure/layout",
+      "samplesNs": [
+        161583,
+        76566,
+        75858,
+        74658,
+        73591
+      ],
+      "medianNs": 75858,
+      "minNs": 73591,
+      "maxNs": 161583,
+      "relativeRange": 1.159956761317198,
+      "relativeMad": 0.01581903029344301
+    },
+    {
+      "kind": "micro",
+      "group": "单阶段 State 扩展性",
+      "name": "10000 State 替换节点 phase 写/失效",
+      "samplesNs": [
+        1349,
+        1435,
+        1932,
+        1077,
+        1682
+      ],
+      "medianNs": 1435,
+      "minNs": 1077,
+      "maxNs": 1932,
+      "relativeRange": 0.5958188153310104,
+      "relativeMad": 0.17212543554006968
+    },
+    {
+      "kind": "micro",
+      "group": "单阶段 State 扩展性",
+      "name": "10000 State 替换节点 phase build",
+      "samplesNs": [
+        2192,
+        2328,
+        2286,
+        1683,
+        3011
+      ],
+      "medianNs": 2286,
+      "minNs": 1683,
+      "maxNs": 3011,
+      "relativeRange": 0.5809273840769904,
+      "relativeMad": 0.04111986001749781
+    },
+    {
+      "kind": "micro",
+      "group": "单阶段 State 扩展性",
+      "name": "10000 State 替换节点 measure/layout",
+      "samplesNs": [
+        863614,
+        893900,
+        870969,
+        810655,
+        883278
+      ],
+      "medianNs": 870969,
+      "minNs": 810655,
+      "maxNs": 893900,
+      "relativeRange": 0.09557745453626937,
+      "relativeMad": 0.014132535141893684
+    },
+    {
+      "kind": "micro",
+      "group": "焦点扩展性",
+      "name": "1000 focusable focusNext",
+      "samplesNs": [
+        32,
+        29,
+        42,
+        29,
+        33
+      ],
+      "medianNs": 32,
+      "minNs": 29,
+      "maxNs": 42,
+      "relativeRange": 0.40625,
+      "relativeMad": 0.09375
+    },
+    {
+      "kind": "micro",
+      "group": "焦点扩展性",
+      "name": "1000 focusable 稳定 build",
+      "samplesNs": [
+        4121,
+        3678,
+        3933,
+        4543,
+        4451
+      ],
+      "medianNs": 4121,
+      "minNs": 3678,
+      "maxNs": 4543,
+      "relativeRange": 0.20990050958505216,
+      "relativeMad": 0.08007765105556904
+    },
+    {
+      "kind": "micro",
+      "group": "焦点扩展性",
+      "name": "1000 空节点稳定 build",
+      "samplesNs": [
+        710,
+        750,
+        610,
+        713,
+        855
+      ],
+      "medianNs": 713,
+      "minNs": 610,
+      "maxNs": 855,
+      "relativeRange": 0.3436185133239832,
+      "relativeMad": 0.051893408134642355
+    },
+    {
+      "kind": "micro",
+      "group": "焦点扩展性",
+      "name": "1000 focusable 稳定 focus/layout",
+      "samplesNs": [
+        507,
+        469,
+        494,
+        557,
+        662
+      ],
+      "medianNs": 507,
+      "minNs": 469,
+      "maxNs": 662,
+      "relativeRange": 0.3806706114398422,
+      "relativeMad": 0.07495069033530571
+    },
+    {
+      "kind": "micro",
+      "group": "焦点扩展性",
+      "name": "1000 空节点稳定 focus/layout",
+      "samplesNs": [
+        438,
+        432,
+        391,
+        393,
+        603
+      ],
+      "medianNs": 432,
+      "minNs": 391,
+      "maxNs": 603,
+      "relativeRange": 0.49074074074074076,
+      "relativeMad": 0.09027777777777778
+    },
+    {
+      "kind": "micro",
+      "group": "焦点扩展性",
+      "name": "10000 focusable focusNext",
+      "samplesNs": [
+        31,
+        42,
+        33,
+        31,
+        30
+      ],
+      "medianNs": 31,
+      "minNs": 30,
+      "maxNs": 42,
+      "relativeRange": 0.3870967741935484,
+      "relativeMad": 0.03225806451612903
+    },
+    {
+      "kind": "micro",
+      "group": "焦点扩展性",
+      "name": "10000 focusable 稳定 build",
+      "samplesNs": [
+        27560,
+        27471,
+        27631,
+        26924,
+        29628
+      ],
+      "medianNs": 27560,
+      "minNs": 26924,
+      "maxNs": 29628,
+      "relativeRange": 0.09811320754716982,
+      "relativeMad": 0.0032293178519593613
+    },
+    {
+      "kind": "micro",
+      "group": "焦点扩展性",
+      "name": "10000 空节点稳定 build",
+      "samplesNs": [
+        755,
+        1113,
+        877,
+        962,
+        887
+      ],
+      "medianNs": 887,
+      "minNs": 755,
+      "maxNs": 1113,
+      "relativeRange": 0.4036076662908681,
+      "relativeMad": 0.08455467869222097
+    },
+    {
+      "kind": "micro",
+      "group": "焦点扩展性",
+      "name": "10000 focusable 稳定 focus/layout",
+      "samplesNs": [
+        635,
+        686,
+        685,
+        653,
+        757
+      ],
+      "medianNs": 685,
+      "minNs": 635,
+      "maxNs": 757,
+      "relativeRange": 0.1781021897810219,
+      "relativeMad": 0.04671532846715328
+    },
+    {
+      "kind": "micro",
+      "group": "焦点扩展性",
+      "name": "10000 空节点稳定 focus/layout",
+      "samplesNs": [
+        461,
+        557,
+        494,
+        547,
+        591
+      ],
+      "medianNs": 547,
+      "minNs": 461,
+      "maxNs": 591,
+      "relativeRange": 0.2376599634369287,
+      "relativeMad": 0.08043875685557587
+    },
+    {
+      "kind": "micro",
+      "group": "事件命中扩展性",
+      "name": "1000 节点 最上层命中",
+      "samplesNs": [
+        676,
+        283,
+        301,
+        428,
+        348
+      ],
+      "medianNs": 348,
+      "minNs": 283,
+      "maxNs": 676,
+      "relativeRange": 1.1293103448275863,
+      "relativeMad": 0.1867816091954023
+    },
+    {
+      "kind": "micro",
+      "group": "事件命中扩展性",
+      "name": "1000 节点 最深层命中",
+      "samplesNs": [
+        5949,
+        5941,
+        7532,
+        6865,
+        6593
+      ],
+      "medianNs": 6593,
+      "minNs": 5941,
+      "maxNs": 7532,
+      "relativeRange": 0.2413165478537843,
+      "relativeMad": 0.09767935689367511
+    },
+    {
+      "kind": "micro",
+      "group": "事件命中扩展性",
+      "name": "10000 节点 最上层命中",
+      "samplesNs": [
+        236,
+        334,
+        352,
+        274,
+        358
+      ],
+      "medianNs": 334,
+      "minNs": 236,
+      "maxNs": 358,
+      "relativeRange": 0.3652694610778443,
+      "relativeMad": 0.0718562874251497
+    },
+    {
+      "kind": "micro",
+      "group": "事件命中扩展性",
+      "name": "10000 节点 最深层命中",
+      "samplesNs": [
+        58730,
+        57488,
+        57846,
+        72018,
+        62040
+      ],
+      "medianNs": 58730,
+      "minNs": 57488,
+      "maxNs": 72018,
+      "relativeRange": 0.24740337136046314,
+      "relativeMad": 0.02114762472331006
+    },
+    {
+      "kind": "micro",
+      "group": "Overlay 扩展性",
+      "name": "1000 keyed 注册",
+      "samplesNs": [
+        53866,
+        57350,
+        52280,
+        55785,
+        46638
+      ],
+      "medianNs": 53866,
+      "minNs": 46638,
+      "maxNs": 57350,
+      "relativeRange": 0.19886384732484313,
+      "relativeMad": 0.03562544090892214
+    },
+    {
+      "kind": "micro",
+      "group": "Overlay 扩展性",
+      "name": "4000 keyed 注册",
+      "samplesNs": [
+        294207,
+        288430,
+        275665,
+        297067,
+        288935
+      ],
+      "medianNs": 288935,
+      "minNs": 275665,
+      "maxNs": 297067,
+      "relativeRange": 0.07407202311938671,
+      "relativeMad": 0.018246318376105353
+    },
+    {
+      "kind": "micro",
+      "group": "Overlay 扩展性",
+      "name": "1000 keyed 未处理事件",
+      "samplesNs": [
+        36883,
+        16336,
+        16850,
+        15833,
+        17126
+      ],
+      "medianNs": 16850,
+      "minNs": 15833,
+      "maxNs": 36883,
+      "relativeRange": 1.2492581602373887,
+      "relativeMad": 0.03050445103857567
+    },
+    {
+      "kind": "micro",
+      "group": "Overlay 扩展性",
+      "name": "4000 keyed 未处理事件",
+      "samplesNs": [
+        75576,
+        75984,
+        72928,
+        72493,
+        75904
+      ],
+      "medianNs": 75576,
+      "minNs": 72493,
+      "maxNs": 75984,
+      "relativeRange": 0.04619191277654282,
+      "relativeMad": 0.005398539218799619
+    },
+    {
+      "kind": "micro",
+      "group": "ModelStore",
+      "name": "直接 State.update",
+      "samplesNs": [
+        641,
+        639,
+        632,
+        637,
+        628
+      ],
+      "medianNs": 637,
+      "minNs": 628,
+      "maxNs": 641,
+      "relativeRange": 0.02040816326530612,
+      "relativeMad": 0.006279434850863423
+    },
+    {
+      "kind": "micro",
+      "group": "ModelStore",
+      "name": "单 action dispatch",
+      "samplesNs": [
+        680,
+        689,
+        675,
+        702,
+        677
+      ],
+      "medianNs": 680,
+      "minNs": 675,
+      "maxNs": 702,
+      "relativeRange": 0.039705882352941174,
+      "relativeMad": 0.007352941176470588
+    },
+    {
+      "kind": "micro",
+      "group": "ModelStore",
+      "name": "32 action 逐次 dispatch",
+      "samplesNs": [
+        7906,
+        7802,
+        7822,
+        8064,
+        7927
+      ],
+      "medianNs": 7906,
+      "minNs": 7802,
+      "maxNs": 8064,
+      "relativeRange": 0.033139387806729065,
+      "relativeMad": 0.010624841892233746
+    },
+    {
+      "kind": "micro",
+      "group": "ModelStore",
+      "name": "32 action 单次折叠",
+      "samplesNs": [
+        2916,
+        2731,
+        2830,
+        2864,
+        3188
+      ],
+      "medianNs": 2864,
+      "minNs": 2731,
+      "maxNs": 3188,
+      "relativeRange": 0.15956703910614525,
+      "relativeMad": 0.018156424581005588
+    },
+    {
+      "kind": "micro",
+      "group": "ScopedStore",
+      "name": "1 层 scope / 单 action",
+      "samplesNs": [
+        671,
+        682,
+        662,
+        675,
+        690
+      ],
+      "medianNs": 675,
+      "minNs": 662,
+      "maxNs": 690,
+      "relativeRange": 0.04148148148148148,
+      "relativeMad": 0.01037037037037037
+    },
+    {
+      "kind": "micro",
+      "group": "ScopedStore",
+      "name": "8 层 scope / 单 action",
+      "samplesNs": [
+        732,
+        734,
+        742,
+        720,
+        747
+      ],
+      "medianNs": 734,
+      "minNs": 720,
+      "maxNs": 747,
+      "relativeRange": 0.03678474114441417,
+      "relativeMad": 0.010899182561307902
+    },
+    {
+      "kind": "micro",
+      "group": "ScopedStore",
+      "name": "32 层 scope / 单 action",
+      "samplesNs": [
+        1025,
+        1002,
+        1119,
+        1027,
+        993
+      ],
+      "medianNs": 1025,
+      "minNs": 993,
+      "maxNs": 1119,
+      "relativeRange": 0.12292682926829268,
+      "relativeMad": 0.0224390243902439
+    },
+    {
+      "kind": "micro",
+      "group": "ScopedStore",
+      "name": "1 层 scope / 稳定局部读取",
+      "samplesNs": [
+        367,
+        361,
+        371,
+        365,
+        354
+      ],
+      "medianNs": 365,
+      "minNs": 354,
+      "maxNs": 371,
+      "relativeRange": 0.04657534246575343,
+      "relativeMad": 0.010958904109589041
+    },
+    {
+      "kind": "micro",
+      "group": "ScopedStore",
+      "name": "8 层 scope / 稳定局部读取",
+      "samplesNs": [
+        360,
+        362,
+        338,
+        343,
+        350
+      ],
+      "medianNs": 350,
+      "minNs": 338,
+      "maxNs": 362,
+      "relativeRange": 0.06857142857142857,
+      "relativeMad": 0.02857142857142857
+    },
+    {
+      "kind": "micro",
+      "group": "ScopedStore",
+      "name": "32 层 scope / 稳定局部读取",
+      "samplesNs": [
+        345,
+        349,
+        348,
+        350,
+        357
+      ],
+      "medianNs": 349,
+      "minNs": 345,
+      "maxNs": 357,
+      "relativeRange": 0.034383954154727794,
+      "relativeMad": 0.0028653295128939827
+    },
+    {
+      "kind": "micro",
+      "group": "ScopedStore",
+      "name": "1 层 scope / dispatch 后局部读取",
+      "samplesNs": [
+        1324,
+        1385,
+        1409,
+        1382,
+        1417
+      ],
+      "medianNs": 1385,
+      "minNs": 1324,
+      "maxNs": 1417,
+      "relativeRange": 0.06714801444043321,
+      "relativeMad": 0.017328519855595668
+    },
+    {
+      "kind": "micro",
+      "group": "ScopedStore",
+      "name": "8 层 scope / dispatch 后局部读取",
+      "samplesNs": [
+        1563,
+        1544,
+        1552,
+        1530,
+        1556
+      ],
+      "medianNs": 1552,
+      "minNs": 1530,
+      "maxNs": 1563,
+      "relativeRange": 0.021262886597938145,
+      "relativeMad": 0.005154639175257732
+    },
+    {
+      "kind": "micro",
+      "group": "ScopedStore",
+      "name": "32 层 scope / dispatch 后局部读取",
+      "samplesNs": [
+        2439,
+        2372,
+        2396,
+        2386,
+        2337
+      ],
+      "medianNs": 2386,
+      "minNs": 2337,
+      "maxNs": 2439,
+      "relativeRange": 0.04274937133277452,
+      "relativeMad": 0.00586756077116513
+    },
+    {
+      "kind": "micro",
+      "group": "ScopedStore selector",
+      "name": "layered 稳定读取",
+      "samplesNs": [
+        748,
+        762,
+        756,
+        752,
+        760
+      ],
+      "medianNs": 756,
+      "minNs": 748,
+      "maxNs": 762,
+      "relativeRange": 0.018518518518518517,
+      "relativeMad": 0.005291005291005291
+    },
+    {
+      "kind": "micro",
+      "group": "ScopedStore selector",
+      "name": "融合稳定读取",
+      "samplesNs": [
+        325,
+        320,
+        325,
+        324,
+        315
+      ],
+      "medianNs": 324,
+      "minNs": 315,
+      "maxNs": 325,
+      "relativeRange": 0.030864197530864196,
+      "relativeMad": 0.0030864197530864196
+    },
+    {
+      "kind": "micro",
+      "group": "ScopedStore selector",
+      "name": "layered dispatch 后读取",
+      "samplesNs": [
+        2235,
+        2238,
+        2291,
+        2262,
+        2229
+      ],
+      "medianNs": 2238,
+      "minNs": 2229,
+      "maxNs": 2291,
+      "relativeRange": 0.02770330652368186,
+      "relativeMad": 0.004021447721179625
+    },
+    {
+      "kind": "micro",
+      "group": "ScopedStore selector",
+      "name": "融合 dispatch 后读取",
+      "samplesNs": [
+        1412,
+        1422,
+        1426,
+        1421,
+        1414
+      ],
+      "medianNs": 1421,
+      "minNs": 1412,
+      "maxNs": 1426,
+      "relativeRange": 0.009852216748768473,
+      "relativeMad": 0.003518648838845883
+    },
+    {
+      "kind": "micro",
+      "group": "ScopedStore",
+      "name": "根 store / 32 action 折叠",
+      "samplesNs": [
+        2627,
+        2722,
+        2656,
+        2641,
+        2714
+      ],
+      "medianNs": 2656,
+      "minNs": 2627,
+      "maxNs": 2722,
+      "relativeRange": 0.03576807228915663,
+      "relativeMad": 0.010918674698795181
+    },
+    {
+      "kind": "micro",
+      "group": "ScopedStore",
+      "name": "1 层 scope / 32 action 融合",
+      "samplesNs": [
+        4291,
+        4159,
+        4236,
+        4207,
+        4187
+      ],
+      "medianNs": 4207,
+      "minNs": 4159,
+      "maxNs": 4291,
+      "relativeRange": 0.031376277632517234,
+      "relativeMad": 0.0068932731162348465
+    },
+    {
+      "kind": "micro",
+      "group": "ScopedStore",
+      "name": "8 层 scope / 32 action 融合",
+      "samplesNs": [
+        7973,
+        9854,
+        9987,
+        9594,
+        11008
+      ],
+      "medianNs": 9854,
+      "minNs": 7973,
+      "maxNs": 11008,
+      "relativeRange": 0.3079967525877816,
+      "relativeMad": 0.026385224274406333
+    },
+    {
+      "kind": "micro",
+      "group": "ScopedStore",
+      "name": "32 层 scope / 32 action 融合",
+      "samplesNs": [
+        27630,
+        29334,
+        27801,
+        26941,
+        29373
+      ],
+      "medianNs": 27801,
+      "minNs": 26941,
+      "maxNs": 29373,
+      "relativeRange": 0.0874788676666307,
+      "relativeMad": 0.03093413905974605
+    },
+    {
+      "kind": "micro",
+      "group": "FeaturePath",
+      "name": "手写 Lens + Action 提取",
+      "samplesNs": [
+        257,
+        263,
+        315,
+        318,
+        280
+      ],
+      "medianNs": 280,
+      "minNs": 257,
+      "maxNs": 318,
+      "relativeRange": 0.21785714285714286,
+      "relativeMad": 0.08214285714285714
+    },
+    {
+      "kind": "micro",
+      "group": "FeaturePath",
+      "name": "复用 FeaturePath",
+      "samplesNs": [
+        258,
+        275,
+        290,
+        303,
+        280
+      ],
+      "medianNs": 280,
+      "minNs": 258,
+      "maxNs": 303,
+      "relativeRange": 0.16071428571428573,
+      "relativeMad": 0.03571428571428571
+    },
+    {
+      "kind": "micro",
+      "group": "FeaturePath",
+      "name": "手写 store scope",
+      "samplesNs": [
+        1791,
+        2252,
+        2063,
+        2202,
+        2290
+      ],
+      "medianNs": 2202,
+      "minNs": 1791,
+      "maxNs": 2290,
+      "relativeRange": 0.22661217075386011,
+      "relativeMad": 0.03996366939146231
+    },
+    {
+      "kind": "micro",
+      "group": "FeaturePath",
+      "name": "FeaturePath store scope",
+      "samplesNs": [
+        1752,
+        1945,
+        2100,
+        2245,
+        2166
+      ],
+      "medianNs": 2100,
+      "minNs": 1752,
+      "maxNs": 2245,
+      "relativeRange": 0.23476190476190475,
+      "relativeMad": 0.06904761904761905
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable",
+      "name": "16 项线性数组更新",
+      "samplesNs": [
+        44,
+        78,
+        59,
+        77,
+        94
+      ],
+      "medianNs": 77,
+      "minNs": 44,
+      "maxNs": 94,
+      "relativeRange": 0.6493506493506493,
+      "relativeMad": 0.22077922077922077
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable",
+      "name": "16 项克隆 HashMap 更新",
+      "samplesNs": [
+        254,
+        255,
+        390,
+        275,
+        367
+      ],
+      "medianNs": 275,
+      "minNs": 254,
+      "maxNs": 390,
+      "relativeRange": 0.49454545454545457,
+      "relativeMad": 0.07636363636363637
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable",
+      "name": "16 项持久表更新",
+      "samplesNs": [
+        1222,
+        1389,
+        1477,
+        1242,
+        1764
+      ],
+      "medianNs": 1389,
+      "minNs": 1222,
+      "maxNs": 1764,
+      "relativeRange": 0.3902087832973362,
+      "relativeMad": 0.10583153347732181
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable",
+      "name": "16 项线性 ID 读取",
+      "samplesNs": [
+        29,
+        23,
+        30,
+        26,
+        27
+      ],
+      "medianNs": 27,
+      "minNs": 23,
+      "maxNs": 30,
+      "relativeRange": 0.25925925925925924,
+      "relativeMad": 0.07407407407407407
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable",
+      "name": "16 项 HashMap 读取",
+      "samplesNs": [
+        4,
+        4,
+        4,
+        3,
+        7
+      ],
+      "medianNs": 4,
+      "minNs": 3,
+      "maxNs": 7,
+      "relativeRange": 1.0,
+      "relativeMad": 0.0
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable",
+      "name": "16 项持久表读取",
+      "samplesNs": [
+        358,
+        339,
+        403,
+        382,
+        394
+      ],
+      "medianNs": 382,
+      "minNs": 339,
+      "maxNs": 403,
+      "relativeRange": 0.16753926701570682,
+      "relativeMad": 0.0549738219895288
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable",
+      "name": "1024 项线性数组更新",
+      "samplesNs": [
+        3390,
+        3380,
+        3639,
+        3337,
+        3354
+      ],
+      "medianNs": 3380,
+      "minNs": 3337,
+      "maxNs": 3639,
+      "relativeRange": 0.0893491124260355,
+      "relativeMad": 0.007692307692307693
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable",
+      "name": "1024 项克隆 HashMap 更新",
+      "samplesNs": [
+        29388,
+        37069,
+        35243,
+        38034,
+        40651
+      ],
+      "medianNs": 37069,
+      "minNs": 29388,
+      "maxNs": 40651,
+      "relativeRange": 0.30383878712670964,
+      "relativeMad": 0.04925948906094041
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable",
+      "name": "1024 项持久表更新",
+      "samplesNs": [
+        1636,
+        1381,
+        1827,
+        2471,
+        1756
+      ],
+      "medianNs": 1756,
+      "minNs": 1381,
+      "maxNs": 2471,
+      "relativeRange": 0.6207289293849658,
+      "relativeMad": 0.0683371298405467
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable",
+      "name": "1024 项线性 ID 读取",
+      "samplesNs": [
+        1161,
+        1181,
+        1348,
+        1339,
+        1294
+      ],
+      "medianNs": 1294,
+      "minNs": 1161,
+      "maxNs": 1348,
+      "relativeRange": 0.1445131375579598,
+      "relativeMad": 0.04173106646058733
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable",
+      "name": "1024 项 HashMap 读取",
+      "samplesNs": [
+        3,
+        5,
+        3,
+        6,
+        5
+      ],
+      "medianNs": 5,
+      "minNs": 3,
+      "maxNs": 6,
+      "relativeRange": 0.6,
+      "relativeMad": 0.2
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable",
+      "name": "1024 项持久表读取",
+      "samplesNs": [
+        479,
+        470,
+        382,
+        544,
+        484
+      ],
+      "medianNs": 479,
+      "minNs": 382,
+      "maxNs": 544,
+      "relativeRange": 0.33820459290187893,
+      "relativeMad": 0.018789144050104383
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable",
+      "name": "10000 项线性数组更新",
+      "samplesNs": [
+        52915,
+        60032,
+        35015,
+        49016,
+        47804
+      ],
+      "medianNs": 49016,
+      "minNs": 35015,
+      "maxNs": 60032,
+      "relativeRange": 0.5103843642892116,
+      "relativeMad": 0.07954545454545454
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable",
+      "name": "10000 项克隆 HashMap 更新",
+      "samplesNs": [
+        300224,
+        265195,
+        302149,
+        311427,
+        304891
+      ],
+      "medianNs": 302149,
+      "minNs": 265195,
+      "maxNs": 311427,
+      "relativeRange": 0.15301060073010336,
+      "relativeMad": 0.00907499280156479
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable",
+      "name": "10000 项持久表更新",
+      "samplesNs": [
+        4958,
+        3335,
+        1873,
+        1582,
+        2223
+      ],
+      "medianNs": 2223,
+      "minNs": 1582,
+      "maxNs": 4958,
+      "relativeRange": 1.518668466036887,
+      "relativeMad": 0.28834907782276203
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable",
+      "name": "10000 项线性 ID 读取",
+      "samplesNs": [
+        11463,
+        11785,
+        11517,
+        11697,
+        11481
+      ],
+      "medianNs": 11517,
+      "minNs": 11463,
+      "maxNs": 11785,
+      "relativeRange": 0.02795866979248068,
+      "relativeMad": 0.004688721021099245
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable",
+      "name": "10000 项 HashMap 读取",
+      "samplesNs": [
+        6,
+        10,
+        6,
+        10,
+        5
+      ],
+      "medianNs": 6,
+      "minNs": 5,
+      "maxNs": 10,
+      "relativeRange": 0.8333333333333334,
+      "relativeMad": 0.16666666666666666
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable",
+      "name": "10000 项持久表读取",
+      "samplesNs": [
+        535,
+        544,
+        466,
+        443,
+        495
+      ],
+      "medianNs": 495,
+      "minNs": 443,
+      "maxNs": 544,
+      "relativeRange": 0.20404040404040405,
+      "relativeMad": 0.08080808080808081
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable",
+      "name": "100000 项线性数组更新",
+      "samplesNs": [
+        390635,
+        702215,
+        526931,
+        543106,
+        580287
+      ],
+      "medianNs": 543106,
+      "minNs": 390635,
+      "maxNs": 702215,
+      "relativeRange": 0.5737001616627325,
+      "relativeMad": 0.06845993231523864
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable",
+      "name": "100000 项克隆 HashMap 更新",
+      "samplesNs": [
+        4281271,
+        4681350,
+        4793188,
+        4748656,
+        4165681
+      ],
+      "medianNs": 4681350,
+      "minNs": 4165681,
+      "maxNs": 4793188,
+      "relativeRange": 0.13404402576179947,
+      "relativeMad": 0.02389011716705651
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable",
+      "name": "100000 项持久表更新",
+      "samplesNs": [
+        3340,
+        5515,
+        2546,
+        2583,
+        3710
+      ],
+      "medianNs": 3340,
+      "minNs": 2546,
+      "maxNs": 5515,
+      "relativeRange": 0.8889221556886228,
+      "relativeMad": 0.22664670658682634
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable",
+      "name": "100000 项线性 ID 读取",
+      "samplesNs": [
+        114066,
+        120866,
+        119904,
+        120175,
+        130939
+      ],
+      "medianNs": 120175,
+      "minNs": 114066,
+      "maxNs": 130939,
+      "relativeRange": 0.1404035781152486,
+      "relativeMad": 0.005749947992510922
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable",
+      "name": "100000 项 HashMap 读取",
+      "samplesNs": [
+        17,
+        26,
+        17,
+        21,
+        39
+      ],
+      "medianNs": 21,
+      "minNs": 17,
+      "maxNs": 39,
+      "relativeRange": 1.0476190476190477,
+      "relativeMad": 0.19047619047619047
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable",
+      "name": "100000 项持久表读取",
+      "samplesNs": [
+        472,
+        548,
+        460,
+        504,
+        604
+      ],
+      "medianNs": 504,
+      "minNs": 460,
+      "maxNs": 604,
+      "relativeRange": 0.2857142857142857,
+      "relativeMad": 0.0873015873015873
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable batch",
+      "name": "10000 项 / 1 更新逐次",
+      "samplesNs": [
+        1199,
+        1731,
+        1041,
+        1403,
+        1754
+      ],
+      "medianNs": 1403,
+      "minNs": 1041,
+      "maxNs": 1754,
+      "relativeRange": 0.5081967213114754,
+      "relativeMad": 0.23378474697077692
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable batch",
+      "name": "10000 项 / 1 更新批次",
+      "samplesNs": [
+        1861,
+        1715,
+        2702,
+        1217,
+        1764
+      ],
+      "medianNs": 1764,
+      "minNs": 1217,
+      "maxNs": 2702,
+      "relativeRange": 0.8418367346938775,
+      "relativeMad": 0.054988662131519275
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable batch",
+      "name": "10000 项 / 4 更新逐次",
+      "samplesNs": [
+        11083,
+        7130,
+        5626,
+        10539,
+        7605
+      ],
+      "medianNs": 7605,
+      "minNs": 5626,
+      "maxNs": 11083,
+      "relativeRange": 0.7175542406311637,
+      "relativeMad": 0.26022353714661406
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable batch",
+      "name": "10000 项 / 4 更新批次",
+      "samplesNs": [
+        7566,
+        9278,
+        6819,
+        4334,
+        6659
+      ],
+      "medianNs": 6819,
+      "minNs": 4334,
+      "maxNs": 9278,
+      "relativeRange": 0.7250329960404751,
+      "relativeMad": 0.1095468543774747
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable batch",
+      "name": "10000 项 / 8 更新逐次",
+      "samplesNs": [
+        12514,
+        8316,
+        20317,
+        20312,
+        19492
+      ],
+      "medianNs": 19492,
+      "minNs": 8316,
+      "maxNs": 20317,
+      "relativeRange": 0.6156884875846501,
+      "relativeMad": 0.04232505643340858
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable batch",
+      "name": "10000 项 / 8 更新批次",
+      "samplesNs": [
+        12868,
+        10061,
+        12045,
+        11573,
+        17599
+      ],
+      "medianNs": 12045,
+      "minNs": 10061,
+      "maxNs": 17599,
+      "relativeRange": 0.6258198422581984,
+      "relativeMad": 0.06832710668327106
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable batch",
+      "name": "10000 项 / 16 更新逐次",
+      "samplesNs": [
+        34189,
+        23353,
+        25914,
+        34480,
+        27917
+      ],
+      "medianNs": 27917,
+      "minNs": 23353,
+      "maxNs": 34480,
+      "relativeRange": 0.39857434538095066,
+      "relativeMad": 0.16348461510907333
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable batch",
+      "name": "10000 项 / 16 更新批次",
+      "samplesNs": [
+        21936,
+        13582,
+        20657,
+        27511,
+        25011
+      ],
+      "medianNs": 21936,
+      "minNs": 13582,
+      "maxNs": 27511,
+      "relativeRange": 0.6349835886214442,
+      "relativeMad": 0.14018052516411378
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable batch",
+      "name": "10000 项 / 32 更新逐次",
+      "samplesNs": [
+        39541,
+        48327,
+        61420,
+        69361,
+        58670
+      ],
+      "medianNs": 58670,
+      "minNs": 39541,
+      "maxNs": 69361,
+      "relativeRange": 0.5082665757627407,
+      "relativeMad": 0.17629111982273735
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable batch",
+      "name": "10000 项 / 32 更新批次",
+      "samplesNs": [
+        51115,
+        36326,
+        24446,
+        35471,
+        23888
+      ],
+      "medianNs": 35471,
+      "minNs": 23888,
+      "maxNs": 51115,
+      "relativeRange": 0.7675847875729469,
+      "relativeMad": 0.3108172873615066
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable batch",
+      "name": "10000 项 / 128 更新逐次",
+      "samplesNs": [
+        127934,
+        272896,
+        123092,
+        310177,
+        128794
+      ],
+      "medianNs": 128794,
+      "minNs": 123092,
+      "maxNs": 310177,
+      "relativeRange": 1.452590959206174,
+      "relativeMad": 0.044272248707237914
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable batch",
+      "name": "10000 项 / 128 更新批次",
+      "samplesNs": [
+        88069,
+        120535,
+        118966,
+        155009,
+        132228
+      ],
+      "medianNs": 120535,
+      "minNs": 88069,
+      "maxNs": 155009,
+      "relativeRange": 0.555357365080682,
+      "relativeMad": 0.0970091674617331
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable batch",
+      "name": "100000 项 / 32 更新逐次",
+      "samplesNs": [
+        39303,
+        41351,
+        47419,
+        68583,
+        58283
+      ],
+      "medianNs": 47419,
+      "minNs": 39303,
+      "maxNs": 68583,
+      "relativeRange": 0.6174740083089058,
+      "relativeMad": 0.1711550222484658
+    },
+    {
+      "kind": "micro",
+      "group": "EntityTable batch",
+      "name": "100000 项 / 32 更新批次",
+      "samplesNs": [
+        32187,
+        41578,
+        76766,
+        29488,
+        30450
+      ],
+      "medianNs": 32187,
+      "minNs": 29488,
+      "maxNs": 76766,
+      "relativeRange": 1.4688538851088948,
+      "relativeMad": 0.08385372976667599
+    },
+    {
+      "kind": "micro",
+      "group": "Entity reducer batch",
+      "name": "10000 项 / 4 Action 逐次",
+      "samplesNs": [
+        9673,
+        4493,
+        12035,
+        7642,
+        8364
+      ],
+      "medianNs": 8364,
+      "minNs": 4493,
+      "maxNs": 12035,
+      "relativeRange": 0.9017216642754663,
+      "relativeMad": 0.1565040650406504
+    },
+    {
+      "kind": "micro",
+      "group": "Entity reducer batch",
+      "name": "10000 项 / 4 Action 批次",
+      "samplesNs": [
+        6546,
+        5973,
+        8076,
+        4019,
+        6808
+      ],
+      "medianNs": 6546,
+      "minNs": 4019,
+      "maxNs": 8076,
+      "relativeRange": 0.6197677971280171,
+      "relativeMad": 0.08753437213565536
+    },
+    {
+      "kind": "micro",
+      "group": "Entity reducer batch",
+      "name": "10000 项 / 32 Action 逐次",
+      "samplesNs": [
+        55705,
+        52152,
+        54368,
+        50568,
+        59845
+      ],
+      "medianNs": 54368,
+      "minNs": 50568,
+      "maxNs": 59845,
+      "relativeRange": 0.170633460859329,
+      "relativeMad": 0.04075927015891701
+    },
+    {
+      "kind": "micro",
+      "group": "Entity reducer batch",
+      "name": "10000 项 / 32 Action 批次",
+      "samplesNs": [
+        44032,
+        43343,
+        32442,
+        28296,
+        44843
+      ],
+      "medianNs": 43343,
+      "minNs": 28296,
+      "maxNs": 44843,
+      "relativeRange": 0.3817686823708557,
+      "relativeMad": 0.03460766444408555
+    },
+    {
+      "kind": "micro",
+      "group": "Entity reducer batch",
+      "name": "10000 项 / 128 Action 逐次",
+      "samplesNs": [
+        211088,
+        228825,
+        198725,
+        188156,
+        216255
+      ],
+      "medianNs": 211088,
+      "minNs": 188156,
+      "maxNs": 228825,
+      "relativeRange": 0.19266372318653832,
+      "relativeMad": 0.05856799060107633
+    },
+    {
+      "kind": "micro",
+      "group": "Entity reducer batch",
+      "name": "10000 项 / 128 Action 批次",
+      "samplesNs": [
+        174161,
+        175318,
+        144166,
+        137472,
+        217271
+      ],
+      "medianNs": 174161,
+      "minNs": 137472,
+      "maxNs": 217271,
+      "relativeRange": 0.45819098420427073,
+      "relativeMad": 0.17222569920935227
+    },
+    {
+      "kind": "micro",
+      "group": "Entity reducer batch",
+      "name": "100000 项 / 32 Action 逐次",
+      "samplesNs": [
+        59415,
+        72620,
+        87242,
+        106005,
+        36840
+      ],
+      "medianNs": 72620,
+      "minNs": 36840,
+      "maxNs": 106005,
+      "relativeRange": 0.9524235747727898,
+      "relativeMad": 0.20134949049848527
+    },
+    {
+      "kind": "micro",
+      "group": "Entity reducer batch",
+      "name": "100000 项 / 32 Action 批次",
+      "samplesNs": [
+        33249,
+        86897,
+        56212,
+        76778,
+        93373
+      ],
+      "medianNs": 76778,
+      "minNs": 33249,
+      "maxNs": 93373,
+      "relativeRange": 0.7830889056761051,
+      "relativeMad": 0.2161426450285238
+    },
+    {
+      "kind": "micro",
+      "group": "特征 Reducer",
+      "name": "手写 Option lift",
+      "samplesNs": [
+        44,
+        67,
+        74,
+        65,
+        92
+      ],
+      "medianNs": 67,
+      "minNs": 44,
+      "maxNs": 92,
+      "relativeRange": 0.7164179104477612,
+      "relativeMad": 0.1044776119402985
+    },
+    {
+      "kind": "micro",
+      "group": "特征 Reducer",
+      "name": "optionalReducer",
+      "samplesNs": [
+        146,
+        99,
+        107,
+        145,
+        140
+      ],
+      "medianNs": 140,
+      "minNs": 99,
+      "maxNs": 146,
+      "relativeRange": 0.3357142857142857,
+      "relativeMad": 0.04285714285714286
+    },
+    {
+      "kind": "micro",
+      "group": "特征 Reducer",
+      "name": "16 项线性末项更新",
+      "samplesNs": [
+        177,
+        232,
+        97,
+        168,
+        139
+      ],
+      "medianNs": 168,
+      "minNs": 97,
+      "maxNs": 232,
+      "relativeRange": 0.8035714285714286,
+      "relativeMad": 0.17261904761904762
+    },
+    {
+      "kind": "micro",
+      "group": "特征 Reducer",
+      "name": "16 项 ID 索引末项更新",
+      "samplesNs": [
+        1145,
+        1364,
+        1257,
+        1597,
+        1320
+      ],
+      "medianNs": 1320,
+      "minNs": 1145,
+      "maxNs": 1597,
+      "relativeRange": 0.3424242424242424,
+      "relativeMad": 0.04772727272727273
+    },
+    {
+      "kind": "micro",
+      "group": "特征 Reducer",
+      "name": "1024 项线性末项更新",
+      "samplesNs": [
+        3549,
+        3367,
+        1762,
+        2453,
+        1952
+      ],
+      "medianNs": 2453,
+      "minNs": 1762,
+      "maxNs": 3549,
+      "relativeRange": 0.7284957195271097,
+      "relativeMad": 0.2816958825927436
+    },
+    {
+      "kind": "micro",
+      "group": "特征 Reducer",
+      "name": "1024 项 ID 索引末项更新",
+      "samplesNs": [
+        1052,
+        1798,
+        1191,
+        1675,
+        1775
+      ],
+      "medianNs": 1675,
+      "minNs": 1052,
+      "maxNs": 1798,
+      "relativeRange": 0.44537313432835823,
+      "relativeMad": 0.07343283582089552
+    },
+    {
+      "kind": "micro",
+      "group": "特征 Reducer",
+      "name": "2048 项线性末项更新",
+      "samplesNs": [
+        9138,
+        11042,
+        9665,
+        6877,
+        3477
+      ],
+      "medianNs": 9138,
+      "minNs": 3477,
+      "maxNs": 11042,
+      "relativeRange": 0.8278616765156489,
+      "relativeMad": 0.20836069161742177
+    },
+    {
+      "kind": "micro",
+      "group": "特征 Reducer",
+      "name": "2048 项 ID 索引末项更新",
+      "samplesNs": [
+        1666,
+        1514,
+        5649,
+        3996,
+        1410
+      ],
+      "medianNs": 1666,
+      "minNs": 1410,
+      "maxNs": 5649,
+      "relativeRange": 2.5444177671068426,
+      "relativeMad": 0.15366146458583432
+    },
+    {
+      "kind": "micro",
+      "group": "特征 Reducer",
+      "name": "4096 项线性末项更新",
+      "samplesNs": [
+        24116,
+        24059,
+        19139,
+        27555,
+        26864
+      ],
+      "medianNs": 24116,
+      "minNs": 19139,
+      "maxNs": 27555,
+      "relativeRange": 0.34897993033670593,
+      "relativeMad": 0.11394924531431415
+    },
+    {
+      "kind": "micro",
+      "group": "特征 Reducer",
+      "name": "4096 项 ID 索引末项更新",
+      "samplesNs": [
+        2733,
+        2826,
+        2562,
+        4246,
+        2320
+      ],
+      "medianNs": 2733,
+      "minNs": 2320,
+      "maxNs": 4246,
+      "relativeRange": 0.7047200878155873,
+      "relativeMad": 0.06256860592755215
+    },
+    {
+      "kind": "micro",
+      "group": "特征 Reducer",
+      "name": "8192 项线性末项更新",
+      "samplesNs": [
+        42103,
+        44578,
+        45658,
+        52572,
+        37273
+      ],
+      "medianNs": 44578,
+      "minNs": 37273,
+      "maxNs": 52572,
+      "relativeRange": 0.34319619543272467,
+      "relativeMad": 0.05552066041545157
+    },
+    {
+      "kind": "micro",
+      "group": "特征 Reducer",
+      "name": "8192 项 ID 索引末项更新",
+      "samplesNs": [
+        4586,
+        3653,
+        4289,
+        8609,
+        5059
+      ],
+      "medianNs": 4586,
+      "minNs": 3653,
+      "maxNs": 8609,
+      "relativeRange": 1.0806803314435238,
+      "relativeMad": 0.103139991277802
+    },
+    {
+      "kind": "micro",
+      "group": "特征 Reducer",
+      "name": "10000 项线性末项更新",
+      "samplesNs": [
+        56414,
+        56733,
+        40300,
+        59785,
+        51462
+      ],
+      "medianNs": 56414,
+      "minNs": 40300,
+      "maxNs": 59785,
+      "relativeRange": 0.34539298755628034,
+      "relativeMad": 0.05975467082639061
+    },
+    {
+      "kind": "micro",
+      "group": "特征 Reducer",
+      "name": "10000 项 ID 索引末项更新",
+      "samplesNs": [
+        4262,
+        5026,
+        4238,
+        3978,
+        3273
+      ],
+      "medianNs": 4238,
+      "minNs": 3273,
+      "maxNs": 5026,
+      "relativeRange": 0.41363850873053326,
+      "relativeMad": 0.06134969325153374
+    },
+    {
+      "kind": "micro",
+      "group": "Identified reducer batch",
+      "name": "16 项 / 4 Action 逐次",
+      "samplesNs": [
+        4788,
+        5584,
+        5685,
+        6173,
+        5352
+      ],
+      "medianNs": 5584,
+      "minNs": 4788,
+      "maxNs": 6173,
+      "relativeRange": 0.24803008595988538,
+      "relativeMad": 0.04154727793696275
+    },
+    {
+      "kind": "micro",
+      "group": "Identified reducer batch",
+      "name": "16 项 / 4 Action 批次",
+      "samplesNs": [
+        5069,
+        4986,
+        4247,
+        5522,
+        4685
+      ],
+      "medianNs": 4986,
+      "minNs": 4247,
+      "maxNs": 5522,
+      "relativeRange": 0.2557160048134777,
+      "relativeMad": 0.06036903329322102
+    },
+    {
+      "kind": "micro",
+      "group": "Identified reducer batch",
+      "name": "1024 项 / 4 Action 逐次",
+      "samplesNs": [
+        3985,
+        5088,
+        4505,
+        6178,
+        5838
+      ],
+      "medianNs": 5088,
+      "minNs": 3985,
+      "maxNs": 6178,
+      "relativeRange": 0.43101415094339623,
+      "relativeMad": 0.1474056603773585
+    },
+    {
+      "kind": "micro",
+      "group": "Identified reducer batch",
+      "name": "1024 项 / 4 Action 批次",
+      "samplesNs": [
+        5426,
+        6871,
+        5778,
+        4676,
+        5121
+      ],
+      "medianNs": 5426,
+      "minNs": 4676,
+      "maxNs": 6871,
+      "relativeRange": 0.4045337265020273,
+      "relativeMad": 0.0648728345005529
+    },
+    {
+      "kind": "micro",
+      "group": "Identified reducer batch",
+      "name": "10000 项 / 1 Action 逐次",
+      "samplesNs": [
+        4503,
+        3741,
+        5239,
+        3048,
+        10625
+      ],
+      "medianNs": 4503,
+      "minNs": 3048,
+      "maxNs": 10625,
+      "relativeRange": 1.6826560071063734,
+      "relativeMad": 0.1692205196535643
+    },
+    {
+      "kind": "micro",
+      "group": "Identified reducer batch",
+      "name": "10000 项 / 1 Action 批次",
+      "samplesNs": [
+        2557,
+        5885,
+        3722,
+        4341,
+        8184
+      ],
+      "medianNs": 4341,
+      "minNs": 2557,
+      "maxNs": 8184,
+      "relativeRange": 1.296245104814559,
+      "relativeMad": 0.35567841511172543
+    },
+    {
+      "kind": "micro",
+      "group": "Identified reducer batch",
+      "name": "10000 项 / 4 Action 逐次",
+      "samplesNs": [
+        20154,
+        17089,
+        16541,
+        15555,
+        15906
+      ],
+      "medianNs": 16541,
+      "minNs": 15555,
+      "maxNs": 20154,
+      "relativeRange": 0.27803639441388067,
+      "relativeMad": 0.03838945650202527
+    },
+    {
+      "kind": "micro",
+      "group": "Identified reducer batch",
+      "name": "10000 项 / 4 Action 批次",
+      "samplesNs": [
+        6914,
+        10974,
+        6139,
+        5591,
+        6615
+      ],
+      "medianNs": 6615,
+      "minNs": 5591,
+      "maxNs": 10974,
+      "relativeRange": 0.8137566137566138,
+      "relativeMad": 0.07195767195767196
+    },
+    {
+      "kind": "micro",
+      "group": "Identified reducer batch",
+      "name": "10000 项 / 8 Action 逐次",
+      "samplesNs": [
+        20494,
+        38645,
+        33042,
+        44390,
+        52487
+      ],
+      "medianNs": 38645,
+      "minNs": 20494,
+      "maxNs": 52487,
+      "relativeRange": 0.8278690645620391,
+      "relativeMad": 0.1486608875663087
+    },
+    {
+      "kind": "micro",
+      "group": "Identified reducer batch",
+      "name": "10000 项 / 8 Action 批次",
+      "samplesNs": [
+        9283,
+        13056,
+        9164,
+        16663,
+        20759
+      ],
+      "medianNs": 13056,
+      "minNs": 9164,
+      "maxNs": 20759,
+      "relativeRange": 0.8880974264705882,
+      "relativeMad": 0.2889859068627451
+    },
+    {
+      "kind": "micro",
+      "group": "Identified reducer batch",
+      "name": "10000 项 / 16 Action 逐次",
+      "samplesNs": [
+        84647,
+        89568,
+        70092,
+        53436,
+        108346
+      ],
+      "medianNs": 84647,
+      "minNs": 53436,
+      "maxNs": 108346,
+      "relativeRange": 0.6486939879735845,
+      "relativeMad": 0.17194938981889493
+    },
+    {
+      "kind": "micro",
+      "group": "Identified reducer batch",
+      "name": "10000 项 / 16 Action 批次",
+      "samplesNs": [
+        16466,
+        25414,
+        23078,
+        15331,
+        11308
+      ],
+      "medianNs": 16466,
+      "minNs": 11308,
+      "maxNs": 25414,
+      "relativeRange": 0.856674359285801,
+      "relativeMad": 0.31325154864569416
+    },
+    {
+      "kind": "micro",
+      "group": "Identified reducer batch",
+      "name": "10000 项 / 32 Action 逐次",
+      "samplesNs": [
+        143542,
+        151695,
+        217760,
+        101588,
+        148718
+      ],
+      "medianNs": 148718,
+      "minNs": 101588,
+      "maxNs": 217760,
+      "relativeRange": 0.7811562823599026,
+      "relativeMad": 0.03480412592961175
+    },
+    {
+      "kind": "micro",
+      "group": "Identified reducer batch",
+      "name": "10000 项 / 32 Action 批次",
+      "samplesNs": [
+        25693,
+        47189,
+        32173,
+        32660,
+        31610
+      ],
+      "medianNs": 32173,
+      "minNs": 25693,
+      "maxNs": 47189,
+      "relativeRange": 0.6681378795884748,
+      "relativeMad": 0.017499145246013738
+    },
+    {
+      "kind": "micro",
+      "group": "Identified reducer batch",
+      "name": "10000 项 / 128 Action 逐次",
+      "samplesNs": [
+        882517,
+        558166,
+        646503,
+        1191893,
+        743109
+      ],
+      "medianNs": 743109,
+      "minNs": 558166,
+      "maxNs": 1191893,
+      "relativeRange": 0.852804904798623,
+      "relativeMad": 0.18760101142631835
+    },
+    {
+      "kind": "micro",
+      "group": "Identified reducer batch",
+      "name": "10000 项 / 128 Action 批次",
+      "samplesNs": [
+        82383,
+        74228,
+        138229,
+        116760,
+        86053
+      ],
+      "medianNs": 86053,
+      "minNs": 74228,
+      "maxNs": 138229,
+      "relativeRange": 0.7437393234402054,
+      "relativeMad": 0.1374153138182283
+    },
+    {
+      "kind": "micro",
+      "group": "Identified reducer batch",
+      "name": "100000 项 / 32 Action 逐次",
+      "samplesNs": [
+        1368655,
+        1828896,
+        1455486,
+        1861265,
+        1731549
+      ],
+      "medianNs": 1731549,
+      "minNs": 1368655,
+      "maxNs": 1861265,
+      "relativeRange": 0.2844909384603035,
+      "relativeMad": 0.07491327129639415
+    },
+    {
+      "kind": "micro",
+      "group": "Identified reducer batch",
+      "name": "100000 项 / 32 Action 批次",
+      "samplesNs": [
+        107738,
+        93141,
+        63939,
+        88413,
+        49126
+      ],
+      "medianNs": 88413,
+      "minNs": 49126,
+      "maxNs": 107738,
+      "relativeRange": 0.662934183886985,
+      "relativeMad": 0.21857645368893713
+    },
+    {
+      "kind": "micro",
+      "group": "ModelStore selector 构建",
+      "name": "240 投影 / 普通 selector build",
+      "samplesNs": [
+        798122,
+        801929,
+        846947,
+        888691,
+        834894
+      ],
+      "medianNs": 834894,
+      "minNs": 798122,
+      "maxNs": 888691,
+      "relativeRange": 0.10847963933146004,
+      "relativeMad": 0.03948405426317592
+    },
+    {
+      "kind": "micro",
+      "group": "ModelStore selector 构建",
+      "name": "240 投影 / 等价 selector build",
+      "samplesNs": [
+        193842,
+        194127,
+        180714,
+        209599,
+        211571
+      ],
+      "medianNs": 194127,
+      "minNs": 180714,
+      "maxNs": 211571,
+      "relativeRange": 0.1589526444028909,
+      "relativeMad": 0.06909394365544205
+    },
+    {
+      "kind": "micro",
+      "group": "EffectStore",
+      "name": "ModelStore 单 action",
+      "samplesNs": [
+        988,
+        1069,
+        965,
+        1055,
+        960
+      ],
+      "medianNs": 988,
+      "minNs": 960,
+      "maxNs": 1069,
+      "relativeRange": 0.11032388663967611,
+      "relativeMad": 0.02834008097165992
+    },
+    {
+      "kind": "micro",
+      "group": "EffectStore",
+      "name": "零效果单 action",
+      "samplesNs": [
+        1242,
+        1163,
+        960,
+        1192,
+        1054
+      ],
+      "medianNs": 1163,
+      "minNs": 960,
+      "maxNs": 1242,
+      "relativeRange": 0.24247635425623387,
+      "relativeMad": 0.06792777300085985
+    },
+    {
+      "kind": "micro",
+      "group": "EffectStore",
+      "name": "显式 handler 零效果单 action",
+      "samplesNs": [
+        1570,
+        1556,
+        1312,
+        1529,
+        1616
+      ],
+      "medianNs": 1556,
+      "minNs": 1312,
+      "maxNs": 1616,
+      "relativeRange": 0.1953727506426735,
+      "relativeMad": 0.017352185089974295
+    },
+    {
+      "kind": "micro",
+      "group": "EffectStore",
+      "name": "connect 门面零效果单 action",
+      "samplesNs": [
+        1382,
+        1625,
+        1514,
+        1694,
+        1693
+      ],
+      "medianNs": 1625,
+      "minNs": 1382,
+      "maxNs": 1694,
+      "relativeRange": 0.192,
+      "relativeMad": 0.04246153846153846
+    },
+    {
+      "kind": "micro",
+      "group": "EffectStore",
+      "name": "connect 门面稳定读取",
+      "samplesNs": [
+        377,
+        298,
+        230,
+        377,
+        336
+      ],
+      "medianNs": 336,
+      "minNs": 230,
+      "maxNs": 377,
+      "relativeRange": 0.4375,
+      "relativeMad": 0.12202380952380952
+    },
+    {
+      "kind": "micro",
+      "group": "EffectStore",
+      "name": "32 zero-effect action 单次折叠",
+      "samplesNs": [
+        6332,
+        7417,
+        8143,
+        7580,
+        8854
+      ],
+      "medianNs": 7580,
+      "minNs": 6332,
+      "maxNs": 8854,
+      "relativeRange": 0.33271767810026387,
+      "relativeMad": 0.07427440633245383
+    },
+    {
+      "kind": "micro",
+      "group": "EffectStore",
+      "name": "32 effect action 逐次 dispatch",
+      "samplesNs": [
+        17886,
+        17942,
+        20044,
+        16685,
+        18930
+      ],
+      "medianNs": 17942,
+      "minNs": 16685,
+      "maxNs": 20044,
+      "relativeRange": 0.18721435737375988,
+      "relativeMad": 0.05506632482443429
+    },
+    {
+      "kind": "micro",
+      "group": "EffectStore",
+      "name": "32 effect action 单次折叠",
+      "samplesNs": [
+        9641,
+        9190,
+        10393,
+        11635,
+        10083
+      ],
+      "medianNs": 10083,
+      "minNs": 9190,
+      "maxNs": 11635,
+      "relativeRange": 0.24248735495388277,
+      "relativeMad": 0.04383615987305366
+    },
+    {
+      "kind": "micro",
+      "group": "EffectStore",
+      "name": "32 effect action connect 融合",
+      "samplesNs": [
+        9051,
+        8498,
+        10442,
+        9305,
+        9532
+      ],
+      "medianNs": 9305,
+      "minNs": 8498,
+      "maxNs": 10442,
+      "relativeRange": 0.2089199355185384,
+      "relativeMad": 0.027297152068780226
+    },
+    {
+      "kind": "micro",
+      "group": "EffectStore",
+      "name": "128 effect action 单次折叠",
+      "samplesNs": [
+        25623,
+        39884,
+        25737,
+        34001,
+        32134
+      ],
+      "medianNs": 32134,
+      "minNs": 25623,
+      "maxNs": 39884,
+      "relativeRange": 0.4437978465177071,
+      "relativeMad": 0.19907263334785585
     },
     {
       "kind": "display",
       "group": "原语提交（上机实测）",
       "name": "2048 rect 单条提交",
       "samplesNs": [
-        1262188,
-        1259575,
-        1291198,
-        1261595,
-        1294853
+        719205,
+        741063,
+        742626,
+        723988,
+        706630
       ],
-      "medianNs": 1262188,
-      "minNs": 1259575,
-      "maxNs": 1294853,
-      "relativeRange": 0.027949877514284717,
-      "relativeMad": 0.0020702145797614935
+      "medianNs": 723988,
+      "minNs": 706630,
+      "maxNs": 742626,
+      "relativeRange": 0.049719056116952216,
+      "relativeMad": 0.023584645049365457
     },
     {
       "kind": "display",
       "group": "原语提交（上机实测）",
       "name": "2048 rect 相邻批处理",
       "samplesNs": [
-        618293,
-        607607,
-        598172,
-        617868,
-        605640
+        379917,
+        402920,
+        407296,
+        428132,
+        403633
       ],
-      "medianNs": 607607,
-      "minNs": 598172,
-      "maxNs": 618293,
-      "relativeRange": 0.033115155026192916,
-      "relativeMad": 0.015528129201934804
+      "medianNs": 403633,
+      "minNs": 379917,
+      "maxNs": 428132,
+      "relativeRange": 0.1194525720146767,
+      "relativeMad": 0.009075075625630213
     },
     {
       "kind": "display",
       "group": "段落布局（上机实测）",
       "name": "20000 字 热缓存",
       "samplesNs": [
-        424288,
-        495109,
-        440766,
-        465603,
-        384403
+        253355,
+        241811,
+        236178,
+        249927,
+        250989
       ],
-      "medianNs": 440766,
-      "minNs": 384403,
-      "maxNs": 495109,
-      "relativeRange": 0.25116728604293437,
-      "relativeMad": 0.05634962769360613
+      "medianNs": 249927,
+      "minNs": 236178,
+      "maxNs": 253355,
+      "relativeRange": 0.06872806859603003,
+      "relativeMad": 0.013716005073481457
     },
     {
       "kind": "display",
       "group": "段落布局（上机实测）",
       "name": "20000 字 LRU 冷抖动",
       "samplesNs": [
-        2612789,
-        2463336,
-        2906859,
-        2698446,
-        2539704
+        1540067,
+        1636169,
+        1595083,
+        1563805,
+        1562507
       ],
-      "medianNs": 2612789,
-      "minNs": 2463336,
-      "maxNs": 2906859,
-      "relativeRange": 0.16975079120434142,
-      "relativeMad": 0.03278374181765156
+      "medianNs": 1563805,
+      "minNs": 1540067,
+      "maxNs": 1636169,
+      "relativeRange": 0.06145395365790492,
+      "relativeMad": 0.015179641963032476
     },
     {
       "kind": "display",
       "group": "内容页滚动（上机实测）",
       "name": "16 区块 ss2x",
       "samplesNs": [
-        11532018,
-        11709520,
-        11681674,
-        11467704,
-        11843623
+        7357666,
+        7325180,
+        7338436,
+        7301526,
+        7374128
       ],
-      "medianNs": 11681674,
-      "minNs": 11467704,
-      "maxNs": 11843623,
-      "relativeRange": 0.0321802337575933,
-      "relativeMad": 0.01281117757609055
+      "medianNs": 7338436,
+      "minNs": 7301526,
+      "maxNs": 7374128,
+      "relativeRange": 0.009893388727516326,
+      "relativeMad": 0.0026204493709558823
+    },
+    {
+      "kind": "display",
+      "group": "内容页滚动（上机实测）",
+      "name": "16 区块 Auto",
+      "samplesNs": [
+        1970176,
+        1974401,
+        1979659,
+        1977143,
+        1972179
+      ],
+      "medianNs": 1974401,
+      "minNs": 1970176,
+      "maxNs": 1979659,
+      "relativeRange": 0.0048029756873097205,
+      "relativeMad": 0.0013887756337238484
     },
     {
       "kind": "display",
       "group": "内容页滚动（上机实测）",
       "name": "16 区块 ss1x",
       "samplesNs": [
-        3792450,
-        3900437,
-        3919990,
-        3924854,
-        3888841
+        1971719,
+        1976595,
+        1979115,
+        1971166,
+        1968323
       ],
-      "medianNs": 3900437,
-      "minNs": 3792450,
-      "maxNs": 3924854,
-      "relativeRange": 0.03394593990365695,
-      "relativeMad": 0.005013028027372317
+      "medianNs": 1971719,
+      "minNs": 1968323,
+      "maxNs": 1979115,
+      "relativeRange": 0.005473396564114866,
+      "relativeMad": 0.0017223549603163533
     },
     {
       "kind": "display",
       "group": "控件密集表单（上机实测）",
       "name": "12 分区 全量 ss2x",
       "samplesNs": [
-        8288804,
-        8206815,
-        8388406,
-        8283935,
-        8485207
+        1357860,
+        1358695,
+        1357009,
+        1357308,
+        1356947
       ],
-      "medianNs": 8288804,
-      "minNs": 8206815,
-      "maxNs": 8485207,
-      "relativeRange": 0.03358651018892472,
-      "relativeMad": 0.009891535618407674
+      "medianNs": 1357308,
+      "minNs": 1356947,
+      "maxNs": 1358695,
+      "relativeRange": 0.0012878432898059983,
+      "relativeMad": 0.0002659676359381953
     },
     {
       "kind": "display",
       "group": "控件密集表单（上机实测）",
       "name": "24 分区 全量 ss2x",
       "samplesNs": [
-        14700750,
-        15373068,
-        14814010,
-        14911088,
-        14872176
+        1359821,
+        1358496,
+        1377754,
+        1363608,
+        1361572
       ],
-      "medianNs": 14872176,
-      "minNs": 14700750,
-      "maxNs": 15373068,
-      "relativeRange": 0.04520643112346169,
-      "relativeMad": 0.003911061837891106
+      "medianNs": 1361572,
+      "minNs": 1358496,
+      "maxNs": 1377754,
+      "relativeRange": 0.01414394538078045,
+      "relativeMad": 0.0014953303975111121
     },
     {
       "kind": "display",
       "group": "控件密集表单（上机实测）",
       "name": "40 分区 全量 ss2x",
       "samplesNs": [
-        28987711,
-        31695653,
-        28554684,
-        27999356,
-        28603639
+        1402043,
+        1396415,
+        1411129,
+        1409532,
+        1398192
       ],
-      "medianNs": 28603639,
-      "minNs": 27999356,
-      "maxNs": 31695653,
-      "relativeRange": 0.1292247115830262,
-      "relativeMad": 0.01342738243899666
+      "medianNs": 1402043,
+      "minNs": 1396415,
+      "maxNs": 1411129,
+      "relativeRange": 0.010494685255730388,
+      "relativeMad": 0.004014142219603821
     },
     {
       "kind": "display",
       "group": "控件密集表单（上机实测）",
       "name": "12 分区 窗口化 ss2x",
       "samplesNs": [
-        3000835,
-        2913206,
-        3024097,
-        3014922,
-        3108520
+        1378066,
+        1386196,
+        1378170,
+        1393291,
+        1393174
       ],
-      "medianNs": 3014922,
-      "minNs": 2913206,
-      "maxNs": 3108520,
-      "relativeRange": 0.06478243881599591,
-      "relativeMad": 0.004672426019644953
+      "medianNs": 1386196,
+      "minNs": 1378066,
+      "maxNs": 1393291,
+      "relativeRange": 0.010983295291574928,
+      "relativeMad": 0.005118323815679745
     },
     {
       "kind": "display",
       "group": "控件密集表单（上机实测）",
       "name": "24 分区 窗口化 ss2x",
       "samplesNs": [
-        3018733,
-        2934606,
-        2998356,
-        3035966,
-        2997110
+        1392326,
+        1375020,
+        1382396,
+        1378418,
+        1395725
       ],
-      "medianNs": 2998356,
-      "minNs": 2934606,
-      "maxNs": 3035966,
-      "relativeRange": 0.03380519191183435,
-      "relativeMad": 0.006796057572883273
+      "medianNs": 1382396,
+      "minNs": 1375020,
+      "maxNs": 1395725,
+      "relativeRange": 0.014977618569498176,
+      "relativeMad": 0.0053356635869895455
     },
     {
       "kind": "display",
       "group": "控件密集表单（上机实测）",
       "name": "40 分区 窗口化 ss2x",
       "samplesNs": [
-        2982285,
-        2947146,
-        2950054,
-        2990351,
-        3058435
+        1391290,
+        1386297,
+        1383568,
+        1384760,
+        1385079
       ],
-      "medianNs": 2982285,
-      "minNs": 2947146,
-      "maxNs": 3058435,
-      "relativeRange": 0.03731668837820664,
-      "relativeMad": 0.01080748486479327
+      "medianNs": 1385079,
+      "minNs": 1383568,
+      "maxNs": 1391290,
+      "relativeRange": 0.0055751332595469286,
+      "relativeMad": 0.00087937222353382
+    },
+    {
+      "kind": "display",
+      "group": "控件密集表单（上机实测）",
+      "name": "40 分区 自测量 ss2x",
+      "samplesNs": [
+        1392137,
+        1376108,
+        1362198,
+        1381337,
+        1372326
+      ],
+      "medianNs": 1376108,
+      "minNs": 1362198,
+      "maxNs": 1392137,
+      "relativeRange": 0.021756286570530803,
+      "relativeMad": 0.0037998471050237335
     },
     {
       "kind": "display",
       "group": "大表绘制（上机实测）",
       "name": "500 行窗口化",
       "samplesNs": [
-        1620658,
-        1638314,
-        1632150,
-        1642062,
-        1707356
+        362766,
+        366584,
+        345556,
+        345858,
+        360810
       ],
-      "medianNs": 1638314,
-      "minNs": 1620658,
-      "maxNs": 1707356,
-      "relativeRange": 0.05291903749830618,
-      "relativeMad": 0.0037624045207451076
+      "medianNs": 360810,
+      "minNs": 345556,
+      "maxNs": 366584,
+      "relativeRange": 0.0582799811535157,
+      "relativeMad": 0.016002882403481057
     },
     {
       "kind": "display",
       "group": "大表绘制（上机实测）",
       "name": "5000 行窗口化",
       "samplesNs": [
-        1647975,
-        1642804,
-        1632644,
-        1659477,
-        1679518
+        357917,
+        349061,
+        353805,
+        359483,
+        367697
       ],
-      "medianNs": 1647975,
-      "minNs": 1632644,
-      "maxNs": 1679518,
-      "relativeRange": 0.028443392648553528,
-      "relativeMad": 0.006979474809994083
+      "medianNs": 357917,
+      "minNs": 349061,
+      "maxNs": 367697,
+      "relativeRange": 0.05206793753859135,
+      "relativeMad": 0.01148869710016568
     },
     {
       "kind": "display",
       "group": "增量仪表盘（真实渲染）",
       "name": "96 区域强制全量",
       "samplesNs": [
-        2510597,
-        2597225,
-        2453876,
-        2515333,
-        2508080
+        561416,
+        557874,
+        556573,
+        557873,
+        548793
       ],
-      "medianNs": 2510597,
-      "minNs": 2453876,
-      "maxNs": 2597225,
-      "relativeRange": 0.057097574799938024,
-      "relativeMad": 0.0018864039111016224
+      "medianNs": 557873,
+      "minNs": 548793,
+      "maxNs": 561416,
+      "relativeRange": 0.022627013675155457,
+      "relativeMad": 0.002330279472209625
     },
     {
       "kind": "display",
       "group": "增量仪表盘（真实渲染）",
       "name": "96 区域命令全场重放",
       "samplesNs": [
-        1793385,
-        1592445,
-        1747824,
-        1788608,
-        1761571
+        518570,
+        515692,
+        522554,
+        537463,
+        518552
       ],
-      "medianNs": 1761571,
-      "minNs": 1592445,
-      "maxNs": 1793385,
-      "relativeRange": 0.1140686353260811,
-      "relativeMad": 0.015348231777203417
+      "medianNs": 518570,
+      "minNs": 515692,
+      "maxNs": 537463,
+      "relativeRange": 0.04198276028308618,
+      "relativeMad": 0.005549877547872032
     },
     {
       "kind": "display",
       "group": "增量仪表盘（真实渲染）",
       "name": "单区域 damage",
       "samplesNs": [
-        1774003,
-        1771433,
-        1768632,
-        1821892,
-        1730863
+        513503,
+        507080,
+        504569,
+        514006,
+        505241
       ],
-      "medianNs": 1771433,
-      "minNs": 1730863,
-      "maxNs": 1821892,
-      "relativeRange": 0.05138721024165181,
-      "relativeMad": 0.0015812057244050438
+      "medianNs": 507080,
+      "minNs": 504569,
+      "maxNs": 514006,
+      "relativeRange": 0.018610475664589413,
+      "relativeMad": 0.004951881359943205
     }
   ],
   "pairedComparisons": [
+    {
+      "name": "lazy-index/key-cold",
+      "numerator": "frame|scrollToIndex 扩展性|100000 项随机 scrollToIndex+帧",
+      "denominator": "frame|scrollToKey 扩展性|100000 项随机 scrollToKey+帧",
+      "samples": [
+        0.1169964795805794,
+        0.122011395250462,
+        0.12680687374173139,
+        0.1234970384712325,
+        0.12638549485075928
+      ],
+      "median": 0.1234970384712325,
+      "relativeMad": 0.02338887163030733,
+      "relativeRange": 0.07943829489836084
+    },
+    {
+      "name": "lazy-scroll-phase/full",
+      "numerator": "frame|LazyColumn 滚动相位|增量物化",
+      "denominator": "frame|LazyColumn 滚动相位|强制全量",
+      "samples": [
+        0.7446275576348571,
+        0.7399705891778144,
+        0.7720400563714267,
+        0.7435157980709115,
+        0.7857029919290504
+      ],
+      "median": 0.7446275576348571,
+      "relativeMad": 0.006254090933505717,
+      "relativeRange": 0.06141647899319582
+    },
+    {
+      "name": "observable-lazy-state/manual",
+      "numerator": "frame|可观察惰性数据|10000 项 State 自动版本",
+      "denominator": "frame|可观察惰性数据|10000 项 显式 snapshot+revision",
+      "samples": [
+        0.9377149407718762,
+        1.0415447630193095,
+        1.0871523697610654,
+        1.0937316930287053,
+        1.0189817278694342
+      ],
+      "median": 1.0415447630193095,
+      "relativeMad": 0.04378842692228137,
+      "relativeRange": 0.1497936121387196
+    },
     {
       "name": "primitive-batch/single",
       "numerator": "display|原语提交（上机实测）|2048 rect 相邻批处理",
       "denominator": "display|原语提交（上机实测）|2048 rect 单条提交",
       "samples": [
-        0.4898580877016736,
-        0.4823904888553679,
-        0.46326899515024034,
-        0.48975146540688574,
-        0.46772876921164025
+        0.5282457713725572,
+        0.5437054609392183,
+        0.5484537304107316,
+        0.5913523428565114,
+        0.5712084117572138
       ],
-      "median": 0.4823904888553679,
-      "relativeMad": 0.015480402327220583,
-      "relativeRange": 0.05511943781172955
+      "median": 0.5484537304107316,
+      "relativeMad": 0.03684533064081971,
+      "relativeRange": 0.11506270809151806
     },
     {
       "name": "text-stable/churn",
       "numerator": "display|段落布局（上机实测）|20000 字 热缓存",
       "denominator": "display|段落布局（上机实测）|20000 字 LRU 冷抖动",
       "samples": [
-        0.16238892616280917,
-        0.20099125738429513,
-        0.1516296456071657,
-        0.17254486471102257,
-        0.15135740227995073
+        0.16450907655316294,
+        0.14779096780344816,
+        0.1480662761749702,
+        0.1598197985042892,
+        0.16063224036756316
       ],
-      "median": 0.16238892616280917,
-      "relativeMad": 0.06625624548349043,
-      "relativeRange": 0.30564802833034377
+      "median": 0.1598197985042892,
+      "relativeMad": 0.029341033418634175,
+      "relativeRange": 0.10460599316339456
     },
     {
       "name": "planner-ss1/ss2",
       "numerator": "display|内容页滚动（上机实测）|16 区块 ss1x",
       "denominator": "display|内容页滚动（上机实测）|16 区块 ss2x",
       "samples": [
-        0.32886265005829857,
-        0.3330996488327446,
-        0.3355674880158443,
-        0.342252817128869,
-        0.3283489351189243
+        0.26798158546473844,
+        0.2698356900444767,
+        0.26969166182003906,
+        0.2699663056736359,
+        0.2669228144670122
       ],
-      "median": 0.3330996488327446,
-      "relativeMad": 0.01271991366335402,
-      "relativeRange": 0.041740908640003044
+      "median": 0.26969166182003906,
+      "relativeMad": 0.001018362420785885,
+      "relativeRange": 0.011285077136179853
+    },
+    {
+      "name": "planner-auto/ss1",
+      "numerator": "display|内容页滚动（上机实测）|16 区块 Auto",
+      "denominator": "display|内容页滚动（上机实测）|16 区块 ss1x",
+      "samples": [
+        0.9992174341272767,
+        0.9988900103460749,
+        1.0002748703334572,
+        1.0030322154501448,
+        1.0019590280660238
+      ],
+      "median": 1.0002748703334572,
+      "relativeMad": 0.0013844794350582686,
+      "relativeRange": 0.0041410668476445376
     },
     {
       "name": "large-table-5000/500",
       "numerator": "display|大表绘制（上机实测）|5000 行窗口化",
       "denominator": "display|大表绘制（上机实测）|500 行窗口化",
       "samples": [
-        1.0168554994329464,
-        1.0027406223715356,
-        1.0003026682596574,
-        1.0106055678774615,
-        0.9836952574624156
+        0.9866332566999112,
+        0.9521992230975711,
+        1.0238716734769473,
+        1.0393947805168595,
+        1.0190876084365732
       ],
-      "median": 1.0027406223715356,
-      "relativeMad": 0.007843449572557308,
-      "relativeRange": 0.03306961065574968
+      "median": 1.0190876084365732,
+      "relativeMad": 0.01992681680374903,
+      "relativeRange": 0.085562376283879
     },
     {
       "name": "dashboard-command/full",
       "numerator": "display|增量仪表盘（真实渲染）|96 区域命令全场重放",
       "denominator": "display|增量仪表盘（真实渲染）|96 区域强制全量",
       "samples": [
-        0.7143261144660015,
-        0.613133247985831,
-        0.712270709685412,
-        0.7110819919271126,
-        0.7023583777231986
+        0.9236822605697024,
+        0.9243879442311347,
+        0.9388777393082309,
+        0.9634146122863089,
+        0.9448954341618789
       ],
-      "median": 0.7110819919271126,
-      "relativeMad": 0.00456223413856523,
-      "relativeRange": 0.14230829584915564
+      "median": 0.9388777393082309,
+      "relativeMad": 0.0154331011061913,
+      "relativeRange": 0.04231898366860999
     },
     {
       "name": "dashboard-damage/command",
       "numerator": "display|增量仪表盘（真实渲染）|单区域 damage",
       "denominator": "display|增量仪表盘（真实渲染）|96 区域命令全场重放",
       "samples": [
-        0.9891925046769099,
-        1.1123982303941424,
-        1.0119050888418972,
-        1.0186088846745627,
-        0.9825678329173221
+        0.9902288987022003,
+        0.983300109367607,
+        0.9655825043918906,
+        0.9563560654407838,
+        0.9743304432342369
       ],
-      "median": 1.0119050888418972,
-      "relativeMad": 0.02244537004056515,
-      "relativeRange": 0.12830293958241512
+      "median": 0.9743304432342369,
+      "relativeMad": 0.009205979547960973,
+      "relativeRange": 0.03476524160425237
     }
-  ]
+  ],
+  "captureDigest": "853c22618688f313541d06c2bb16d7936e593d1fb321ad4e4931c2b4f2388568",
+  "promotion": {
+    "promotedAt": "2026-08-31T17:51:36+08:00",
+    "protocol": "explicit-reviewed-candidate-v1"
+  }
 }

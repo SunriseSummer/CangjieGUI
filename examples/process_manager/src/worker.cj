@@ -18,6 +18,12 @@ class RefreshWorker {
 
     init(snapshotFixture!: ?String = None) {
         this.snapshotFixture = snapshotFixture
+        // Snapshot E2E must not race its first frame against a spawned fixture publisher. Seed the
+        // same mailbox that production workers publish into; interactive runs still start empty.
+        match (snapshotFixture) {
+            case Some(snapshot) => pending = Some(snapshot)
+            case None => ()
+        }
     }
 
     func request(): Unit {
@@ -85,6 +91,10 @@ func tick(frame: FrameInfo, model: ProcessModel, worker: RefreshWorker): Unit {
             model.output.value = snapshot
             model.selectedRow.value = rowIndexOfPid(model.processRows.value, pid)
             model.refreshedTick.value = frame.elapsedMs
+            // The automatic interval starts when the result reaches the UI, not when the possibly
+            // expensive request began. It also prevents a pre-seeded snapshot from immediately
+            // launching a duplicate refresh in the same frame.
+            model.requestedTick.value = frame.elapsedMs
         case None => ()
     }
     let requested = model.requestedTick.value

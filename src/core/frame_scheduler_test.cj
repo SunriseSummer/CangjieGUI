@@ -2,6 +2,20 @@ package cui.core
 
 import std.sync.{AtomicBool, SyncCounter}
 
+private class SchedulerTransferProbe {
+    var rejected = false
+}
+
+private class SchedulerNestedTransactionProbe {
+    var notifications: Int64 = 0
+    var current: Int64 = -1
+
+    func record(value: Int64): Unit {
+        notifications += 1
+        current = value
+    }
+}
+
 @Test
 func frameSchedulerCoalescesNestedTransactions(): Unit {
     let scheduler = FrameScheduler()
@@ -24,6 +38,61 @@ func frameSchedulerCoalescesNestedTransactions(): Unit {
         }
     )
     @Expect(state.value, Int64(3))
+}
+
+@Test
+func frameSchedulerDefersAndCoalescesStateNotifications(): Unit {
+    let scheduler = FrameScheduler()
+    let state = State<Int64>(0)
+    let notifications = State<Int64>(0)
+    let previousValue = State<Int64>(-1)
+    let currentValue = State<Int64>(-1)
+    let observation = state.observe(
+        {
+            previous, current =>
+                notifications.value += 1
+                previousValue.value = previous
+                currentValue.value = current
+        }
+    )
+
+    withFrameScheduler(
+        scheduler,
+        {
+            =>
+                scheduler.transaction(
+                    {
+                        =>
+                            state.value = 1
+                            state.value = 2
+                            @Expect(notifications.value, Int64(0))
+                    }
+                )
+        }
+    )
+
+    @Expect(notifications.value, Int64(1))
+    @Expect(previousValue.value, Int64(0))
+    @Expect(currentValue.value, Int64(2))
+    observation.close()
+}
+
+@Test
+func frameSchedulerFlushesObserverWritesBeforeDerivedEffects(): Unit {
+    let scheduler = FrameScheduler()
+    let source = State<Int64>(0)
+    let reflected = State<Int64>(0)
+    let total = derive(source, reflected, {left, right => left + right})
+    let observed = State<Int64>(-1)
+    let sourceObservation = source.observe({_, current => reflected.value = current * 10})
+    let totalObservation = total.observe({_, current => observed.value = current})
+
+    withFrameScheduler(scheduler, {=> scheduler.transaction({=> source.value = 3})})
+
+    @Expect(reflected.value, Int64(30))
+    @Expect(observed.value, Int64(33))
+    sourceObservation.close()
+    totalObservation.close()
 }
 
 @Test
@@ -196,4 +265,62 @@ func stateTransfersInvalidationToSequentialAppOnTheSameThread(): Unit {
 
     @Expect(first.generation, firstBefore)
     @Expect(second.generation, UInt64(1))
+}
+
+@Test
+func stateRejectsTransferWhilePreviousSchedulerTransactionIsActive(): Unit {
+    let first = FrameScheduler()
+    let second = FrameScheduler()
+    let state = State<Int64>(0)
+    let probe = SchedulerTransferProbe()
+
+    withFrameScheduler(
+        first,
+        {
+            =>
+                let _ = state.value
+                first.transaction(
+                    {
+                        => try {
+                            withFrameScheduler(second, {=> state.value = 1})
+                        } catch (_: IllegalStateException) {
+                            probe.rejected = true
+                        }
+                    }
+                )
+        }
+    )
+
+    @Expect(probe.rejected)
+    @Expect(state.value, Int64(0))
+    @Expect(first.generation, UInt64(0))
+    @Expect(second.generation, UInt64(0))
+}
+
+@Test
+func observerNestedTransactionJoinsOuterSettlement(): Unit {
+    let scheduler = FrameScheduler()
+    let source = State<Int64>(0)
+    let reflected = State<Int64>(0)
+    let probe = SchedulerNestedTransactionProbe()
+    let sourceObservation = source.observe(
+        {_, current => scheduler.transaction({=> reflected.value = current * 10})}
+    )
+    let reflectedObservation = reflected.observe({_, current => probe.record(current)})
+
+    withFrameScheduler(
+        scheduler,
+        {
+            =>
+                let before = scheduler.generation
+                scheduler.transaction({=> source.value = 3})
+                @Expect(scheduler.generation, before + UInt64(1))
+        }
+    )
+
+    @Expect(reflected.value, Int64(30))
+    @Expect(probe.notifications, Int64(1))
+    @Expect(probe.current, Int64(30))
+    sourceObservation.close()
+    reflectedObservation.close()
 }

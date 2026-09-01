@@ -18,8 +18,13 @@ private let VARIANT_COUNT: Int64 = 96
 
 main(): Int64 {
     if (pairedArgument()) {
-        runTextLayout(true)
-        runTextLayout(false)
+        if (reverseArgument()) {
+            runTextLayout(false)
+            runTextLayout(true)
+        } else {
+            runTextLayout(true)
+            runTextLayout(false)
+        }
         return 0
     }
     runTextLayout(stableArgument())
@@ -64,9 +69,17 @@ private func pairedArgument(): Bool {
     false
 }
 
+private func reverseArgument(): Bool {
+    for (argument in getCommandLine()) {
+        if (argument == "reverse") {
+            return true
+        }
+    }
+    false
+}
+
 private func makeVariants(chars: Int64, count: Int64): Array<String> {
-    let palette = "仓颉语言声明式界面框架渲染布局状态驱动组件示例文档测试性能基准长文换行段落缓存"
-        .toRuneArray()
+    let palette = "仓颉语言声明式界面框架渲染布局状态驱动组件示例文档测试性能基准长文换行段落缓存".toRuneArray()
     let variants = ArrayList<String>()
     for (seed in 0..count) {
         let builder = StringBuilder()

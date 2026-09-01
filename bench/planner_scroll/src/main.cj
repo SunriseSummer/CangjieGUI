@@ -9,8 +9,9 @@
  *
  * Arguments are passed through cjpm's `--run-args`:
  *   --run-args "8"          block count (default 16)
- *   --run-args "ss1"        supersample factor 1 (off); ss2 is the default — isolates fill cost
- *   --run-args "pair"       run ss2 then ss1 in one process so power/scheduler drift is shared
+ *   --run-args "auto"       physical-density-aware factor (the default)
+ *   --run-args "ss1"        exact supersample factor 1 (off); ss2 isolates fill cost
+ *   --run-args "pair"       run ss2, Auto, then ss1 in one process so drift is shared
  *   --run-args "--profile"  per-phase frame breakdown (build/layout/draw/resolve/present)
  * combine freely, e.g. --run-args "8 ss1 --profile".
  *
@@ -30,8 +31,15 @@ private let SCROLL_SPAN: Float32 = 3200.0
 
 main(): Int64 {
     if (pairedArgument()) {
-        runPlanner(2)
-        runPlanner(1)
+        if (reverseArgument()) {
+            runPlanner(1)
+            runPlanner(0)
+            runPlanner(2)
+        } else {
+            runPlanner(2)
+            runPlanner(0)
+            runPlanner(1)
+        }
         return 0
     }
     runPlanner(supersampleArgument())
@@ -42,11 +50,11 @@ private func runPlanner(supersample: Int32): Unit {
     let blocks = blocksArgument()
     let scroll = State<Float32>(0.0)
     let sweep = ScrollSweep(SCROLL_SPAN, SCROLL_STEP)
-    let accumulator = BenchAccumulator(group: "内容页滚动（上机实测）", name: "${blocks} 区块 ss${supersample}x", scroll: scroll,
-        sweep: sweep, frames: 150)
+    let accumulator = BenchAccumulator(group: "内容页滚动（上机实测）",
+        name: "${blocks} 区块 ${supersampleLabel(supersample)}", scroll: scroll, sweep: sweep, frames: 150)
     // vsync off + frameDelay 0 so the measured frame period is true per-frame work, not a refresh
     // multiple — otherwise every result snaps to 60/30/20/15 fps and sub-refresh gains are invisible.
-    // Pass `ss1`/`ss2` to isolate the supersample fill cost, `--profile` for a per-phase breakdown.
+    // Pass `auto`/`ss1`/`ss2` to compare policy and fill cost, `--profile` for phase breakdown.
     let app = DesktopApp(
         WindowSpec("CUI bench: planner scroll", 1120, 720, scale: 1.5, vsync: false, supersample: supersample),
         frameDelay: 0)
@@ -59,7 +67,8 @@ private func runPlanner(supersample: Int32): Unit {
 
 func plannerScrollView(scroll: State<Float32>, blocks: Int64): Unit {
     VStack {
-        Label("规划台滚动基准：右栏内容（LazyColumn 虚拟化）自动上下滚动，跑满固定帧数后自动退出。").fontSize(FontSizes.BODY)
+        Label("规划台滚动基准：右栏内容（LazyColumn 虚拟化）自动上下滚动，跑满固定帧数后自动退出。").fontSize(
+            FontSizes.BODY)
         Panel {
             lazyContentScrollScene(scroll, blocks)
         }.contentPadding(18.vp).flex()
@@ -80,10 +89,13 @@ private func blocksArgument(): Int64 {
     DEFAULT_BLOCKS
 }
 
-// Reads a supersample factor from a `ssN` argument (e.g. `ss1`, `ss2`), defaulting to 2. Isolates
-// the supersample fill cost: `ss1` turns it off, so the difference from `ss2` is that cost alone.
+// Reads Auto or an exact `ssN` factor (e.g. `ss1`, `ss2`), defaulting to Auto. Comparing ss1 and
+// ss2 isolates fill cost; Auto should resolve to the factor justified by physical backing density.
 private func supersampleArgument(): Int32 {
     for (arg in getCommandLine()) {
+        if (arg == "auto") {
+            return 0
+        }
         if (arg.size == 3 && arg[0] == UInt8(115) && arg[1] == UInt8(115)) { // "ss" + one digit
             let digit = arg[2]
             if (digit >= UInt8(49) && digit <= UInt8(57)) {
@@ -91,12 +103,29 @@ private func supersampleArgument(): Int32 {
             }
         }
     }
-    2
+    0
+}
+
+private func supersampleLabel(supersample: Int32): String {
+    if (supersample == 0) {
+        "Auto"
+    } else {
+        "ss${supersample}x"
+    }
 }
 
 private func pairedArgument(): Bool {
     for (arg in getCommandLine()) {
         if (arg == "pair") {
+            return true
+        }
+    }
+    false
+}
+
+private func reverseArgument(): Bool {
+    for (arg in getCommandLine()) {
+        if (arg == "reverse") {
             return true
         }
     }

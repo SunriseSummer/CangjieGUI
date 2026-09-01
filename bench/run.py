@@ -15,7 +15,8 @@ Usage:
     python bench/run.py --open          # ...and open it in a browser
     python bench/run.py --no-run        # reuse the last capture, just re-render the report
     python bench/run.py --display       # also run the display benchmarks (opens brief windows)
-    python bench/run.py --display --save-baseline # record a complete, stable regression baseline
+    python bench/run.py --display --capture-baseline-candidate # stage reviewed evidence
+    python bench/run.py --promote-baseline-candidate # explicitly replace the active baseline
     python bench/run.py --check         # 0 pass; 1 regression; 2 incomparable; 3 inconclusive
     python bench/run.py --samples 5     # take the per-case median of five independent runs
     python bench/run_test.py            # self-test the --check gate logic
@@ -34,10 +35,12 @@ import json
 import os
 import platform
 import statistics
+import struct
 import subprocess
 import sys
 import time
 import webbrowser
+from ctypes import wintypes
 from datetime import datetime
 from pathlib import Path
 
@@ -49,11 +52,17 @@ CAPTURE_META = RESULTS / "capture.meta.json"
 REPORT = RESULTS / "report.html"
 JSON_REPORT = RESULTS / "report.json"
 CHECK_JSON_REPORT = RESULTS / "check.json"
+BASELINE_CAPTURE_JSON_REPORT = RESULTS / "baseline-capture.json"
 BASELINE = ROOT / "baseline.json"
 BASELINE_META = ROOT / "baseline.meta.json"
+PLATFORM_BASELINES = ROOT / "baselines"
+BASELINE_CANDIDATE = RESULTS / "baseline-candidate.json"
+BASELINE_CANDIDATE_META = RESULTS / "baseline-candidate.meta.json"
 BUILT_WINDOWS_PACKAGES = set()
+CLEANED_BENCHMARK_PACKAGES = set()
 LAST_WINDOWS_BENCHMARK_END = None
 WINDOWS_BENCHMARK_COOLDOWN_SECONDS = 1.0
+BENCHMARK_AFFINITY = {"policy": "not-configured"}
 
 sys.path.insert(0, str(ROOT.parent / ".devtools"))
 from process_runner import run_command
@@ -87,6 +96,10 @@ NOISE_LIMIT = 0.10
 # ignores a lone scheduler spike that the median already rejects, while still refusing bimodal or
 # generally dispersed captures. The full range remains in reports as a tail diagnostic.
 SAMPLE_MAD_LIMIT = 0.10
+# A lone slow sample is safely rejected by the median. A lone sample more than 30% *faster* than
+# the median is different: on hybrid Windows CPUs it proves that the same process sometimes ran on
+# a faster core class, so the slower cluster cannot be called a code regression with confidence.
+SAMPLE_FAST_DOMAIN_RATIO = 0.70
 
 RATING_LABEL = {
     "ok": "120fps 就绪",
@@ -105,13 +118,37 @@ DISPLAY_CASES = [
     ("controls_form", "12 lazy ss2"),
     ("controls_form", "24 lazy ss2"),
     ("controls_form", "40 lazy ss2"),
+    ("controls_form", "40 measured ss2"),
     ("large_table", "pair"),
-    ("incremental_dashboard", None),
+    ("incremental_dashboard", "pair"),
 ]
+DISPLAY_CASE_REPETITIONS = {
+    ("planner_scroll", "pair"): 3,
+    ("controls_form", "12 ss2"): 3,
+    ("controls_form", "40 lazy ss2"): 3,
+    ("incremental_dashboard", "pair"): 3,
+}
+DISPLAY_WARMUP_ROUNDS = 2
+
+HEADLESS_GROUPS = [f"daily {index}" for index in range(25)]
+HEADLESS_GROUP_REPETITIONS = {
+    "daily 9": 11,
+    "daily 22": 5,
+    "daily 23": 3,
+}
 
 # Ratios whose numerator is the optimized path. Both sides are emitted by one benchmark process, so
 # they cancel most CPU/GPU power and presentation drift that absolute cross-process times cannot.
 PAIRED_COMPARISONS = [
+    ("lazy-index/key-cold",
+     "frame|scrollToIndex 扩展性|100000 项随机 scrollToIndex+帧",
+     "frame|scrollToKey 扩展性|100000 项随机 scrollToKey+帧"),
+    ("lazy-scroll-phase/full",
+     "frame|LazyColumn 滚动相位|增量物化",
+     "frame|LazyColumn 滚动相位|强制全量"),
+    ("observable-lazy-state/manual",
+     "frame|可观察惰性数据|10000 项 State 自动版本",
+     "frame|可观察惰性数据|10000 项 显式 snapshot+revision"),
     ("primitive-batch/single",
      "display|原语提交（上机实测）|2048 rect 相邻批处理",
      "display|原语提交（上机实测）|2048 rect 单条提交"),
@@ -121,6 +158,9 @@ PAIRED_COMPARISONS = [
     ("planner-ss1/ss2",
      "display|内容页滚动（上机实测）|16 区块 ss1x",
      "display|内容页滚动（上机实测）|16 区块 ss2x"),
+    ("planner-auto/ss1",
+     "display|内容页滚动（上机实测）|16 区块 Auto",
+     "display|内容页滚动（上机实测）|16 区块 ss1x"),
     ("large-table-5000/500",
      "display|大表绘制（上机实测）|5000 行窗口化",
      "display|大表绘制（上机实测）|500 行窗口化"),
@@ -133,6 +173,103 @@ PAIRED_COMPARISONS = [
 ]
 
 
+def baseline_capture_destination(save_alias, explicit_candidate):
+    """Resolve every capture spelling to staging; active baselines only change by promotion."""
+    if not (save_alias or explicit_candidate):
+        return None
+    return "candidate", BASELINE_CANDIDATE, BASELINE_CANDIDATE_META
+
+
+def select_performance_affinity(cpu_sets):
+    """Return a group-0 mask for the highest Windows CPU efficiency class, or None if uniform."""
+    available = [item for item in cpu_sets if item.get("group") == 0]
+    classes = {item.get("efficiencyClass") for item in available}
+    if len(classes) <= 1:
+        return None
+    fastest = max(classes)
+    mask = 0
+    for item in available:
+        if item.get("efficiencyClass") == fastest:
+            mask |= 1 << int(item["logicalProcessorIndex"])
+    return mask or None
+
+
+def windows_cpu_sets():
+    """Read logical CPU efficiency classes without optional packages; unavailable APIs yield []."""
+    if os.name != "nt":
+        return []
+    try:
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        query = kernel32.GetSystemCpuSetInformation
+        query.argtypes = [ctypes.c_void_p, wintypes.ULONG, ctypes.POINTER(wintypes.ULONG),
+                          wintypes.HANDLE, wintypes.ULONG]
+        query.restype = wintypes.BOOL
+        required = wintypes.ULONG()
+        process = kernel32.GetCurrentProcess()
+        query(None, 0, ctypes.byref(required), process, 0)
+        if required.value == 0:
+            return []
+        buffer = ctypes.create_string_buffer(required.value)
+        if not query(buffer, required.value, ctypes.byref(required), process, 0):
+            return []
+        result = []
+        offset = 0
+        while offset < required.value:
+            size, info_type = struct.unpack_from("<II", buffer, offset)
+            if size <= 0 or offset + size > required.value:
+                return []
+            if info_type == 0 and size >= 20:
+                group = struct.unpack_from("<H", buffer, offset + 12)[0]
+                logical, _, _, _, efficiency, flags = struct.unpack_from("<BBBBBB", buffer, offset + 14)
+                result.append({
+                    "group": group,
+                    "logicalProcessorIndex": logical,
+                    "efficiencyClass": efficiency,
+                    "parked": bool(flags & 1),
+                })
+            offset += size
+        return result
+    except (AttributeError, OSError, ValueError, struct.error):
+        return []
+
+
+def apply_benchmark_affinity():
+    """Pin hybrid Windows captures to the fastest CPU class so child processes share one domain."""
+    if os.name != "nt":
+        return {"policy": "os-default"}
+    cpu_sets = windows_cpu_sets()
+    mask = select_performance_affinity(cpu_sets)
+    if mask is None:
+        return {"policy": "windows-uniform", "cpuSetCount": len(cpu_sets)}
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    get_current_process = kernel32.GetCurrentProcess
+    get_current_process.argtypes = []
+    get_current_process.restype = wintypes.HANDLE
+    get_affinity = kernel32.GetProcessAffinityMask
+    get_affinity.argtypes = [wintypes.HANDLE, ctypes.POINTER(ctypes.c_size_t),
+                             ctypes.POINTER(ctypes.c_size_t)]
+    get_affinity.restype = wintypes.BOOL
+    set_affinity = kernel32.SetProcessAffinityMask
+    set_affinity.argtypes = [wintypes.HANDLE, ctypes.c_size_t]
+    set_affinity.restype = wintypes.BOOL
+    process = get_current_process()
+    process_mask = ctypes.c_size_t()
+    system_mask = ctypes.c_size_t()
+    if not get_affinity(process, ctypes.byref(process_mask), ctypes.byref(system_mask)):
+        raise RuntimeError(f"GetProcessAffinityMask failed: {ctypes.get_last_error()}")
+    selected = mask & process_mask.value
+    if selected == 0 or not set_affinity(process, ctypes.c_size_t(selected)):
+        raise RuntimeError(f"SetProcessAffinityMask failed: {ctypes.get_last_error()}")
+    selected_sets = [item for item in cpu_sets
+                     if item["group"] == 0 and selected & (1 << item["logicalProcessorIndex"])]
+    return {
+        "policy": "windows-highest-efficiency-class",
+        "mask": f"0x{selected:X}",
+        "logicalProcessors": [item["logicalProcessorIndex"] for item in selected_sets],
+        "efficiencyClass": max(item["efficiencyClass"] for item in selected_sets),
+    }
+
+
 def cjpm_command(action, run_args=None):
     command = ["cjpm", action]
     if run_args:
@@ -140,9 +277,23 @@ def cjpm_command(action, run_args=None):
     return command
 
 
+def ensure_fresh_benchmark_package(pkg_dir: Path, timeout: int):
+    """Clean one package once so coverage/profile caches cannot masquerade as benchmark binaries."""
+    package_key = str(pkg_dir.resolve())
+    if package_key in CLEANED_BENCHMARK_PACKAGES:
+        return
+    code, stdout, stderr, timed_out = run_command(cjpm_command("clean"), pkg_dir, timeout)
+    if code != 0:
+        suffix = f"; timed out after {timeout}s" if timed_out else ""
+        raise RuntimeError(f"cjpm clean failed in {pkg_dir} (exit {code}{suffix})\n{stdout}{stderr}")
+    CLEANED_BENCHMARK_PACKAGES.add(package_key)
+
+
 def run_cjpm(pkg_dir: Path, action: str = "run", timeout: int = 600, run_args=None) -> list:
     """Run `cjpm <action>` in pkg_dir and return its stdout as a list of lines."""
     global LAST_WINDOWS_BENCHMARK_END
+    if action == "run":
+        ensure_fresh_benchmark_package(pkg_dir, timeout)
     if action == "run" and os.name == "nt":
         # On Windows an optimized benchmark can emit its complete machine log in under two seconds.
         # `cjpm run` intermittently stalls while forwarding that fast child output into another
@@ -255,15 +406,97 @@ def diagnostic_contract_issues(counts):
                 issues.append("LRU churn did not exceed the paragraph-cache budget (no eviction observed)")
 
     planner_group = "内容页滚动（上机实测）"
-    measure_name = "16 区块 ss1x text measures"
-    compute_name = "16 区块 ss1x text computes"
-    if any(key[0] == planner_group and key[1].startswith("16 区块 ss1x text ") for key in values):
-        measures = values.get((planner_group, measure_name))
-        computes = values.get((planner_group, compute_name))
-        if measures is None or computes is None or measures <= 0:
-            issues.append("ss1 text-cache diagnostics are incomplete")
-        elif computes * 2 >= measures:
-            issues.append(f"ss1 logical text cache is ineffective: {computes} computes / {measures} measures")
+    for variant in ("ss2x", "Auto", "ss1x"):
+        prefix = f"16 区块 {variant} text "
+        if any(key[0] == planner_group and key[1].startswith(prefix) for key in values):
+            measure_name = f"16 区块 {variant} text measures"
+            compute_name = f"16 区块 {variant} text computes"
+            measures = values.get((planner_group, measure_name))
+            computes = values.get((planner_group, compute_name))
+            if measures is None or computes is None or measures <= 0:
+                issues.append(f"{variant} text-cache diagnostics are incomplete")
+            elif computes * 100 >= measures:
+                issues.append(
+                    f"{variant} scaled text-metrics cache lost warm reuse: {computes} computes / {measures} measures"
+                )
+
+    sampling_suffix = " sampling target pixels"
+    sampling_keys = [key for key in values if key[1].endswith(sampling_suffix)]
+    for group, pixel_name in sampling_keys:
+        prefix = pixel_name[:-len(sampling_suffix)]
+        pixels = values[(group, pixel_name)]
+        target_bytes = values.get((group, f"{prefix} sampling target bytes"))
+        max_texture_edge = values.get((group, f"{prefix} max texture edge"))
+        if target_bytes is None or max_texture_edge is None:
+            issues.append(f"{prefix} render-sampling diagnostics are incomplete")
+        elif target_bytes != pixels * 4 or max_texture_edge <= 0:
+            issues.append(
+                f"{prefix} render-sampling resource accounting is inconsistent: "
+                f"pixels={pixels}, bytes={target_bytes}, max edge={max_texture_edge}"
+            )
+
+    controls_group = "控件密集表单（上机实测）"
+    full_draw_name = "40 分区 全量 ss2x text draws"
+    lazy_draw_name = "40 分区 窗口化 ss2x text draws"
+    full_draws = values.get((controls_group, full_draw_name))
+    lazy_draws = values.get((controls_group, lazy_draw_name))
+    if full_draws is not None or lazy_draws is not None:
+        if full_draws is None or lazy_draws is None or lazy_draws <= 0:
+            issues.append("controls-form paint-culling diagnostics are incomplete")
+        elif full_draws > lazy_draws * 2:
+            issues.append(
+                f"ordinary ScrollView lost paint culling: {full_draws} full draws / {lazy_draws} virtualized draws"
+            )
+    measured_draw_name = "40 分区 自测量 ss2x text draws"
+    measured_measure_name = "40 分区 自测量 ss2x text measures"
+    full_measure_name = "40 分区 全量 ss2x text measures"
+    measured_draws = values.get((controls_group, measured_draw_name))
+    measured_measures = values.get((controls_group, measured_measure_name))
+    full_measures = values.get((controls_group, full_measure_name))
+    if measured_draws is not None or measured_measures is not None:
+        if (measured_draws is None or measured_measures is None or full_measures is None
+                or lazy_draws is None or lazy_draws <= 0):
+            issues.append("self-measuring virtualization diagnostics are incomplete")
+        else:
+            if measured_draws > lazy_draws * 2:
+                issues.append(
+                    f"self-measuring list lost paint windowing: {measured_draws} measured draws / {lazy_draws} fixed draws"
+                )
+            if measured_measures * 4 >= full_measures:
+                issues.append(
+                    f"self-measuring list lost layout windowing: {measured_measures} measured / {full_measures} full measures"
+                )
+
+    lazy_phase_group = "LazyColumn 滚动相位"
+    lazy_phase_keys = [key for key in values if key[0] == lazy_phase_group]
+    if lazy_phase_keys:
+        incremental_bodies = values.get((lazy_phase_group, "增量 body 总执行"))
+        full_bodies = values.get((lazy_phase_group, "强制全量 body 总执行"))
+        incremental_passes = values.get((lazy_phase_group, "增量稳定化总 pass"))
+        if incremental_bodies is None or full_bodies is None or incremental_passes is None:
+            issues.append("lazy scroll phase-split diagnostics are incomplete")
+        elif (full_bodies != 800 or incremental_bodies * 4 >= full_bodies
+              or incremental_passes != 800 + incremental_bodies):
+            issues.append(
+                "lazy scroll phase split lost discrete materialization: "
+                f"incremental bodies={incremental_bodies}, full bodies={full_bodies}, "
+                f"incremental passes={incremental_passes}"
+            )
+
+    lazy_navigation_groups = {"scrollToKey 扩展性", "scrollToIndex 扩展性"}
+    if any(key[0] in lazy_navigation_groups for key in values):
+        index_10k = values.get(("scrollToIndex 扩展性", "10000 项平均 key 访问"))
+        index_100k = values.get(("scrollToIndex 扩展性", "100000 项平均 key 访问"))
+        key_10k = values.get(("scrollToKey 扩展性", "10000 项平均 key 访问"))
+        key_100k = values.get(("scrollToKey 扩展性", "100000 项平均 key 访问"))
+        if index_10k is None or index_100k is None or key_10k is None or key_100k is None:
+            issues.append("lazy index/key navigation diagnostics are incomplete")
+        elif (index_10k > 128 or index_100k > 128 or index_100k > index_10k * 2
+              or key_100k <= index_100k * 10 or key_100k <= key_10k * 5):
+            issues.append(
+                "lazy index navigation lost total-size independence: "
+                f"index 10k/100k={index_10k}/{index_100k}, key 10k/100k={key_10k}/{key_100k}"
+            )
 
     automatic_groups = {"自动组合", "自动显示列表", "自动渲染边界"}
     if any(key[0] in automatic_groups for key in values):
@@ -514,11 +747,54 @@ def rotated_display_cases(cases, sample_index, sample_count):
     return list(cases[offset:]) + list(cases[:offset])
 
 
+def counterbalanced_run_args(run_args, sample_index):
+    """Alternate the internal order of same-process pairs across independent samples."""
+    if run_args == "pair" and sample_index % 2 == 1:
+        return "pair reverse"
+    return run_args
+
+
+def run_display_sample_case(app, run_args, timeout, sample_index):
+    """Capture pair variants in both orders before they become one independent sample."""
+    effective_run_args = counterbalanced_run_args(run_args, sample_index)
+    repetitions = DISPLAY_CASE_REPETITIONS.get((app, run_args), 1)
+    if run_args != "pair":
+        captures = [
+            run_cjpm(ROOT / app, "run", timeout, effective_run_args) for _ in range(repetitions)
+        ]
+        return median_capture(captures) if repetitions > 1 else captures[0]
+    reverse_run_args = "pair" if effective_run_args == "pair reverse" else "pair reverse"
+    captures = []
+    for repetition in range(repetitions):
+        first = effective_run_args if repetition % 2 == 0 else reverse_run_args
+        second = reverse_run_args if repetition % 2 == 0 else effective_run_args
+        captures.append(median_capture([
+            run_cjpm(ROOT / app, "run", timeout, first),
+            run_cjpm(ROOT / app, "run", timeout, second),
+        ]))
+    return median_capture(captures) if repetitions > 1 else captures[0]
+
+
+def run_headless_sample(timeout, sample_index, sample_count):
+    """Run the complete headless key set with a fresh process per GC/ownership domain."""
+    lines = []
+    for run_args in rotated_display_cases(HEADLESS_GROUPS, sample_index, sample_count):
+        repetitions = HEADLESS_GROUP_REPETITIONS.get(run_args, 1)
+        captures = []
+        for repetition in range(repetitions):
+            counterbalanced = run_args in ("daily 9", "daily 22") and repetition % 2 == 1
+            effective_run_args = f"{run_args} reverse" if counterbalanced \
+                else run_args
+            captures.append(run_cjpm(ROOT / "micro", "run", timeout, effective_run_args))
+        lines.extend(median_capture(captures) if repetitions > 1 else captures[0])
+    return lines
+
+
 def comparison_environment_mismatches(baseline, current):
     """List stable host/power fields that make two absolute benchmark runs incomparable."""
     fields = (
         "platform", "machine", "processor", "logicalCpuCount", "powerSource",
-        "powerScheme", "effectivePowerOverlay", "videoControllers",
+        "powerScheme", "effectivePowerOverlay", "videoControllers", "benchmarkAffinity",
     )
     mismatches = []
     for field in fields:
@@ -811,6 +1087,65 @@ def windows_power_environment():
             "acPowerOverlay": overlay_ac, "dcPowerOverlay": overlay_dc}
 
 
+def linux_power_environment(power_root=Path("/sys/class/power_supply")):
+    """Read kernel power-supply state without assuming a particular adapter or battery name."""
+    if not power_root.is_dir():
+        return {"powerSource": "unknown", "powerScheme": "unknown",
+                "effectivePowerOverlay": "unknown"}
+    adapters_online = False
+    battery_discharging = False
+    battery_on_ac = False
+    try:
+        for supply in power_root.iterdir():
+            supply_type = (supply / "type").read_text(encoding="utf-8").strip().lower()
+            if supply_type == "battery":
+                status_path = supply / "status"
+                status = status_path.read_text(encoding="utf-8").strip().lower() \
+                    if status_path.is_file() else "unknown"
+                battery_discharging = battery_discharging or status == "discharging"
+                battery_on_ac = battery_on_ac or status in ("charging", "full", "not charging")
+            elif supply_type in ("mains", "usb", "usb_c"):
+                online_path = supply / "online"
+                adapters_online = adapters_online or (
+                    online_path.is_file() and online_path.read_text(encoding="utf-8").strip() == "1")
+    except OSError:
+        return {"powerSource": "unknown", "powerScheme": "unknown",
+                "effectivePowerOverlay": "unknown"}
+    source = "ac" if adapters_online or battery_on_ac \
+        else "battery" if battery_discharging else "unknown"
+    return {"powerSource": source, "powerScheme": "unknown", "effectivePowerOverlay": "unknown"}
+
+
+def parse_macos_power_source(output):
+    lowered = output.lower()
+    if "ac power" in lowered:
+        return "ac"
+    if "battery power" in lowered:
+        return "battery"
+    return "unknown"
+
+
+def macos_power_environment():
+    try:
+        completed = subprocess.run(["pmset", "-g", "batt"], capture_output=True, text=True, timeout=10)
+        source = parse_macos_power_source(completed.stdout + completed.stderr) \
+            if completed.returncode == 0 else "unknown"
+    except (OSError, subprocess.TimeoutExpired):
+        source = "unknown"
+    return {"powerSource": source, "powerScheme": "unknown", "effectivePowerOverlay": "unknown"}
+
+
+def power_environment():
+    system = platform.system()
+    if system == "Windows":
+        return windows_power_environment()
+    if system == "Linux":
+        return linux_power_environment()
+    if system == "Darwin":
+        return macos_power_environment()
+    return {"powerSource": "unknown", "powerScheme": "unknown", "effectivePowerOverlay": "unknown"}
+
+
 def windows_video_environment():
     if os.name != "nt":
         return []
@@ -842,15 +1177,53 @@ def toolchain() -> str:
         return "-"
 
 
-def load_baseline():
-    if BASELINE.exists():
-        return json.loads(BASELINE.read_text(encoding="utf-8"))
+def baseline_profile(context=None):
+    """Return the host family/architecture that owns one non-portable performance baseline."""
+    if context is None:
+        system = platform.system()
+        machine = platform.machine()
+    else:
+        environment = context.get("hostEnvironment", {})
+        system = str(environment.get("system", "")).strip()
+        machine = str(environment.get("machine", "")).strip()
+        if not system:
+            platform_name = str(environment.get("platform", "")).lower()
+            if platform_name.startswith("windows"):
+                system = "windows"
+            elif platform_name.startswith("linux"):
+                system = "linux"
+            elif platform_name.startswith(("macos", "darwin")):
+                system = "macos"
+    system_key = {"windows": "windows", "linux": "linux", "darwin": "macos", "macos": "macos"}.get(
+        system.lower(), system.lower() or "unknown")
+    machine_key = {
+        "amd64": "x86_64", "x86_64": "x86_64", "x64": "x86_64",
+        "arm64": "arm64", "aarch64": "arm64",
+    }.get(machine.lower(), machine.lower() or "unknown")
+    safe_system = "".join(char if char.isalnum() or char in "-_" else "-" for char in system_key)
+    safe_machine = "".join(char if char.isalnum() or char in "-_" else "-" for char in machine_key)
+    return f"{safe_system}-{safe_machine}"
+
+
+def active_baseline_paths(context=None):
+    """Keep the checked-in Windows x64 path compatible; isolate every other target profile."""
+    profile = baseline_profile(context)
+    if profile == "windows-x86_64":
+        return BASELINE, BASELINE_META
+    return PLATFORM_BASELINES / f"{profile}.json", PLATFORM_BASELINES / f"{profile}.meta.json"
+
+
+def load_baseline(context=None):
+    data_path, _ = active_baseline_paths(context)
+    if data_path.exists():
+        return json.loads(data_path.read_text(encoding="utf-8"))
     return {}
 
 
-def load_baseline_metadata():
-    if BASELINE_META.exists():
-        return json.loads(BASELINE_META.read_text(encoding="utf-8"))
+def load_baseline_metadata(context=None):
+    _, metadata_path = active_baseline_paths(context)
+    if metadata_path.exists():
+        return json.loads(metadata_path.read_text(encoding="utf-8"))
     return {}
 
 
@@ -864,16 +1237,28 @@ def index_display_environments(records):
 
 def baseline_verdict_mode(context):
     power_source = str(context.get("hostEnvironment", {}).get("powerSource", "unknown")).lower()
-    return "observational" if power_source == "battery" else "gate"
+    return "gate" if power_source == "ac" else "observational"
 
 
-def save_baseline(frame, display, display_environments, stability, context, sample_count):
+def baseline_capture_digest(data, metadata):
+    """Bind baseline values and provenance into one reviewable, tamper-evident capture."""
+    captured_metadata = dict(metadata)
+    captured_metadata.pop("captureDigest", None)
+    captured_metadata.pop("promotion", None)
+    document = {"baseline": data, "metadata": captured_metadata}
+    encoded = json.dumps(
+        document, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def baseline_documents(frame, display, display_environments, stability, context, sample_count):
     data = {f"{r['kind']}|{r['group']}|{r['name']}": r["ns"] for r in list(frame) + list(display)}
-    write_text_lf(BASELINE, json.dumps(data, ensure_ascii=False, indent=2) + "\n")
     metadata = {
         "schemaVersion": 1,
         "generatedAt": datetime.now().astimezone().isoformat(timespec="seconds"),
         "samples": sample_count,
+        "baselineProfile": baseline_profile(context),
         "verdictMode": baseline_verdict_mode(context),
         "source": context["source"],
         "hostEnvironment": context["hostEnvironment"],
@@ -881,28 +1266,214 @@ def save_baseline(frame, display, display_environments, stability, context, samp
         "sampleStability": stability,
         "pairedComparisons": paired_comparison_stability(stability),
     }
-    write_text_lf(BASELINE_META, json.dumps(metadata, ensure_ascii=False, indent=2) + "\n")
+    metadata["captureDigest"] = baseline_capture_digest(data, metadata)
+    return data, metadata
+
+
+def save_baseline(
+        frame, display, display_environments, stability, context, sample_count,
+        data_path=None, metadata_path=None, label="baseline"):
+    data_path = data_path or BASELINE
+    metadata_path = metadata_path or BASELINE_META
+    data, metadata = baseline_documents(
+        frame, display, display_environments, stability, context, sample_count)
+    write_text_lf(data_path, json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False) + "\n")
+    write_text_lf(metadata_path, json.dumps(metadata, ensure_ascii=False, indent=2, allow_nan=False) + "\n")
     mode = metadata["verdictMode"]
-    print(f"{mode.capitalize()} baseline saved to {BASELINE} ({len(data)} cases).")
-    print(f"Baseline provenance saved to {BASELINE_META}.")
+    print(f"{mode.capitalize()} {label} saved to {data_path} ({len(data)} cases).")
+    print(f"{label.capitalize()} provenance saved to {metadata_path}.")
+
+
+def candidate_promotion_issues(data, metadata):
+    """Return every reason a staged capture is unsafe to make the hard regression baseline."""
+    issues = []
+    if not isinstance(data, dict) or not isinstance(metadata, dict):
+        return ["candidate values and provenance must both be JSON objects"]
+    if metadata.get("schemaVersion") != 1:
+        issues.append("candidate provenance is missing or has an unsupported schema")
+    recorded_profile = metadata.get("baselineProfile")
+    derived_profile = baseline_profile({"hostEnvironment": metadata.get("hostEnvironment", {})})
+    if recorded_profile is not None and recorded_profile != derived_profile:
+        issues.append("candidate baseline profile does not match its captured host")
+    if metadata.get("verdictMode") != "gate":
+        issues.append("candidate is observational; only a stable AC capture can be promoted")
+    if baseline_verdict_mode({"hostEnvironment": metadata.get("hostEnvironment", {})}) != "gate":
+        issues.append("candidate host environment is not eligible for a hard gate")
+    try:
+        sample_count = int(metadata.get("samples", 0))
+    except (TypeError, ValueError):
+        sample_count = 0
+    if sample_count < 3:
+        issues.append("candidate used fewer than 3 independent samples")
+
+    expected_digest = metadata.get("captureDigest")
+    try:
+        actual_digest = baseline_capture_digest(data, metadata)
+    except (TypeError, ValueError):
+        actual_digest = None
+    if not expected_digest or actual_digest != expected_digest:
+        issues.append("candidate capture digest is missing or does not match its values/provenance")
+
+    source = metadata.get("source", {})
+    source = source if isinstance(source, dict) else {}
+    for repository in ("cangjieGui", "cangjieSdl"):
+        fingerprint = source.get(repository, {})
+        fingerprint = fingerprint if isinstance(fingerprint, dict) else {}
+        digest = fingerprint.get("sourceDigest")
+        if digest in (None, "", "unavailable"):
+            issues.append(f"candidate lacks a usable {repository} source fingerprint")
+
+    stability = metadata.get("sampleStability", [])
+    if not isinstance(stability, list):
+        stability = []
+        issues.append("candidate sample stability must be an array")
+    expected_keys = []
+    records = []
+    valid_stability = []
+    for sample in stability:
+        if not isinstance(sample, dict):
+            issues.append("candidate contains a malformed sample stability record")
+            continue
+        if sample.get("kind") not in ("frame", "display"):
+            continue
+        key = f"{sample.get('kind')}|{sample.get('group')}|{sample.get('name')}"
+        expected_keys.append(key)
+        samples = sample.get("samplesNs", [])
+        samples = samples if isinstance(samples, list) else []
+        if len(samples) != sample_count:
+            issues.append(f"candidate sample count mismatch for {key}")
+        numeric_samples = (len(samples) == sample_count and all(
+            isinstance(item, (int, float)) and not isinstance(item, bool)
+            and float("-inf") < item < float("inf") and item >= 0 for item in samples))
+        if not numeric_samples:
+            issues.append(f"candidate has malformed independent samples for {key}")
+        value = data.get(key)
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or value <= 0:
+            issues.append(f"candidate has no positive finite value for {key}")
+            continue
+        if not isinstance(value, bool) and isinstance(value, (int, float)) and not (float("-inf") < value < float("inf")):
+            issues.append(f"candidate has no positive finite value for {key}")
+            continue
+        if numeric_samples and statistics.median(samples) != value:
+            issues.append(f"candidate median does not match captured samples for {key}")
+        mad = sample.get("relativeMad")
+        if (not isinstance(mad, (int, float)) or isinstance(mad, bool)
+                or not float("-inf") < mad < float("inf") or mad < 0):
+            issues.append(f"candidate has no valid MAD for {key}")
+            continue
+        records.append({
+            "kind": sample.get("kind"), "group": sample.get("group"),
+            "name": sample.get("name"), "ns": value,
+        })
+        valid_stability.append(sample)
+
+    if not expected_keys or not any(key.startswith("frame|") for key in expected_keys):
+        issues.append("candidate does not contain the headless frame suite")
+    if not any(key.startswith("display|") for key in expected_keys):
+        issues.append("candidate does not contain the real-window display suite")
+    if len(expected_keys) != len(set(expected_keys)):
+        issues.append("candidate contains duplicate frame/display stability records")
+    if set(data) != set(expected_keys):
+        missing = sorted(set(expected_keys) - set(data))
+        unexpected = sorted(set(data) - set(expected_keys))
+        if missing:
+            issues.append(f"candidate is missing {len(missing)} captured frame/display case(s)")
+        if unexpected:
+            issues.append(f"candidate contains {len(unexpected)} uncaptured frame/display case(s)")
+
+    display_keys = {key.removeprefix("display|") for key in expected_keys if key.startswith("display|")}
+    display_environments = metadata.get("displayEnvironments", {})
+    display_environments = display_environments if isinstance(display_environments, dict) else {}
+    environment_keys = set(display_environments)
+    if display_keys != environment_keys:
+        issues.append("candidate display environments do not exactly cover its display cases")
+
+    expected_pairs = [item[0] for item in PAIRED_COMPARISONS]
+    pairs = metadata.get("pairedComparisons", [])
+    if not isinstance(pairs, list):
+        pairs = []
+        issues.append("candidate paired A/B evidence must be an array")
+    elif any(not isinstance(item, dict) for item in pairs):
+        issues.append("candidate contains a malformed paired A/B record")
+        pairs = [item for item in pairs if isinstance(item, dict)]
+    actual_pairs = [item.get("name") for item in pairs]
+    if sorted(actual_pairs) != sorted(expected_pairs):
+        issues.append("candidate paired A/B coverage does not match the current benchmark contract")
+    for item in pairs:
+        mad = item.get("relativeMad")
+        if (not isinstance(mad, (int, float)) or isinstance(mad, bool)
+                or not float("-inf") < mad < float("inf") or mad < 0):
+            issues.append(f"candidate has no valid paired MAD for {item.get('name')}")
+        elif mad > SAMPLE_MAD_LIMIT:
+            issues.append(f"unstable paired candidate {item.get('name')}: ratio MAD "
+                          f"{mad * 100:.0f}%")
+
+    for key, sample in sorted(unstable_material_keys(records, valid_stability, data).items()):
+        issues.append(f"unstable candidate case {key}: sample MAD {sample['relativeMad'] * 100:.0f}%")
+    return issues
+
+
+def promote_baseline_candidate(
+        candidate_path=None, candidate_metadata_path=None,
+        baseline_path=None, baseline_metadata_path=None):
+    candidate_path = candidate_path or BASELINE_CANDIDATE
+    candidate_metadata_path = candidate_metadata_path or BASELINE_CANDIDATE_META
+    if not candidate_path.exists() or not candidate_metadata_path.exists():
+        print("No complete baseline candidate; capture one with --capture-baseline-candidate.", file=sys.stderr)
+        return 2
+    try:
+        data = json.loads(candidate_path.read_text(encoding="utf-8"))
+        metadata = json.loads(candidate_metadata_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        print(f"Cannot read baseline candidate: {error}", file=sys.stderr)
+        return 2
+    issues = candidate_promotion_issues(data, metadata)
+    candidate_context = {"hostEnvironment": metadata.get("hostEnvironment", {})}
+    candidate_profile = metadata.get("baselineProfile") or baseline_profile(candidate_context)
+    current_profile = baseline_profile()
+    if candidate_profile != current_profile:
+        issues.append(
+            f"candidate belongs to {candidate_profile}, but promotion is running on {current_profile}")
+    if issues:
+        print("Baseline candidate cannot be promoted:", file=sys.stderr)
+        for issue in issues:
+            print(f"  {issue}", file=sys.stderr)
+        return 2
+    default_baseline_path, default_baseline_metadata_path = active_baseline_paths(candidate_context)
+    baseline_path = baseline_path or default_baseline_path
+    baseline_metadata_path = baseline_metadata_path or default_baseline_metadata_path
+    promoted = dict(metadata)
+    promoted["promotion"] = {
+        "promotedAt": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "protocol": "explicit-reviewed-candidate-v1",
+    }
+    write_text_lf(baseline_path, json.dumps(data, ensure_ascii=False, indent=2, allow_nan=False) + "\n")
+    write_text_lf(
+        baseline_metadata_path,
+        json.dumps(promoted, ensure_ascii=False, indent=2, allow_nan=False) + "\n")
+    print(f"Promoted reviewed AC baseline candidate ({len(data)} cases) to {baseline_path}.")
+    print(f"Promotion audit record saved to {baseline_metadata_path}.")
+    return 0
 
 
 def host_environment():
     result = {
+        "system": platform.system(),
         "platform": platform.platform(),
         "machine": platform.machine(),
         "processor": platform.processor(),
         "logicalCpuCount": os.cpu_count(),
         "python": platform.python_version(),
     }
-    result.update(windows_power_environment())
+    result.update(power_environment())
     result["videoControllers"] = windows_video_environment()
+    result["benchmarkAffinity"] = BENCHMARK_AFFINITY
     return result
 
 
 def write_json_report(
         path, frame, micro, display, distributions, display_environments,
-        counts, sample_count, check_code, context, stability):
+        counts, sample_count, check_code, context, stability, baseline_capture=None):
     """Write the complete machine-readable report even when ``--check`` exits before HTML render."""
     baseline = load_baseline()
     records = list(frame) + list(display)
@@ -933,6 +1504,8 @@ def write_json_report(
         "generatedAt": datetime.now().astimezone().isoformat(timespec="seconds"),
         "commit": git_commit(),
         "toolchain": toolchain(),
+        "baselineProfile": baseline_profile(context),
+        "activeBaseline": str(active_baseline_paths(context)[0]),
         "hostEnvironment": context["hostEnvironment"],
         "source": context["source"],
         "baselineSource": load_baseline_metadata().get("source"),
@@ -956,11 +1529,14 @@ def write_json_report(
         "pairedComparisons": paired_comparison_stability(stability),
         "counts": counts,
     }
+    if baseline_capture is not None:
+        payload["baselineCapture"] = baseline_capture
     write_text_lf(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
 
 
 def write_text_lf(path, text):
     """Write deterministic UTF-8/LF artifacts on every host, including checked-in baselines."""
+    path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="\n") as stream:
         stream.write(text)
 
@@ -1065,7 +1641,10 @@ def unstable_material_keys(records, stability, base=None):
         key = f"{record['kind']}|{record['group']}|{record['name']}"
         sample = by_key.get(key)
         material = max(float(record["ns"]), float(base.get(key, 0))) >= MATERIAL_NS
-        if material and sample is not None and sample["relativeMad"] > SAMPLE_MAD_LIMIT:
+        fast_domain_outlier = record["kind"] == "frame" and sample is not None and \
+            sample.get("medianNs", 0) > 0 and \
+            sample.get("minNs", 0) < sample["medianNs"] * SAMPLE_FAST_DOMAIN_RATIO
+        if material and sample is not None and (sample["relativeMad"] > SAMPLE_MAD_LIMIT or fast_domain_outlier):
             unstable[key] = sample
     return unstable
 
@@ -1079,7 +1658,8 @@ def baseline_capture_issues(
     if not allow_timing_noise:
         unstable = unstable_material_keys(list(frame) + list(display), stability)
         for key, sample in sorted(unstable.items()):
-            issues.append(f"unstable baseline case {key}: sample MAD {sample['relativeMad'] * 100:.0f}%")
+            issues.append(f"unstable baseline case {key}: sample MAD {sample['relativeMad'] * 100:.0f}%, "
+                          f"range {sample['relativeRange'] * 100:.0f}%")
     paired = paired_comparison_stability(stability)
     if len(paired) != len(PAIRED_COMPARISONS):
         issues.append(f"complete baseline requires {len(PAIRED_COMPARISONS)} paired comparisons; got {len(paired)}")
@@ -1120,7 +1700,7 @@ def check_regressions(
     stability = stability or []
     base = load_baseline()
     if not base:
-        print("No baseline.json; run with --save-baseline first.", file=sys.stderr)
+        print("No baseline.json; capture and promote a reviewed baseline candidate first.", file=sys.stderr)
         return 2
     if baseline_metadata is not None:
         issues = baseline_context_issues(baseline_metadata, current_context or {}, display_environments)
@@ -1137,7 +1717,7 @@ def check_regressions(
         print("Baseline coverage error: current benchmark cases are not gated:", file=sys.stderr)
         for key in missing:
             print(f"  {key}", file=sys.stderr)
-        print("Run the complete intended suite with --save-baseline after reviewing its results.", file=sys.stderr)
+        print("Capture the complete intended suite, review it, then promote the candidate.", file=sys.stderr)
         return 2
     if diagnostic_issues:
         print("Deterministic performance feature contracts failed:", file=sys.stderr)
@@ -1215,7 +1795,8 @@ def check_regressions(
 
     if unstable:
         inconclusive = True
-        print(f"\nINCONCLUSIVE sample dispersion (MAD limit {SAMPLE_MAD_LIMIT * 100:.0f}%):")
+        print(f"\nINCONCLUSIVE sample dispersion (MAD limit {SAMPLE_MAD_LIMIT * 100:.0f}%; "
+              f"fast-domain floor {SAMPLE_FAST_DOMAIN_RATIO * 100:.0f}% of median):")
         for key, sample in sorted(unstable.items()):
             print(f"  {key}: {sample['relativeMad'] * 100:.0f}% MAD, "
                   f"{sample['relativeRange'] * 100:.0f}% full range across "
@@ -1275,32 +1856,57 @@ def main() -> int:
     ap.add_argument("--no-run", action="store_true", help="reuse the last capture instead of rebuilding")
     ap.add_argument("--open", action="store_true", help="open the report when finished")
     ap.add_argument("--display", action="store_true", help="also run the display benchmarks")
-    ap.add_argument("--save-baseline", action="store_true", help="record current costs as the regression baseline")
+    ap.add_argument("--save-baseline", action="store_true",
+                    help="deprecated alias for --capture-baseline-candidate; never overwrites the active gate")
+    ap.add_argument("--capture-baseline-candidate", action="store_true",
+                    help="stage a complete reviewable baseline without replacing the active gate")
+    ap.add_argument("--promote-baseline-candidate", action="store_true",
+                    help="promote a reviewed stable AC candidate without running benchmarks")
     ap.add_argument("--check", action="store_true",
                     help="gate regressions; environment mismatch/noise also exit non-zero")
     ap.add_argument("--timeout", type=int, default=600, help="timeout for each benchmark process (default 600s)")
     ap.add_argument("--samples", type=int,
-                    help="independent runs aggregated by median/MAD (default 5 for --check/--save-baseline, else 1)")
+                    help="independent runs aggregated by median/MAD (default 5 for gate/candidate actions, else 1)")
     args = ap.parse_args()
 
     if args.timeout <= 0:
         ap.error("--timeout must be greater than zero")
     if args.samples is not None and args.samples <= 0:
         ap.error("--samples must be greater than zero")
+    if args.promote_baseline_candidate:
+        incompatible = (args.display or args.no_run or args.open or args.check or args.save_baseline
+                        or args.capture_baseline_candidate or args.samples is not None)
+        if incompatible:
+            ap.error("--promote-baseline-candidate must be used on its own")
+        return promote_baseline_candidate()
     if args.display and args.no_run:
         ap.error("--display cannot be combined with --no-run")
     if args.no_run and args.samples is not None:
         ap.error("--samples cannot be combined with --no-run")
-    if args.no_run and (args.check or args.save_baseline):
+    if args.no_run and (args.check or args.save_baseline or args.capture_baseline_candidate):
         ap.error("--no-run cannot be used for a baseline verdict or baseline capture")
-    if args.check and args.save_baseline:
-        ap.error("--check cannot be combined with --save-baseline")
-    if args.save_baseline and not args.display:
-        ap.error("--save-baseline requires --display so the reviewed baseline covers the complete suite")
+    baseline_actions = sum((args.check, args.save_baseline, args.capture_baseline_candidate))
+    if baseline_actions > 1:
+        ap.error("--check, --save-baseline and --capture-baseline-candidate are mutually exclusive")
+    if (args.save_baseline or args.capture_baseline_candidate) and not args.display:
+        ap.error("baseline capture requires --display so it covers the complete suite")
 
-    sample_count = args.samples or (5 if args.check or args.save_baseline else 1)
+    if args.save_baseline:
+        print("--save-baseline is a deprecated candidate-capture alias; explicit promotion is required.",
+              file=sys.stderr)
+
+    sample_count = args.samples or (
+        5 if args.check or args.save_baseline or args.capture_baseline_candidate else 1)
 
     RESULTS.mkdir(parents=True, exist_ok=True)
+    global BENCHMARK_AFFINITY
+    if not args.no_run:
+        try:
+            BENCHMARK_AFFINITY = apply_benchmark_affinity()
+        except RuntimeError as error:
+            print(f"Cannot establish a stable benchmark CPU domain: {error}", file=sys.stderr)
+            return 2
+        print(f"Benchmark CPU domain: {BENCHMARK_AFFINITY}")
     start_context = {"source": source_context(), "hostEnvironment": host_environment()}
     stability = []
 
@@ -1315,11 +1921,14 @@ def main() -> int:
         stability = capture_metadata.get("sampleStability", [])
     else:
         print(f"Building and running headless benchmarks (bench/micro, {sample_count} sample(s))...")
+        if sample_count > 1 and (args.check or args.save_baseline or args.capture_baseline_candidate):
+            print("  steady-state warm-up (not recorded)")
+            run_headless_sample(args.timeout, 0, sample_count)
         captures = []
         for sample in range(1, sample_count + 1):
             if sample_count > 1:
                 print(f"  sample {sample}/{sample_count}")
-            captures.append(run_cjpm(ROOT / "micro", "run", args.timeout))
+            captures.append(run_headless_sample(args.timeout, sample - 1, sample_count))
         stability.extend(capture_stability(captures))
         lines = [f"@@BENCH_META|samples|{sample_count}"] + median_capture(captures)
         RAW.write_text("\n".join(lines), encoding="utf-8")
@@ -1332,15 +1941,25 @@ def main() -> int:
     if args.display and not args.no_run:
         available_cases = [case for case in DISPLAY_CASES if (ROOT / case[0] / "cjpm.toml").exists()]
         captures_by_case = {case: [] for case in available_cases}
+        if sample_count > 1 and (args.check or args.save_baseline or args.capture_baseline_candidate):
+            print(f"  display steady-state warm-up ({DISPLAY_WARMUP_ROUNDS} unrecorded round(s))")
+            for warmup in range(DISPLAY_WARMUP_ROUNDS):
+                for app, run_args in rotated_display_cases(
+                        available_cases, warmup, DISPLAY_WARMUP_ROUNDS):
+                    run_cjpm(ROOT / app, "run", args.timeout,
+                             counterbalanced_run_args(run_args, warmup))
         print(f"Running {len(available_cases)} display cases in {sample_count} counterbalanced round(s) "
               f"(opens brief windows)...")
         for sample in range(sample_count):
             print(f"  display round {sample + 1}/{sample_count}")
             for app, run_args in rotated_display_cases(available_cases, sample, sample_count):
-                variant = f" [{run_args}]" if run_args else ""
+                effective_run_args = counterbalanced_run_args(run_args, sample)
+                shown_run_args = f"{effective_run_args} + opposite order" if run_args == "pair" \
+                    else effective_run_args
+                variant = f" [{shown_run_args}]" if shown_run_args else ""
                 print(f"    bench/{app}{variant}")
                 captures_by_case[(app, run_args)].append(
-                    run_cjpm(ROOT / app, "run", args.timeout, run_args))
+                    run_display_sample_case(app, run_args, args.timeout, sample))
         for case in available_cases:
             captures = captures_by_case[case]
             stability.extend(capture_stability(captures))
@@ -1381,7 +2000,20 @@ def main() -> int:
         for issue in diagnostic_issues:
             print(f"  {issue}", file=sys.stderr)
 
-    if args.save_baseline:
+    capture_destination = baseline_capture_destination(
+        args.save_baseline, args.capture_baseline_candidate)
+    if capture_destination is not None:
+        action, capture_data_path, capture_metadata_path = capture_destination
+
+        def write_baseline_capture_report(status, issues):
+            write_json_report(
+                BASELINE_CAPTURE_JSON_REPORT,
+                frame, micro, display, distributions, display_environments,
+                counts, sample_count, None, start_context, stability,
+                baseline_capture={"action": action, "status": status, "issues": list(issues)},
+            )
+            print(f"Structured baseline-capture report written to {BASELINE_CAPTURE_JSON_REPORT}")
+
         observational = baseline_verdict_mode(start_context) == "observational"
         strict_issues = baseline_capture_issues(
             frame, display, stability, sample_count, diagnostic_issues)
@@ -1389,16 +2021,21 @@ def main() -> int:
             frame, display, stability, sample_count, diagnostic_issues, allow_timing_noise=True,
         ) if observational else strict_issues
         if issues:
-            print("Baseline capture is not stable enough to save:", file=sys.stderr)
+            write_baseline_capture_report("rejected", issues)
+            print("Baseline capture is not complete and stable enough to save:", file=sys.stderr)
             for issue in issues:
                 print(f"  {issue}", file=sys.stderr)
             return 3
         if observational and strict_issues:
-            print("Saving an observational battery baseline with timing-noise warnings:")
+            print("Saving an observational battery candidate with timing-noise warnings:")
             for issue in strict_issues:
                 print(f"  {issue}")
-            print("  These values are report/reference data only and can never produce a hard PASS/FAIL.")
-        save_baseline(frame, display, display_environments, stability, start_context, sample_count)
+            print("  This candidate is report/reference data only and cannot be promoted.")
+        save_baseline(
+            frame, display, display_environments, stability, start_context, sample_count,
+            data_path=capture_data_path, metadata_path=capture_metadata_path,
+            label="baseline candidate")
+        write_baseline_capture_report("saved", [])
     check_code = None
     if args.check:
         check_code = check_regressions(

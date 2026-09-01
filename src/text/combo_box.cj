@@ -2,9 +2,9 @@ package cui.text
 
 import std.collection.ArrayList
 import sdl.{Color, FontSizes, Key, MouseButton, Rect, Size, SurfaceStyle, UiEvent}
-import cui.core.{drawFieldChevron, Bindable, CUI_CONTROL_H, CUI_SMALL_H, Overlay, ScrollBar, State, UiContext, Widget,
-    resolveControlKey, buildChild, clampItemIndex, clampScrollOffset, drawSurface, drawVerticalScrollBar, emit,
-    localState, scrollBarGutter, scrollOffsetAfterWheel}
+import cui.core.{drawFieldChevron, Bindable, CUI_CONTROL_H, CUI_SMALL_H, Overlay, PaintOutset, ScrollBar, State,
+    UiContext, Widget, resolveControlKey, buildChild, clampItemIndex, clampScrollOffset, drawSurface,
+    drawVerticalScrollBar, emit, localState, scrollBarGutter, scrollOffsetAfterWheel}
 
 private let COMBO_POPUP_PAD: Float32 = 5.0
 private let COMBO_GAP: Float32 = 4.0
@@ -52,7 +52,8 @@ public class ComboBox <: Widget {
         this.anchorState = anchor
         // The embedded field shares this control's identity (so focus and state line up), passed as
         // its explicit key.
-        this.field = buildChild("ComboBox.field", {=> TextField(text, key: ident, cursor: Some(cursor), anchor: Some(anchor))})
+        this.field = buildChild("ComboBox.field",
+            {=> TextField(text, key: ident, cursor: Some(cursor), anchor: Some(anchor))})
         this.overlayOwner = "ComboBox:${ident}"
         this.open = localState<Bool>("ComboBox:${ident}:open") {false}
         this.highlight = localState<Int64>("ComboBox:${ident}:hl") {0}
@@ -111,6 +112,10 @@ public class ComboBox <: Widget {
 
     public func focusableId(): ?String {
         Some(fieldId) // the embedded field owns the focus stop
+    }
+
+    public func paintOutset(): PaintOutset {
+        field.paintOutset()
     }
 
     private func toggleOpen(ctx: UiContext): Unit {

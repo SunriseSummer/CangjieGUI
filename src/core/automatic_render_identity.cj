@@ -5,10 +5,14 @@ import sdl.{Rect, Size}
 func sameWidget(left: Widget, right: Widget): Bool {
     if (let Some(leftObject) <- (left as Object)) {
         if (let Some(rightObject) <- (right as Object)) {
-            return refEq(leftObject, rightObject)
+            return sameObjectReference(leftObject, rightObject)
         }
     }
     false
+}
+
+func sameObjectReference(left: Object, right: Object): Bool {
+    refEq(left, right)
 }
 
 func sameAutomaticNode(left: AutomaticRenderNode, right: AutomaticRenderNode): Bool {

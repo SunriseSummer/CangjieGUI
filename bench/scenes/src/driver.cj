@@ -123,6 +123,11 @@ public class BenchAccumulator {
         reportCount(group, "${name} paragraph hits", paragraph.hits)
         reportCount(group, "${name} paragraph misses", paragraph.misses)
         reportCount(group, "${name} paragraph evictions", paragraph.evictions)
+        let sampling = ctx.renderer.renderSamplingStats()
+        reportCount(group, "${name} sampling target pixels",
+            UInt64(sampling.targetWidth) * UInt64(sampling.targetHeight))
+        reportCount(group, "${name} sampling target bytes", sampling.estimatedTargetBytes)
+        reportCount(group, "${name} max texture edge", UInt64(sampling.maxTextureSize))
         reportFrameDistribution(group, name, frameDistribution(samples.toArray()))
         reportBenchmarkEnvironment(
             group,

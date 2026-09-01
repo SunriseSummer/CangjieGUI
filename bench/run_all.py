@@ -39,15 +39,22 @@ def main():
     parser.add_argument("--display", action="store_true", help="include real-window GPU/text benchmarks")
     parser.add_argument("--check", action="store_true", help="apply bench/baseline.json regression gate")
     parser.add_argument("--save-baseline", action="store_true",
-                        help="save the daily/display suite as the reviewed regression baseline")
+                        help="deprecated alias for --capture-baseline-candidate")
+    parser.add_argument("--capture-baseline-candidate", action="store_true",
+                        help="stage the daily/display suite for review without replacing the active gate")
     parser.add_argument("--skip-self-tests", action="store_true", help="skip Python benchmark-tool self-tests")
     args = parser.parse_args()
     if args.samples <= 0:
         parser.error("--samples must be greater than zero")
     if args.timeout <= 0:
         parser.error("--timeout must be greater than zero")
-    if args.check and args.save_baseline:
-        parser.error("--check cannot be combined with --save-baseline")
+    if sum((args.check, args.save_baseline, args.capture_baseline_candidate)) > 1:
+        parser.error("--check, --save-baseline and --capture-baseline-candidate are mutually exclusive")
+    if (args.save_baseline or args.capture_baseline_candidate) and not args.display:
+        parser.error("baseline capture requires --display")
+    if args.save_baseline:
+        print("--save-baseline is a deprecated candidate-capture alias; promote separately with run.py.",
+              file=sys.stderr)
 
     steps = []
     tooling_ready = True
@@ -70,8 +77,8 @@ def main():
             daily.append("--display")
         if args.check:
             daily.append("--check")
-        if args.save_baseline:
-            daily.append("--save-baseline")
+        if args.save_baseline or args.capture_baseline_candidate:
+            daily.append("--capture-baseline-candidate")
         steps.append(run_step("daily/headless and display suite", daily))
 
     # The architecture suite is independent evidence. A daily regression or an honest inconclusive
@@ -88,13 +95,16 @@ def main():
         "samples": args.samples,
         "display": args.display,
         "baselineCheck": args.check,
-        "baselineSaved": args.save_baseline,
+        "baselineSaved": False,
+        "baselineCandidateCaptured": args.capture_baseline_candidate or args.save_baseline,
+        "deprecatedSaveBaselineAliasUsed": args.save_baseline,
         "exitCode": exit_code,
         "steps": steps,
         "reports": {
             "html": str(RESULTS / "report.html"),
             "json": str(RESULTS / "report.json"),
             "checkJson": str(RESULTS / "check.json"),
+            "baselineCaptureJson": str(RESULTS / "baseline-capture.json"),
             "architectureMarkdown": str(RESULTS / "phase3.md"),
             "architectureJson": str(RESULTS / "phase3.json"),
         },

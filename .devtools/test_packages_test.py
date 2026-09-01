@@ -54,6 +54,55 @@ Summary: TOTAL: 5
         self.assertEqual(environment["GCOV_PREFIX_STRIP"], "100")
         self.assertEqual(environment.get("PATH"), os.environ.get("PATH"))
 
+    def test_coverage_session_removes_only_its_generated_metadata_root(self):
+        with tempfile.TemporaryDirectory(dir=runner.ROOT / "target") as temporary:
+            base = Path(temporary)
+            metadata = base / "cov_output"
+            sibling = base / "keep"
+            metadata.mkdir()
+            sibling.mkdir()
+            (metadata / "stale.gcno").write_bytes(b"stale")
+            (sibling / "user.txt").write_text("keep", encoding="utf-8")
+
+            runner.reset_coverage_metadata(metadata)
+
+            self.assertFalse(metadata.exists())
+            self.assertEqual((sibling / "user.txt").read_text(encoding="utf-8"), "keep")
+
+    def test_coverage_session_removes_only_the_cjpm_release_cache(self):
+        with tempfile.TemporaryDirectory(dir=runner.ROOT / "target") as temporary:
+            base = Path(temporary)
+            release = base / "release"
+            sibling = base / "cross-platform"
+            release.mkdir()
+            sibling.mkdir()
+            (release / "compiled.bin").write_bytes(b"generated")
+            (sibling / "evidence.json").write_text("{}", encoding="utf-8")
+
+            runner.reset_cjpm_build_cache(release)
+
+            self.assertFalse(release.exists())
+            self.assertEqual((sibling / "evidence.json").read_text(encoding="utf-8"), "{}")
+
+    def test_coverage_session_rejects_a_symlink_metadata_root(self):
+        with tempfile.TemporaryDirectory(dir=runner.ROOT / "target") as temporary:
+            base = Path(temporary)
+            target = base / "actual"
+            link = base / "cov_output"
+            target.mkdir()
+            try:
+                link.symlink_to(target, target_is_directory=True)
+            except OSError:
+                self.skipTest("symbolic links are unavailable on this Windows host")
+            with self.assertRaisesRegex(ValueError, "symbolic link"):
+                runner.reset_coverage_metadata(link)
+            self.assertTrue(target.is_dir())
+
+    def test_coverage_session_rejects_generated_roots_outside_workspace(self):
+        outside = Path(tempfile.gettempdir()) / "release"
+        with self.assertRaisesRegex(ValueError, "within the workspace"):
+            runner.reset_cjpm_build_cache(outside)
+
     def test_coverage_sources_are_normalized_from_staging(self):
         with tempfile.TemporaryDirectory(dir=runner.ROOT / "target") as temporary:
             base = Path(temporary)
@@ -72,6 +121,48 @@ Summary: TOTAL: 5
             payload = json.loads(report.read_text(encoding="utf-8"))
             self.assertEqual(payload["fileLists"][0]["filepath"], "src/core/state.cj")
             self.assertEqual(payload["fileLists"][1]["filepath"], "src/core/state.cj")
+
+    def test_coverage_staging_recovers_production_graph_from_another_package_build(self):
+        with tempfile.TemporaryDirectory(dir=runner.ROOT / "target") as temporary:
+            base = Path(temporary)
+            metadata = base / "cov_output"
+            current = metadata / "cui.core"
+            donor = metadata / "cui.controls"
+            counters = base / "counters"
+            staging = base / "staging"
+            current.mkdir(parents=True)
+            donor.mkdir(parents=True)
+            counters.mkdir(parents=True)
+            (current / "0-cui.core$test.gcno").write_bytes(b"test graph")
+            (donor / "0-cui.core.gcno").write_bytes(b"production graph")
+            (counters / "0-cui.core.gcda").write_bytes(b"production counter")
+            (counters / "0-cui.core$test.gcda").write_bytes(b"test counter")
+
+            graphs, counter_count = runner.stage_coverage_inputs(
+                "core", counters, staging, metadata_root=metadata)
+
+            self.assertEqual((graphs, counter_count), (1, 1))
+            self.assertEqual((staging / "0-cui.core.gcno").read_bytes(), b"production graph")
+            self.assertEqual((staging / "0-cui.core.gcda").read_bytes(), b"production counter")
+            self.assertFalse((staging / "0-cui.core$test.gcda").exists())
+
+    def test_coverage_staging_rejects_ambiguous_graph_generations(self):
+        with tempfile.TemporaryDirectory(dir=runner.ROOT / "target") as temporary:
+            base = Path(temporary)
+            metadata = base / "cov_output"
+            first = metadata / "cui.controls"
+            second = metadata / "cui.text"
+            current = metadata / "cui.core"
+            counters = base / "counters"
+            for directory in (first, second, current, counters):
+                directory.mkdir(parents=True)
+            (first / "0-cui.core.gcno").write_bytes(b"first generation")
+            (second / "0-cui.core.gcno").write_bytes(b"second generation")
+            (counters / "0-cui.core.gcda").write_bytes(b"counter")
+
+            with self.assertRaisesRegex(ValueError, "non-identical"):
+                runner.stage_coverage_inputs(
+                    "core", counters, base / "staging", metadata_root=metadata)
 
     def test_coverage_aggregation_unions_packages_and_excludes_tests_and_dependencies(self):
         with tempfile.TemporaryDirectory(dir=runner.ROOT / "target") as temporary:

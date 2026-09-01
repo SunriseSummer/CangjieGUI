@@ -16,7 +16,7 @@ package bench_controls_form
 
 import std.env.getCommandLine
 import cui.{DesktopApp, State, WindowSpec}
-import bench_scenes.{BenchAccumulator, BenchDriver, controlsFormScene, lazyControlsFormScene}
+import bench_scenes.{BenchAccumulator, BenchDriver, controlsFormScene, lazyControlsFormScene, measuredControlsFormScene}
 import bench_harness.ScrollSweep
 
 private let DEFAULT_SECTIONS = 40
@@ -27,10 +27,13 @@ main(): Int64 {
     let sections = sectionsArgument()
     let supersample = supersampleArgument()
     let lazy = lazyArgument()
+    let measured = measuredArgument()
     let scroll = State<Float32>(0.0)
     let sweep = ScrollSweep(SCROLL_SPAN, SCROLL_STEP)
     let mode = if (lazy) {
         "窗口化"
+    } else if (measured) {
+        "自测量"
     } else {
         "全量"
     }
@@ -44,11 +47,22 @@ main(): Int64 {
         BenchDriver(accumulator)
         if (lazy) {
             let _ = lazyControlsFormScene(scroll, sections)
+        } else if (measured) {
+            let _ = measuredControlsFormScene(scroll, sections)
         } else {
             let _ = controlsFormScene(scroll, sections)
         }
     }
     return 0
+}
+
+private func measuredArgument(): Bool {
+    for (arg in getCommandLine()) {
+        if (arg == "measured") {
+            return true
+        }
+    }
+    false
 }
 
 private func lazyArgument(): Bool {

@@ -2,9 +2,9 @@ package cui.controls
 
 import std.collection.ArrayList
 import sdl.{Color, FontSizes, Key, MouseButton, Rect, Size, UiEvent, clampF32}
-import cui.core.{clampItemIndex, Bindable, CUI_CONTROL_H, CUI_GAP, CursorShape, Spring, UiContext, Widget, buildChildren,
-    claimHoverIfInside, drawFocusRing, drawSurface, emit, focusableControlIdentity, localState, requireControlId,
-    unregisterFocusable, ellipsize}
+import cui.core.{clampItemIndex, Bindable, CUI_CONTROL_H, CUI_GAP, CursorShape, PaintOutset, Spring, UiContext, Widget,
+    buildChildren, claimHoverIfInside, drawFocusRing, drawSurface, emit, focusableControlIdentity, localState,
+    requireControlId, unregisterFocusable, ellipsize}
 
 private let SEGMENT_MIN_WIDTH: Float32 = 96.0
 private let SEGMENT_LABEL_PADDING: Float32 = 12.0
@@ -191,6 +191,15 @@ public class TabView <: Widget {
             }
         }
         ids.toArray()
+    }
+
+    public func paintOutset(): PaintOutset {
+        let strip = PaintOutset.all(4.0)
+        if (pages.size == 0) {
+            strip
+        } else {
+            strip.join(pages[pageIndex()].paintOutset())
+        }
     }
 
     private func pageIndex(): Int64 {

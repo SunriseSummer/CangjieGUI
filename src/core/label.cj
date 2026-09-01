@@ -13,6 +13,7 @@ private let LABEL_LINE_GAP: Float32 = 2.0
  */
 public class Label <: Widget {
     private let text: String
+    private let semanticId: String
     private var isMuted: Bool
     private var alignment: TextAlign
     private var textColor: ?Color
@@ -31,6 +32,7 @@ public class Label <: Widget {
     private var cachedLinesWidest: Float32 = 0.0
     private var cachedTextWidth: Float32 = -1.0
     private var cachedTextWidthPointSize: Float32 = -1.0
+    private var cachedMeasurementEnvironment: ?UiEnvironmentKey = None
 
     public init(
         text: String,
@@ -40,6 +42,7 @@ public class Label <: Widget {
         fontSize!: Length = Length(FontSizes.BODY, LengthUnit.Fp)
     ) {
         this.text = text
+        this.semanticId = controlIdentity("Label:${text}")
         this.isMuted = muted
         this.alignment = align
         this.textColor = color
@@ -135,6 +138,7 @@ public class Label <: Widget {
         cachedLines = None
         cachedLinesWidth = -1.0
         cachedLinesPointSize = -1.0
+        cachedMeasurementEnvironment = None
     }
 
     /**
@@ -172,8 +176,9 @@ public class Label <: Widget {
         Size(min(available.w, cachedLinesWidest), max(CUI_SMALL_H, textBlock + 6.0))
     }
 
-    public func layout(_: UiContext, rect: Rect): Unit {
+    public func layout(ctx: UiContext, rect: Rect): Unit {
         frame = rect
+        ctx.registerSemantics(SemanticsNode(semanticId, Semantics(label: text, role: SemanticsRole.Text), rect))
     }
 
     public func draw(ctx: UiContext): Unit {
@@ -212,6 +217,10 @@ public class Label <: Widget {
         false
     }
 
+    public func pointerEventScope(): PointerEventScope {
+        PointerEventScope.LayoutBounds
+    }
+
     private func drawColor(ctx: UiContext): Color {
         match (textColor) {
             case Some(value) => value
@@ -231,6 +240,7 @@ public class Label <: Widget {
     // Exact float comparison is deliberate in both caches: the keys are reused values,
     // not computed approximations, so equality means "same inputs as last time".
     private func singleLineWidth(ctx: UiContext, ps: Float32): Float32 {
+        prepareMeasurementEnvironment(ctx)
         if (cachedTextWidthPointSize != ps) { // cjcheck-ignore: float-equal # cache-key identity; miss only costs a re-measure
             cachedTextWidth = ctx.renderer.textWidth(text, pointSize: ps, style: textStyle, font: fontFace)
             cachedTextWidthPointSize = ps
@@ -239,6 +249,7 @@ public class Label <: Widget {
     }
 
     private func linesFor(ctx: UiContext, width: Float32, ps: Float32): Array<String> {
+        prepareMeasurementEnvironment(ctx)
         match (cachedLines) {
             case Some(lines) where cachedLinesWidth == width && cachedLinesPointSize == ps => lines // cjcheck-ignore: float-equal # cache-key identity; miss only costs a re-wrap
             case _ =>
@@ -248,6 +259,16 @@ public class Label <: Widget {
                 cachedLinesPointSize = ps
                 cachedLinesWidest = layout.widest
                 layout.lines
+        }
+    }
+
+    private func prepareMeasurementEnvironment(ctx: UiContext): Unit {
+        let environment = ctx.uiEnvironmentKey()
+        match (cachedMeasurementEnvironment) {
+            case Some(value) where sameUiEnvironment(value, environment) => return
+            case _ =>
+                dropMetricsCaches()
+                cachedMeasurementEnvironment = Some(environment)
         }
     }
 

@@ -444,14 +444,18 @@ public class TimePicker <: Widget {
     // minute in the middle. While a digit is being typed the whole group shows the active field
     // border, and an empty buffer ghosts the current minute so the box never reads blank.
     private func drawMinuteStepper(ctx: UiContext, popup: Rect, minute: Int64): Unit {
-        drawSurface(ctx, stepperRect(popup), ctx.theme.fieldSurface(active: editing.value))
+        let isEditing = editing.value
+        drawSurface(ctx, stepperRect(popup), ctx.theme.fieldSurface(active: isEditing))
         drawStepButton(ctx, minusRect(popup), "−")
         drawStepButton(ctx, plusRect(popup), "+")
         let box = valueRect(popup)
-        if (editing.value && !editBuffer.value.isEmpty()) {
-            ctx.renderer.textCenter(editBuffer.value, box, ctx.theme.text, pointSize: FontSizes.CONTROL)
-        } else if (editing.value) {
-            ctx.renderer.textCenter(padTwo(minute), box, ctx.theme.mutedText, pointSize: FontSizes.CONTROL)
+        if (isEditing) {
+            let buffer = editBuffer.value
+            if (buffer.isEmpty()) {
+                ctx.renderer.textCenter(padTwo(minute), box, ctx.theme.mutedText, pointSize: FontSizes.CONTROL)
+            } else {
+                ctx.renderer.textCenter(buffer, box, ctx.theme.text, pointSize: FontSizes.CONTROL)
+            }
         } else {
             ctx.renderer.textCenter(padTwo(minute), box, ctx.theme.text, pointSize: FontSizes.CONTROL)
         }

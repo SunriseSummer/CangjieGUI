@@ -22,7 +22,7 @@ ScrollView <: [`Widget`](Widget.md)
 
 偏移与滑块拖动状态标识默认由声明顺序自动派生；树的结构会变化（条件分支、动态列表）时给显式 `key!`，或用 [`scrollState`](#scrollstate) 换成外部持有的状态以便程序化滚动（如"发送后滚到底部"）。绘制在滚动轴上精确裁剪，交叉轴留出阴影余量，视口边缘卡片的软阴影不会被竖直切掉。
 
-数据量大的列表改用惰性容器 [`LazyColumn`](LazyColumn.md)/[`LazyList`](LazyList.md)：`ScrollView` 每帧测量并布局全部内容，惰性容器只构建视口附近的行。
+数据量大的列表改用惰性容器 [`LazyColumn`](LazyColumn.md)/[`LazyList`](LazyList.md)：`ScrollView` 每帧测量并布局全部内容，惰性容器只构建视口附近的行；变高内容可用 `LazyList.measured`，无需业务维护逐行高度。
 
 ## 示例
 

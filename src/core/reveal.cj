@@ -67,7 +67,10 @@ public class Reveal <: Widget {
         frame = rect
         // Lay the child out at its full natural height, anchored to the top; drawing clips it to the
         // revealed portion so it slides in from the top instead of squashing.
-        child.layout(ctx, Rect(rect.x, rect.y, rect.w, contentHeight))
+        let visible = Rect(rect.x, rect.y, rect.w, min(contentHeight * fraction(), rect.h))
+        ctx.withSpatialClip(verticalViewportSpatialClip(visible, child.paintOutset())) {
+            => child.layout(ctx, Rect(rect.x, rect.y, rect.w, contentHeight))
+        }
     }
 
     public func draw(ctx: UiContext): Unit {
@@ -84,9 +87,10 @@ public class Reveal <: Widget {
         if (visible <= 0.5) {
             return
         }
-        ctx.renderer.pushClip(Rect(frame.x, frame.y, frame.w, visible))
-        child.draw(ctx)
-        ctx.renderer.popClip()
+        ctx.drawWithinSpatialClip(
+            verticalViewportSpatialClip(Rect(frame.x, frame.y, frame.w, visible), child.paintOutset())) {
+            => child.draw(ctx)
+        }
     }
 
     /*
@@ -118,6 +122,18 @@ public class Reveal <: Widget {
 
     public func participatesInLayout(): Bool {
         child.participatesInLayout()
+    }
+
+    public func needsDetachedLayout(): Bool {
+        !isFullyCollapsed() && child.needsDetachedLayout()
+    }
+
+    public func paintOutset(): PaintOutset {
+        if (isFullyCollapsed()) {
+            PaintOutset()
+        } else {
+            child.paintOutset().horizontalOnly()
+        }
     }
 
     public func focusableIds(): Array<String> {

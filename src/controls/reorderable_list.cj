@@ -2,8 +2,8 @@ package cui.controls
 
 import std.collection.ArrayList
 import sdl.{MouseButton, Rect, Size, SurfaceStyle, UiEvent, clampF32}
-import cui.core.{CUI_SHADOW_CLEARANCE, CursorShape, State, UiContext, Widget, broadcastEvent, resolveControlKey,
-    buildLazyChildren, drawSurface, emit, lazyKeyOrIndex, localState}
+import cui.core.{CUI_SHADOW_CLEARANCE, CursorShape, PaintOutset, State, UiContext, Widget, broadcastEvent,
+    resolveControlKey, buildLazyChildren, drawSurface, emit, lazyKeyOrIndex, localState}
 
 // Width of the drag handle at the left of each row.
 private let REORDER_HANDLE_W: Float32 = 30.0
@@ -176,6 +176,14 @@ public class ReorderableList <: Widget {
         ids.toArray()
     }
 
+    public func paintOutset(): PaintOutset {
+        var result = PaintOutset.all(CUI_SHADOW_CLEARANCE)
+        for (row in rows) {
+            result = result.join(row.paintOutset())
+        }
+        result
+    }
+
     private func contentHeight(): Float32 {
         if (count <= 0) {
             0.0
@@ -270,14 +278,13 @@ public class ReorderableList <: Widget {
         let rowRect = Rect(frame.x, top, frame.w, rowHeight)
         if (lifted) {
             // A raised surface with a shadow so the dragged row reads as picked up.
-            drawSurface(ctx, rowRect, SurfaceStyle(ctx.theme.panelRaised, border: ctx.theme.accent,
-                radius: ctx.theme.controlRadius, borderWidth: 1.0, shadow: ctx.theme.shadow, shadowOffsetY: 5.0))
+            drawSurface(ctx, rowRect,
+                SurfaceStyle(ctx.theme.panelRaised, border: ctx.theme.accent, radius: ctx.theme.controlRadius,
+                    borderWidth: 1.0, shadow: ctx.theme.shadow, shadowOffsetY: 5.0))
         }
         drawHandle(ctx, Rect(frame.x, top, REORDER_HANDLE_W, rowHeight), lifted)
-        // The slot clip is widened by the shadow clearance so a card row's soft halo wraps its
-        // rounded corners instead of being sliced off at the slot boundary; row content itself is
-        // slot-sized, so only the halo occupies the margin.
-        ctx.renderer.pushClip(rowRect.inset(-CUI_SHADOW_CLEARANCE))
+        // Each row declares its own halo; the dragged surface is painted before this content clip.
+        ctx.renderer.pushClip(rows[i].paintOutset().expand(rowRect))
         rows[i].draw(ctx)
         ctx.renderer.popClip()
     }

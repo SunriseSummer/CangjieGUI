@@ -23,8 +23,8 @@ struct AutomaticSubtreeShape {
 
 class AutomaticCompositionRecord {
     var children: Array<Widget>
-    var focusableIds: Array<String>
-    var frameSubscribers: Array<FrameSubscriber>
+    var focusFragment: FocusSnapshot
+    var frameSubscribers: FrameSubscriptionSnapshot
     let mountScope: StateMountScope
     var usesRenderNodes: Bool
     var subtreeWeight: Int64
@@ -37,29 +37,29 @@ class AutomaticCompositionRecord {
         usesRenderNodes: Bool,
         subtreeWeight: Int64,
         subtreeMaxBranching: Int64,
-        focusableIds: Array<String>,
-        frameSubscribers: Array<FrameSubscriber>
+        focusFragment: FocusSnapshot,
+        frameSubscribers: FrameSubscriptionSnapshot
     ) {
         this.children = children
         this.mountScope = mountScope
         this.usesRenderNodes = usesRenderNodes
         this.subtreeWeight = subtreeWeight
         this.subtreeMaxBranching = subtreeMaxBranching
-        this.focusableIds = focusableIds
+        this.focusFragment = focusFragment
         this.frameSubscribers = frameSubscribers
         refreshDamageSink()
     }
 
     func replace(
         children: Array<Widget>,
-        focusableIds: Array<String>,
-        frameSubscribers: Array<FrameSubscriber>,
+        focusFragment: FocusSnapshot,
+        frameSubscribers: FrameSubscriptionSnapshot,
         usesRenderNodes: Bool,
         subtreeWeight: Int64,
         subtreeMaxBranching: Int64
     ): Unit {
         this.children = children
-        this.focusableIds = focusableIds
+        this.focusFragment = focusFragment
         this.frameSubscribers = frameSubscribers
         this.usesRenderNodes = usesRenderNodes
         this.subtreeWeight = subtreeWeight
@@ -103,8 +103,8 @@ class PendingAutomaticCompositionReplacement {
     let record: AutomaticCompositionRecord
     let reconciliation: AutomaticRenderReconciliation
     let children: Array<Widget>
-    let focusableIds: Array<String>
-    let frameSubscribers: Array<FrameSubscriber>
+    let focusFragment: FocusSnapshot
+    let frameSubscribers: FrameSubscriptionSnapshot
     let usesRenderNodes: Bool
     let subtreeWeight: Int64
     let subtreeMaxBranching: Int64
@@ -113,8 +113,8 @@ class PendingAutomaticCompositionReplacement {
         record: AutomaticCompositionRecord,
         reconciliation: AutomaticRenderReconciliation,
         children: Array<Widget>,
-        focusableIds: Array<String>,
-        frameSubscribers: Array<FrameSubscriber>,
+        focusFragment: FocusSnapshot,
+        frameSubscribers: FrameSubscriptionSnapshot,
         usesRenderNodes: Bool,
         subtreeWeight: Int64,
         subtreeMaxBranching: Int64
@@ -122,7 +122,7 @@ class PendingAutomaticCompositionReplacement {
         this.record = record
         this.reconciliation = reconciliation
         this.children = children
-        this.focusableIds = focusableIds
+        this.focusFragment = focusFragment
         this.frameSubscribers = frameSubscribers
         this.usesRenderNodes = usesRenderNodes
         this.subtreeWeight = subtreeWeight
@@ -131,7 +131,18 @@ class PendingAutomaticCompositionReplacement {
 
     func commit(): Unit {
         reconciliation.commit()
-        record.replace(children, focusableIds, frameSubscribers, usesRenderNodes, subtreeWeight, subtreeMaxBranching)
+        record.replace(
+            children,
+            focusFragment,
+            frameSubscribers,
+            usesRenderNodes,
+            subtreeWeight,
+            subtreeMaxBranching
+        )
+    }
+
+    func cancel(): Unit {
+        reconciliation.cancel()
     }
 }
 
@@ -148,8 +159,7 @@ extend StateStore {
 
         match (automaticEntries.get(path)) {
             case Some(record) where !forceFullRetainedExecution && !parentForcesChildren &&
-                !record.mountScope.buildDirty && record.mountScope.retainedKeys.isEmpty() &&
-                record.mountScope.effectKeys.isEmpty() =>
+                !record.mountScope.buildDirty && !record.mountScope.requiresExternalDeclarationReplay() =>
                 replayAutomaticComposition(record)
                 currentMountBuild(this).absorbAutomaticSubtree(record.subtreeWeight, record.subtreeMaxBranching)
                 record.buildHits += UInt64(1)
@@ -168,12 +178,14 @@ extend StateStore {
     ): Array<Widget> {
         let mountScope = match (previous) {
             case Some(existing) => existing.mountScope
-            case None => StateMountScope(currentMountScope(this), automaticDiagnosticScopedKey(identity))
+            case None => createElementMountScope(this, path, automaticDiagnosticScopedKey(identity),
+                ElementKind.Automatic)
         }
         let forceChildren = parentForcesChildren || previous.isNone() || mountScope.buildSelfDirty
         pushScope(identity)
         beginAutomaticMount(this, mountScope, forceChildren)
         let subscriberStart = frameSubscriberCount(this)
+        let focusStart = focusDeclarationCount()
         var subtreeShape = AutomaticSubtreeShape(1, 0)
         let rawChildren = try {
             body()
@@ -182,28 +194,27 @@ extend StateStore {
             popScope()
         }
         let subscribers = frameSubscribersFrom(this, subscriberStart)
+        let focusFragment = focusFragmentFrom(focusStart)
         let usesRenderNodes = shouldUseAutomaticRenderNodes(kind, rawChildren.size, subtreeShape, previous)
         let reconciliation = automaticRenderReconciliation(this, mountScope, previous, rawChildren, usesRenderNodes)
         let children = reconciliation.children
-        let focusables = collectFocusableIds(children)
         match (previous) {
             case Some(existing) => stageAutomaticReplacement(this,
-                PendingAutomaticCompositionReplacement(existing, reconciliation, children, focusables, subscribers,
+                PendingAutomaticCompositionReplacement(existing, reconciliation, children, focusFragment, subscribers,
                     usesRenderNodes, subtreeShape.weight, subtreeShape.maxBranching))
             case None =>
                 let created = AutomaticCompositionRecord(children, mountScope, usesRenderNodes, subtreeShape.weight,
-                    subtreeShape.maxBranching, focusables, subscribers)
+                    subtreeShape.maxBranching, focusFragment, subscribers)
                 let _ = automaticEntries.add(path, created) // cjcheck-ignore: ignore-result # path was checked absent
                 automaticAddedDuringBuild.add(path)
+                elementArena.attachAutomatic(mountScope.elementId, created)
         }
         children
     }
 
     private func replayAutomaticComposition(record: AutomaticCompositionRecord): Unit {
         replayFrameSubscribers(this, record.frameSubscribers)
-        for (id in record.focusableIds) {
-            registerFocusable(id)
-        }
+        registerFocusFragment(record.focusFragment)
     }
 
     private func nextAutomaticScopeIdentity(kind: String): String {
@@ -241,20 +252,15 @@ private func automaticRenderReconciliation(
             case Some(record) => automaticRenderNodes(record.children)
             case None => []
         }
-        return AutomaticRenderReconciliation(rawChildren, [], removed)
-    }
-    let invalidateComposition = {
-        =>
-            scope.markBuildDirty()
-            markFullRetainedDamage(store)
+        return AutomaticRenderReconciliation(rawChildren, [], removed, [])
     }
     let invalidateDamage = {rect: Rect => markRetainedDamage(store, rect)}
+    let scene = store.elementArena.sceneFacet(scope.elementId)
     match (previous) {
-        case Some(record) => reconcileAutomaticChildren(record.children, rawChildren, store.automaticPaintBudget,
-            invalidateComposition, invalidateDamage)
+        case Some(record) => reconcileAutomaticChildren(record.children, rawChildren, scene, store.automaticPaintBudget,
+            invalidateDamage)
         case None => AutomaticRenderReconciliation(
-            wrapAutomaticChildren(rawChildren, store.automaticPaintBudget, invalidateComposition, invalidateDamage), [],
-            [])
+            wrapAutomaticChildren(rawChildren, scene, store.automaticPaintBudget, invalidateDamage), [], [], [])
     }
 }
 
@@ -286,11 +292,18 @@ func automaticDescendantsForced(store: StateStore): Bool {
 }
 
 func beginAutomaticMount(store: StateStore, scope: StateMountScope, forceChildren: Bool): Unit {
-    let build = StateMountBuild(scope, collectStateReads: true, invalidate: {=> scope.markBuildDirty()},
-        forceAutomaticDescendants: forceChildren, automaticSubtreeWeight: 1)
+    let build = acquireMountBuild(
+        store,
+        scope,
+        collectStateReads: true,
+        invalidate: {=> scope.markBuildDirty()},
+        forceAutomaticDescendants: forceChildren,
+        automaticSubtreeWeight: 1
+    )
+    registerCurrentImplicitSlotScope(store, build)
     store.mountBuilds.add(build)
     store.activeMountBuilds.add(build)
-    beginStateReadCollection()
+    beginMountStateReadCollection(store)
 }
 
 func endAutomaticMount(store: StateStore): AutomaticSubtreeShape {
@@ -314,24 +327,29 @@ func removeAutomaticMount(store: StateStore, path: String): Unit {
     match (store.automaticEntries.get(path)) {
         case Some(record) =>
             record.closeRenderNodes()
-            for (statePath in record.mountScope.stateKeys) {
-                let _ = store.entries.remove(statePath) // cjcheck-ignore: ignore-result # state belongs to the automatic subtree
-            }
-            for (childPath in record.mountScope.retainedKeys) {
-                removeRetainedMount(store, childPath)
-            }
-            for (childPath in record.mountScope.automaticKeys) {
-                removeAutomaticMount(store, childPath)
+            match (record.mountScope.committedOwnership()) {
+                case Some(ownership) =>
+                    for (statePath in ownership.stateKeys) {
+                        let _ = store.entries.remove(statePath) // cjcheck-ignore: ignore-result # state belongs to the automatic subtree
+                    }
+                    for (childPath in ownership.retainedKeys) {
+                        removeRetainedMount(store, childPath)
+                    }
+                    for (childPath in ownership.automaticKeys) {
+                        removeAutomaticMount(store, childPath)
+                    }
+                case None => ()
             }
             stageLifecycleEffectsInScope(store, record.mountScope)
-            record.mountScope.stateKeys.clear()
-            record.mountScope.retainedKeys.clear()
-            record.mountScope.automaticKeys.clear()
-            record.mountScope.effectKeys.clear()
+            record.mountScope.clearCommittedOwnership()
             record.mountScope.closeBuildDependencies()
         case None => ()
     }
     let _ = store.automaticEntries.remove(path) // cjcheck-ignore: ignore-result # missing records are harmless during cleanup
+    match (store.elementArena.idForPath(path)) {
+        case Some(id) => store.elementArena.releaseIfLive(id)
+        case None => ()
+    }
 }
 
 /* Hosts opt into the automatic graph; direct StateStore transaction tests keep raw build semantics. */

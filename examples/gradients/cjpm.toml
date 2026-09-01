@@ -4,6 +4,7 @@ name = "cui_gradients"
 version = "0.1.0"
 output-type = "executable"
 description = "CUI linear-gradient backgrounds (gradientBackground) showcase."
+compile-option = "-O2"
 
 [dependencies]
 cui = { path = "../.." }

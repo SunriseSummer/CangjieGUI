@@ -14,7 +14,7 @@ public struct Shadow
 
 ## 说明
 
-阴影越大越伸出组件之外；在滚动容器内，特别大的模糊或扩散可能在视口边缘被裁剪（框架只保留固定的阴影余量），卡片高度保持适中即可——[`elevation`](#elevation) 预设的低档位都在余量内。需要商业级的立体感时用 [`keyAmbient`](#keyambient)：宽而淡的环境光晕叠上窄而深的主阴影，单层阴影读起来更平。
+阴影越大越伸出组件之外；modifier 会从 offset、blur 与 spread 自动产生非对称 [`PaintOutset`](PaintOutset.md)，滚动容器与 retained damage 因此保留完整 halo，同时仍在滚动轴严格裁剪。需要商业级的立体感时用 [`keyAmbient`](#keyambient)：宽而淡的环境光晕叠上窄而深的主阴影，单层阴影读起来更平。
 
 ## 示例
 

@@ -1,0 +1,297 @@
+name: Cross-platform qualification
+
+on:
+  workflow_dispatch:
+    inputs:
+      sdl_ref:
+        description: CangjieSDL branch, tag, or commit paired with this GUI revision
+        required: true
+        default: main
+        type: string
+      performance_mode:
+        description: Platform performance action; candidate/check require a stable AC runner
+        required: true
+        default: report
+        type: choice
+        options:
+          - report
+          - candidate
+          - check
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - .github/workflows/cross-platform-qualification.yml
+      - .devtools/**
+      - bench/**
+      - examples/**
+      - platform/**
+      - src/**
+      - cjpm.toml
+      - README.md
+      - docs/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cross-platform-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portable:
+    name: portable-${{ matrix.profile }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: linux-x86_64
+            runner: ubuntu-24.04
+          - profile: macos-arm64
+            runner: macos-15
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout CangjieGUI
+        uses: actions/checkout@v6
+        with:
+          path: CangjieGUI
+          persist-credentials: false
+
+      - name: Checkout paired CangjieSDL
+        uses: actions/checkout@v6
+        with:
+          repository: SunriseSummer/CangjieSDL
+          ref: ${{ inputs.sdl_ref || 'main' }}
+          path: CangjieSDL
+          persist-credentials: false
+
+      - name: Install Linux SDL build prerequisites
+        if: runner.os == 'Linux'
+        run: >-
+          sudo apt-get update &&
+          sudo apt-get install --yes
+          cmake ninja-build pkg-config libfreetype6-dev libharfbuzz-dev
+
+      - name: Install macOS SDL build prerequisites
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install cmake ninja pkg-config freetype harfbuzz
+          printf 'SDL_FREETYPE_PREFIX=%s\n' "$(brew --prefix freetype)" >> "$GITHUB_ENV"
+          printf 'SDL_HARFBUZZ_PREFIX=%s\n' "$(brew --prefix harfbuzz)" >> "$GITHUB_ENV"
+
+      - name: Verify portable bootstrap contracts
+        working-directory: CangjieGUI
+        run: >-
+          python .devtools/bootstrap_cross_platform_test.py &&
+          python .devtools/build_sdl_runtime_test.py &&
+          python .devtools/stage_sdl_runtime_test.py &&
+          python .devtools/cross_platform_workflow_test.py
+
+      - name: Fetch hash-pinned official toolchain sources
+        id: bootstrap
+        working-directory: CangjieGUI
+        run: >-
+          python .devtools/bootstrap_cross_platform.py
+          --profile ${{ matrix.profile }}
+
+      - name: Activate isolated Cangjie SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk='${{ steps.bootstrap.outputs.cangjie_root }}'
+          runtime='${{ steps.bootstrap.outputs.cangjie_runtime }}'
+          test -x "$sdk/bin/cjc"
+          test -d "$runtime"
+          test -d "$sdk/tools/lib"
+          printf 'CANGJIE_HOME=%s\n' "$sdk" >> "$GITHUB_ENV"
+          for directory in "$sdk/bin" "$sdk/tools/bin"; do
+            test -d "$directory"
+            printf '%s\n' "$directory" >> "$GITHUB_PATH"
+          done
+          runtime_paths="$runtime:$sdk/tools/lib"
+          printf '%s\n' "$runtime" "$sdk/tools/lib" >> "$GITHUB_PATH"
+          printf 'LD_LIBRARY_PATH=%s\n' "$runtime_paths" >> "$GITHUB_ENV"
+          printf 'DYLD_LIBRARY_PATH=%s\n' "$runtime_paths" >> "$GITHUB_ENV"
+
+      - name: Verify isolated Cangjie toolchain
+        run: cjc --version && cjpm --version
+
+      - name: Build pinned SDL shared runtimes
+        working-directory: CangjieGUI
+        shell: bash
+        run: |
+          set -euo pipefail
+          dependencies=()
+          if test "${{ runner.os }}" = "macOS"; then
+            dependencies+=(--dependency-prefix "$SDL_FREETYPE_PREFIX")
+            dependencies+=(--dependency-prefix "$SDL_HARFBUZZ_PREFIX")
+          fi
+          python .devtools/build_sdl_runtime.py \
+            --profile '${{ matrix.profile }}' \
+            --sdl-source '${{ steps.bootstrap.outputs.sdl_root }}' \
+            --sdl-ttf-source '${{ steps.bootstrap.outputs.sdl_ttf_root }}' \
+            --jobs 2 "${dependencies[@]}"
+
+      - name: Stage built SDL runtimes and loader paths
+        working-directory: CangjieGUI
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime="$PWD/target/toolchains/${{ matrix.profile }}/sdl-prefix"
+          python .devtools/stage_sdl_runtime.py --source "$runtime" --destination ../CangjieSDL/.sdl3
+          staged="$PWD/../CangjieSDL/.sdl3"
+          printf '%s\n' "$staged" >> "$GITHUB_PATH"
+          printf 'LD_LIBRARY_PATH=%s:%s\n' "$staged" "${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+          printf 'DYLD_LIBRARY_PATH=%s:%s\n' "$staged" "${DYLD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+          printf 'SDL_VIDEODRIVER=dummy\n' >> "$GITHUB_ENV"
+
+      - name: Build and test CangjieSDL headlessly
+        working-directory: CangjieSDL
+        run: cjpm build && cjpm test --no-progress
+
+      - name: Build and test CangjieGUI packages headlessly
+        working-directory: CangjieGUI
+        run: cjpm build && python .devtools/test_packages.py
+
+      - name: Verify documentation and public example builds
+        working-directory: CangjieGUI
+        run: >-
+          python .devtools/check_docs.py &&
+          python .devtools/test_examples.py --action build --jobs 2 --timeout 300
+
+      - name: Upload portability evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cui-${{ matrix.profile }}-portability
+          if-no-files-found: error
+          path: |
+            CangjieGUI/target/cross-platform/bootstrap-${{ matrix.profile }}.json
+            CangjieGUI/target/cross-platform/sdl-build-${{ matrix.profile }}.json
+            CangjieGUI/target/test-package-results/**
+
+  qualify:
+    name: ${{ matrix.profile }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: windows-x86_64
+            os_label: Windows
+            arch_label: X64
+          - profile: linux-x86_64
+            os_label: Linux
+            arch_label: X64
+          - profile: macos-arm64
+            os_label: macOS
+            arch_label: ARM64
+    runs-on: [self-hosted, "${{ matrix.os_label }}", "${{ matrix.arch_label }}", cangjie-1.0.5, cui-gui]
+
+    steps:
+      - name: Checkout CangjieGUI
+        uses: actions/checkout@v6
+        with:
+          path: CangjieGUI
+          persist-credentials: false
+
+      - name: Checkout paired CangjieSDL
+        uses: actions/checkout@v6
+        with:
+          repository: SunriseSummer/CangjieSDL
+          ref: ${{ inputs.sdl_ref || 'main' }}
+          path: CangjieSDL
+          persist-credentials: false
+
+      - name: Stage explicit SDL runtimes
+        working-directory: CangjieGUI
+        run: python .devtools/stage_sdl_runtime.py
+
+      - name: Verify tooling contracts
+        working-directory: CangjieGUI
+        run: >-
+          python .devtools/process_runner_test.py &&
+          python .devtools/test_packages_test.py &&
+          python .devtools/test_examples_test.py &&
+          python .devtools/test_desktop_lifecycle_test.py &&
+          python .devtools/snapshot_tool_test.py &&
+          python .devtools/bootstrap_cross_platform_test.py &&
+          python .devtools/build_sdl_runtime_test.py &&
+          python .devtools/cross_platform_workflow_test.py &&
+          python .devtools/stage_sdl_runtime_test.py &&
+          python .devtools/verify_release_bundle_test.py &&
+          python bench/run_test.py &&
+          python bench/compare_test.py &&
+          python bench/phase3_probe_test.py
+
+      - name: Build and test CangjieSDL
+        working-directory: CangjieSDL
+        run: cjpm build && cjpm test --no-progress
+
+      - name: Build and test CangjieGUI packages
+        working-directory: CangjieGUI
+        run: cjpm build && python .devtools/test_packages.py
+
+      - name: Verify documentation
+        working-directory: CangjieGUI
+        run: python .devtools/check_docs.py
+
+      - name: Build all public examples
+        working-directory: CangjieGUI
+        run: python .devtools/test_examples.py --action build --jobs 2 --timeout 300
+
+      - name: Verify real-window examples and retained equivalence
+        working-directory: CangjieGUI
+        run: python .devtools/test_examples.py --smoke-snapshots --retained-diff --timeout 300
+
+      - name: Verify Windows UI Automation client
+        if: matrix.profile == 'windows-x86_64'
+        working-directory: CangjieGUI
+        shell: pwsh
+        run: .devtools/check_windows_uia.ps1
+
+      - name: Verify clean release directory
+        working-directory: CangjieGUI
+        run: >-
+          python .devtools/verify_release_bundle.py
+          --expected-profile ${{ matrix.profile }}
+          --expected-sdk 1.0.5
+          --timeout 120
+          --build-timeout 240
+
+      - name: Capture target-platform performance environment
+        if: inputs.performance_mode == '' || inputs.performance_mode == 'report'
+        working-directory: CangjieGUI
+        run: python bench/run.py --display --samples 3 --timeout 600
+
+      - name: Capture reviewable target-platform baseline candidate
+        if: inputs.performance_mode == 'candidate'
+        working-directory: CangjieGUI
+        run: >-
+          python bench/run.py --display --samples 5
+          --capture-baseline-candidate --timeout 600
+
+      - name: Check target-platform performance baseline
+        if: inputs.performance_mode == 'check'
+        working-directory: CangjieGUI
+        run: python bench/run.py --display --samples 5 --check --timeout 600
+
+      - name: Verify incremental architecture evidence
+        working-directory: CangjieGUI
+        run: python bench/phase3_probe.py --samples 3 --timeout 600
+
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cui-${{ matrix.profile }}-qualification
+          if-no-files-found: error
+          path: |
+            CangjieGUI/target/cross-platform/**
+            CangjieGUI/target/test-package-results/**
+            CangjieGUI/examples/.e2e-results/**
+            CangjieGUI/bench/results/**

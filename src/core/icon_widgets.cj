@@ -61,6 +61,10 @@ public class Icon <: Widget {
         false
     }
 
+    public func pointerEventScope(): PointerEventScope {
+        PointerEventScope.LayoutBounds
+    }
+
     private func iconColor(ctx: UiContext): Color {
         match (iconColorOverride) {
             case Some(value) => value
@@ -138,8 +142,9 @@ public class IconButton <: Widget {
             // Measure at the same size draw uses (FontSizes.CONTROL), so the two cannot drift
             // apart if the token tables ever diverge from the measurement default.
             case Some(value) => max(76.0,
-                ICON_BUTTON_PAD * 2.0 + ICON_DEFAULT_SIZE + ICON_TEXT_GAP +
-                    ctx.renderer.textWidth(value, pointSize: FontSizes.CONTROL))
+                ICON_BUTTON_PAD * 2.0 + ICON_DEFAULT_SIZE + ICON_TEXT_GAP + ctx
+                    .renderer
+                    .textWidth(value, pointSize: FontSizes.CONTROL))
             case None => CUI_CONTROL_H
         }
         Size(min(available.w, width), CUI_CONTROL_H)
@@ -168,6 +173,10 @@ public class IconButton <: Widget {
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
         handleButtonProtocol(ctx, event, frame, controlId, onClick)
+    }
+
+    public func pointerEventScope(): PointerEventScope {
+        PointerEventScope.LayoutBounds
     }
 
     public func focusableId(): ?String {
@@ -253,6 +262,10 @@ public class Divider <: Widget {
 
     public func handle(_: UiContext, _: UiEvent): Bool {
         false
+    }
+
+    public func pointerEventScope(): PointerEventScope {
+        PointerEventScope.LayoutBounds
     }
 
     private func dividerRect(): Rect {

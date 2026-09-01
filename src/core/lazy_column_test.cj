@@ -29,6 +29,19 @@ class LazyBuiltIndices {
 }
 
 @Test
+func lazyColumnRejectsAmbiguousScrollOwner(): Unit {
+    let scroll = State<Float32>(0.0)
+    let controller = LazyViewportController()
+    var rejected = false
+    try {
+        let _ = LazyColumn(1, 20.0, scroll: scroll, controller: controller, id: "ambiguous.column") {_ => ()}
+    } catch (error: IllegalArgumentException) {
+        rejected = error.message == "LazyColumn accepts either scroll or controller, not both"
+    }
+    @Expect(rejected)
+}
+
+@Test
 func lazyContentHeightSumsRowsAndGaps(): Unit {
     @Expect(lazyContentHeight(0, 100.0, 10.0), 0.0)
     @Expect(lazyContentHeight(1, 100.0, 10.0), 100.0)
@@ -77,10 +90,9 @@ func lazyControllerScrollsToStableKeyAndRevisionAnchorsItAcrossInsert(): Unit {
     let controller = LazyViewportController()
     let data = State<Array<String>>(["k0", "k1", "k2", "k3", "k4", "k5", "k6", "k7", "k8", "k9"])
     let body: () -> Unit = {
-        =>
-            let snapshot = data.value
-            LazyColumn.of<String>(snapshot, 20.0, key: {value => value}, id: "anchor", revision: data.revision,
-                controller: controller) {_ => emit(Spacer())}
+        => LazyColumn.of<String>(data, 20.0, key: {value => value}, id: "anchor", controller: controller) {
+            _ => emit(Spacer())
+        }
     }
     let first = buildRoot(body, store)
     first.layout(testContext(), Rect(0.0, 0.0, 200.0, 80.0))
@@ -131,6 +143,35 @@ func lazyControllerMaterializesTargetForFocusAndRoutesItsPointerEvent(): Unit {
     @Expect(revealed.handle(ctx, UiEvent.MouseDown(MouseButton.Left, 20.0, 16.0)))
     @Expect(revealed.handle(ctx, UiEvent.MouseUp(MouseButton.Left, 20.0, 16.0)))
     @Expect(pressed.value, Int64(50))
+}
+
+@Test
+func lazyControllerScrollToIndexMaterializesTargetWithoutStableKeyLookup(): Unit {
+    let store = StateStore()
+    let controller = LazyViewportController()
+    let built = LazyBuiltIndices()
+    let body: () -> Unit = {
+        => LazyColumn(1000, 32.0, id: "index.reveal", controller: controller, overscan: 0.0) {
+            index =>
+                built.add(index)
+                emit(Spacer())
+        }
+    }
+    let first = buildRoot(body, store)
+    first.layout(testContext(), Rect(0.0, 0.0, 200.0, 96.0))
+
+    built.count = 0
+    built.low = Int64.Max
+    built.high = Int64.Min
+    controller.scrollToIndex(500, alignment: LazyScrollAlignment.Start)
+    let revealed = buildRoot(body, store)
+    revealed.layout(testContext(), Rect(0.0, 0.0, 200.0, 96.0))
+
+    @Expect(controller.offset, Float32(16000.0))
+    @Expect(controller.lastTargetFound())
+    @Expect(built.low <= Int64(500))
+    @Expect(built.high >= Int64(500))
+    @Expect(built.count < Int64(20))
 }
 
 @Test

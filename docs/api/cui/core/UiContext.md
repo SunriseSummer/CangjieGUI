@@ -98,6 +98,12 @@ main(): Unit {
 | [`clearTextInputAnchor()`](#cleartextinputanchor) | 清除已报告的插入符锚点；宿主在每帧绘制前调用。 |
 | [`textInputAnchorRect()`](#textinputanchorrect) | 返回本帧 `draw` 期间报告的插入符矩形；无聚焦文本控件时为 `None`。 |
 | [`setOverlay(overlay: Overlay)`](#setoverlay) | 登记一个交互浮层到已开浮层之上；同 `owner` 重复登记时原位替换。 |
+| [`semanticsSnapshot()`](#semanticssnapshot) | 返回当前平台无关的无障碍节点快照。 |
+| [`semanticsTreeSnapshot()`](#semanticstreesnapshot) | 返回带 revision 和 O(1) id 索引的已提交语义树。 |
+| [`focusedSemanticsNode()`](#focusedsemanticsnode) | 返回当前代际焦点所有者对应的已提交语义节点。 |
+| [`performSemanticsAction(id, action)`](#performsemanticsaction) | 对语义节点执行平台无关动作。 |
+| [`setAccessibilityAdapter(adapter)`](#setaccessibilityadapter) | 安装增量语义树 push adapter。 |
+| [`registerSemantics(node, perform!)`](#registersemantics) | 自定义 Widget 在布局时登记语义与动作。 |
 | [`removeOverlay(owner: String)`](#removeoverlay) | 移除登记在 `owner` 名下的浮层，栈中其余浮层保持打开。 |
 | [`clearActiveOverlay()`](#clearactiveoverlay) | 移除全部已开浮层；宿主在每帧树重新登记前调用。 |
 | [`hasOverlay()`](#hasoverlay) | 返回当前是否有交互浮层打开。 |
@@ -112,7 +118,7 @@ main(): Unit {
 | [`isPressed(id: String)`](#ispressed) | 返回 `id` 是否持有活动的主键按下。 |
 | [`clearPress()`](#clearpress) | 清除活动的主键按下。 |
 
-**字段**
+**属性与只读字段**
 
 | 成员 | 说明 |
 |---|---|
@@ -357,7 +363,7 @@ public func textInputAnchorRect(): ?Rect
 
 ### setOverlay
 
-登记一个交互浮层到已开浮层之上；同 `owner` 重复登记时原位替换。替换保持原有的 z 位置，打开中的控件因此每帧重复登记也不会越级。
+登记一个交互浮层到已开浮层之上；同 `owner` 重复登记时原位替换。替换保持原有的 z 位置，打开中的控件因此每帧重复登记也不会越级。owner 由内部索引定位，不随栈规模线性扫描；干净布局缓存会采用不可变有序片段而不逐项重登。
 
 ```cangjie
 public func setOverlay(overlay: Overlay): Unit
@@ -409,7 +415,7 @@ public func overlayCount(): Int64
 
 ### dispatchOverlay
 
-把事件自顶向下提供给已开浮层，返回是否被某层消费。未消费的层让事件落往下一层——模态层对一切返回 `true`，事件永远不会穿过对话框进入背后的树。公开给自定义宿主（不限于 `DesktopApp`）路由事件；派发走栈快照，处理器可在派发中途安全关闭浮层。
+把事件自顶向下提供给已开浮层，返回是否被某层消费。未消费的层让事件落往下一层——模态层对一切返回 `true`，事件永远不会穿过对话框进入背后的树。公开给自定义宿主（不限于 `DesktopApp`）路由事件；派发走栈快照，处理器可在派发中途安全关闭浮层。keyed 层通过 owner 索引确认仍存活，被上层移除的旧快照项不会收到事件。
 
 ```cangjie
 public func dispatchOverlay(event: UiEvent): Bool
@@ -508,7 +514,9 @@ public func isPressed(id: String): Bool
 public func clearPress(): Unit
 ```
 
-## 字段
+## 属性与只读字段
+
+交互状态保留原有的读写语法，但实现为 `public mut prop`，实际存储由 `cui.core` 拥有。宿主仍可赋值；viewport、display/font scale 与 clickCount 的 setter 会归一化非法范围，避免零缩放、负视口或越界连击数进入布局协议。
 
 ### renderer
 
@@ -528,138 +536,195 @@ public let theme: Theme
 
 ### focusId
 
-当前持有键盘焦点的控件 id；空串表示无焦点。`var` 字段，通常经 [`focus`](#focus)/[`clearFocus`](#clearfocus)/焦点遍历写入——直接赋值不会更新焦点环可见性。
+当前持有键盘焦点的控件 id；空串表示无焦点。可写属性通常经 [`focus`](#focus)/[`clearFocus`](#clearfocus)/焦点遍历写入——直接赋值不会更新焦点环可见性。
 
 ```cangjie
-public var focusId: String = ""
+public mut prop focusId: String
 ```
 
 ### focusRingVisible
 
-聚焦控件是否应绘制焦点环：焦点最后一次由键盘移动时为 `true`。`var` 字段；行为（激活、插入符、方向键）只看 `focusId`，仅焦点环受它门控。
+聚焦控件是否应绘制焦点环：焦点最后一次由键盘移动时为 `true`。行为（激活、插入符、方向键）只看 `focusId`，仅焦点环受它门控。
 
 ```cangjie
-public var focusRingVisible: Bool = false
+public mut prop focusRingVisible: Bool
 ```
 
 ### hoverId
 
-指针当前悬停的控件 id；空串表示无悬停。`var` 字段，由宿主在每次 MouseMove 派发后根据申请结果写入；控件通过 [`isHovered`](#ishovered) 读取它并绘制悬停状态。
+指针当前悬停的控件 id；空串表示无悬停。宿主在每次 MouseMove 派发后根据申请结果写入；控件通过 [`isHovered`](#ishovered) 读取它并绘制悬停状态。
 
 ```cangjie
-public var hoverId: String = ""
+public mut prop hoverId: String
 ```
 
 ### dragId
 
-活动拖拽所有者的控件 id；空串表示无拖拽。`var` 字段，经 [`beginDrag`](#begindrag)/[`clearDrag`](#cleardrag) 写入；滚动视口据它判断是否指针捕获。
+活动拖拽所有者的控件 id；空串表示无拖拽。经 [`beginDrag`](#begindrag)/[`clearDrag`](#cleardrag) 写入；滚动视口据它判断是否指针捕获。
 
 ```cangjie
-public var dragId: String = ""
+public mut prop dragId: String
 ```
 
 ### pressedId
 
-持有活动主键按下的控件 id；空串表示无按下。`var` 字段，经 [`press`](#press)/[`clearPress`](#clearpress) 写入。
+持有活动主键按下的控件 id；空串表示无按下。经 [`press`](#press)/[`clearPress`](#clearpress) 写入。
 
 ```cangjie
-public var pressedId: String = ""
+public mut prop pressedId: String
 ```
 
 ### tooltipText
 
-本帧要绘制在树上方的提示文本；空串表示本帧无提示。`var` 字段，经 [`showTooltip`](#showtooltip)/[`clearTooltip`](#cleartooltip) 写入，宿主在树之后据它绘制。
+本帧要绘制在树上方的提示文本；空串表示本帧无提示。经 [`showTooltip`](#showtooltip)/[`clearTooltip`](#cleartooltip) 写入，宿主在树之后据它绘制。
 
 ```cangjie
-public var tooltipText: String = ""
+public mut prop tooltipText: String
 ```
 
 ### tooltipAnchor
 
-本帧提示的锚点矩形，即触发提示的控件边界。`var` 字段，随 [`showTooltip`](#showtooltip) 一起写入。
+本帧提示的锚点矩形，即触发提示的控件边界，随 [`showTooltip`](#showtooltip) 一起写入。
 
 ```cangjie
-public var tooltipAnchor: Rect = Rect.zero()
+public mut prop tooltipAnchor: Rect
 ```
 
 ### mouseX
 
-指针当前的 x 坐标，逻辑像素。`var` 字段，宿主随指针事件更新；控件在无事件的 `draw` 里也能读到指针位置。
+指针当前的 x 坐标，逻辑像素。宿主随指针事件更新；控件在无事件的 `draw` 里也能读到指针位置。
 
 ```cangjie
-public var mouseX: Float32 = 0.0
+public mut prop mouseX: Float32
 ```
 
 ### mouseY
 
-指针当前的 y 坐标，逻辑像素。`var` 字段，宿主随指针事件更新。
+指针当前的 y 坐标，逻辑像素，宿主随指针事件更新。
 
 ```cangjie
-public var mouseY: Float32 = 0.0
+public mut prop mouseY: Float32
 ```
 
 ### leftMouseDown
 
-主键（左键）当前是否处于按住状态。`var` 字段，宿主随按下/释放事件更新；拖拽控制器据它判断拖拽是否仍在进行。
+主键（左键）当前是否处于按住状态。宿主随按下/释放事件更新；拖拽控制器据它判断拖拽是否仍在进行。
 
 ```cangjie
-public var leftMouseDown: Bool = false
+public mut prop leftMouseDown: Bool
 ```
 
 ### shouldClose
 
-应用是否已请求退出主循环。`var` 字段，[`requestClose`](#requestclose) 置位，宿主查询到即结束循环。
+应用是否已请求退出主循环。[`requestClose`](#requestclose) 置位，宿主查询到即结束循环。
 
 ```cangjie
-public var shouldClose: Bool = false
+public mut prop shouldClose: Bool
 ```
 
 ### frame
 
-本帧的时间信息：总流逝毫秒与帧间隔毫秒。`var` 字段，宿主每帧写入；连击判定与时间驱动动画都以它为时钟。
+本帧的时间信息：总流逝毫秒与帧间隔毫秒。宿主每帧写入；连击判定与时间驱动动画都以它为时钟。
 
 ```cangjie
-public var frame: FrameInfo = FrameInfo(UInt64(0), UInt64(0))
+public mut prop frame: FrameInfo
 ```
 
 ### viewportWidth
 
-绘制表面的逻辑宽度；浮层用它把弹出内容限制在窗口内。`var` 字段，宿主随窗口尺寸写入。
+绘制表面的逻辑宽度；浮层用它把弹出内容限制在窗口内。宿主随窗口尺寸写入，负值归一为 0。
 
 ```cangjie
-public var viewportWidth: Float32 = 0.0
+public mut prop viewportWidth: Float32
 ```
 
 ### viewportHeight
 
-绘制表面的逻辑高度；浮层用它把弹出内容限制在窗口内。`var` 字段，宿主随窗口尺寸写入。
+绘制表面的逻辑高度；浮层用它把弹出内容限制在窗口内。宿主随窗口尺寸写入，负值归一为 0。
 
 ```cangjie
-public var viewportHeight: Float32 = 0.0
+public mut prop viewportHeight: Float32
 ```
 
 ### displayScale
 
-每虚拟像素对应的物理像素数，取自窗口内容缩放。`var` 字段，默认 `1.0`；[`resolve`](#resolve) 用它换算 `px` 长度。
+每虚拟像素对应的物理像素数，取自窗口内容缩放。默认 `1.0`，setter 至少保留 `0.001`；[`resolve`](#resolve) 用它换算 `px` 长度。值实际变化时会推进内部 UI 环境 generation，使相同可用尺寸下的 Element/Stack/text memo 与布局提交自动失配；重复写入同一归一化值不制造无效工作。
 
 ```cangjie
-public var displayScale: Float32 = 1.0
+public mut prop displayScale: Float32
 ```
 
 ### fontScale
 
-作用于 `fp` 长度的用户字体缩放；`1.0` 时 `fp` 与 `vp` 等值。`var` 字段，调大它即放大全部以 `fp` 声明的字号，排版随无障碍设置走。
+作用于 `fp` 长度的用户字体缩放；`1.0` 时 `fp` 与 `vp` 等值，setter 至少保留 `0.1`。调大它即放大全部以 `fp` 声明的字号，排版随无障碍设置走。值变化会自动失效依赖 UI 环境的测量与布局提交，无需应用重建 key 或手工推进 retained revision。
 
 ```cangjie
-public var fontScale: Float32 = 1.0
+public mut prop fontScale: Float32
 ```
 
 ### clickCount
 
-当前主键按下是连击的第几次：1 单击、2 双击、3 三击。`var` 字段，宿主在每次左键 MouseDown 派发前按时间与位置就近判定写入，控件在处理按下时读取；不限于文本控件，任何组件都可响应双击。
+当前主键按下是连击的第几次：1 单击、2 双击、3 三击。setter 把值限制在 1..3；宿主在每次左键 MouseDown 派发前按时间与位置就近判定写入，控件在处理按下时读取。
 
 ```cangjie
-public var clickCount: Int64 = 1
+public mut prop clickCount: Int64
+```
+
+### semanticsSnapshot
+
+返回最近一次稳定布局提交的平台无关无障碍节点。归一化在事务提交时完成；稳定 fragment 的重复查询直接返回已提交
+数组。重复 id 以后声明者覆盖属性和动作。
+
+```cangjie
+public func semanticsSnapshot(): Array<SemanticsNode>
+```
+
+### semanticsTreeSnapshot
+
+返回带单调 revision 和 id 索引的 [`SemanticsSnapshot`](SemanticsSnapshot.md)。`node(id)` 平均 O(1)；adapter 和
+频繁诊断应优先使用它。
+
+```cangjie
+public func semanticsTreeSnapshot(): SemanticsSnapshot
+```
+
+### focusedSemanticsNode
+
+通过焦点 key 与代际 Element owner 查询当前已提交语义节点。焦点为空、节点未登记，或相同字符串 key 已被卸载后
+由另一代 Element 复用时返回 `None`；查询不扫描焦点环或语义数组。显式 `focus` 后本地查询立即反映新焦点；
+adapter 仍只在下一次稳定事务提交时收到与树属性原子一致的 `snapshot.focusedId`。
+
+```cangjie
+public func focusedSemanticsNode(): ?SemanticsNode
+```
+
+### performSemanticsAction
+
+向最新语义节点请求动作。提交阶段建立 id 索引，因此与节点在声明序列中的位置无关；节点不存在、禁用或不支持
+该动作时返回 `false`。
+
+```cangjie
+public func performSemanticsAction(id: String, action: SemanticsAction): Bool
+```
+
+### setAccessibilityAdapter
+
+安装或替换 [`AccessibilityAdapter`](AccessibilityAdapter.md)，并立即发送当前树 bootstrap。后续只在稳定事务产生
+真实 [`SemanticsChange`](SemanticsChange.md) 时同步 push。
+
+```cangjie
+public func setAccessibilityAdapter(adapter: AccessibilityAdapter): Unit
+```
+
+### registerSemantics
+
+供自定义 Widget 在 `layout` 中登记静态语义、边界和可选动作回调。普通应用优先使用 [`Widget.semantics`](Widget.md#semantics)；复杂控件可用本方法把语义动作接回同一业务操作。
+
+```cangjie
+public func registerSemantics(
+    node: SemanticsNode,
+    perform!: (SemanticsAction) -> Bool = {_ => false}
+): Unit
 ```
 
 ## 另请参阅
@@ -669,4 +734,5 @@ public var clickCount: Int64 = 1
 - [CursorShape](CursorShape.md) — 悬停申请携带的指针形状。
 - [Theme](Theme.md) — 构造时注入的配色主题。
 - [Length](Length.md) — `resolve` 换算的带单位长度。
+- [Semantics](Semantics.md) — 平台无关无障碍属性与动作模型。
 - [DesktopApp](../desktop/DesktopApp.md) — 驱动全部协议括号调用的桌面应用对象。

@@ -76,20 +76,21 @@ public struct AutomaticScopeDiagnostics {
     public let paintCommandCount: Int64
     public let paintEstimatedBytes: UInt64
     public let paintBypassRemaining: Int64
+    public let sceneRevision: UInt64
     public let lastInvalidationReason: String
 
     init(identity: String, path: String, scope: StateMountScope, buildHits: UInt64, render: AutomaticRenderStats) {
         this.identity = identity
         this.path = path
         this.depth = scope.depth
-        this.stateCount = scope.stateKeys.size
-        this.effectCount = scope.effectKeys.size
-        this.retainedChildCount = scope.retainedKeys.size
-        this.automaticChildCount = scope.automaticKeys.size
+        this.stateCount = scope.stateKeyCount()
+        this.effectCount = scope.effectKeyCount()
+        this.retainedChildCount = scope.retainedKeyCount()
+        this.automaticChildCount = scope.automaticKeyCount()
         this.buildDirty = scope.buildDirty
         this.selfDirty = scope.buildSelfDirty
         this.descendantDirty = scope.buildDescendantDirty
-        this.buildDependencyCount = scope.buildDependencies.size
+        this.buildDependencyCount = scope.buildDependencyCount()
         this.buildInvalidations = scope.buildInvalidations
         this.buildHits = buildHits
         this.renderNodeCount = render.nodeCount
@@ -102,6 +103,7 @@ public struct AutomaticScopeDiagnostics {
         this.paintCommandCount = render.paintCommandCount
         this.paintEstimatedBytes = render.paintEstimatedBytes
         this.paintBypassRemaining = render.paintBypassRemaining
+        this.sceneRevision = render.sceneRevision
         this.lastInvalidationReason = scope.buildDirtyReason
     }
 }
@@ -254,6 +256,10 @@ private func appendScopeCounters(result: StringBuilder, scope: RetainedScopeDiag
     result.append(scope.stats.paintBypassRemaining)
 }
 
+/*
+ * Reads only committed retained state. Throws `IllegalStateException` while a build transaction is
+ * active, so diagnostics can never expose a partially staged graph.
+ */
 protected func retainedGraphDiagnostics(store: StateStore): RetainedGraphDiagnostics {
     if (!store.activeMountBuilds.isEmpty()) {
         throw IllegalStateException("Retained diagnostics are available only after a build commits")
@@ -308,9 +314,9 @@ private func rootScopeDiagnostics(store: StateStore): RetainedScopeDiagnostics {
         root.diagnosticPath,
         root.depth,
         Rect.zero(),
-        root.stateKeys.size,
-        root.effectKeys.size,
-        root.retainedKeys.size,
+        root.stateKeyCount(),
+        root.effectKeyCount(),
+        root.retainedKeyCount(),
         clean,
         clean,
         clean,
@@ -320,9 +326,9 @@ private func rootScopeDiagnostics(store: StateStore): RetainedScopeDiagnostics {
             UInt64(0),
             UInt64(0),
             UInt64(0),
-            root.buildDependencies.size,
+            root.buildDependencyCount(),
             root.buildInvalidations,
-            store.frameSubscribers.size,
+            frameSubscriberCount(store),
             0,
             0,
             0
@@ -340,9 +346,9 @@ private func retainedScopeDiagnostics(store: StateStore): ArrayList<RetainedScop
                 scope.diagnosticPath,
                 retainedDiagnosticDepth(scope),
                 record.diagnosticBounds(),
-                scope.stateKeys.size,
-                scope.effectKeys.size,
-                scope.retainedKeys.size,
+                scope.stateKeyCount(),
+                scope.effectKeyCount(),
+                scope.retainedKeyCount(),
                 scope.buildDirty,
                 record.diagnosticMeasureDirty(),
                 record.diagnosticLayoutDirty(),

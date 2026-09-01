@@ -13,11 +13,11 @@ import sdl.system.AppMetadata
 import sdl.system.ApplicationMetadata
 import sdl.system.SdlHintSetting
 import sdl.system.SdlHints
-import cui.core.{CursorShape, FrameSchedule, FrameScheduler, RetainedFrameDamage, RetainedGraphDiagnostics, StateStore,
-    Theme, UiContext, Widget, broadcastEvent, buildRoot, collectRootLayoutStateReads, collectRootPaintStateReads,
-    dispatchEventRecordSequence, dispatchFrameSubscribers, drawTooltip, frameSubscriberCount, retainedGraphDiagnostics,
-    takeRetainedFrameDamage, enableAutomaticComposition, useFullRetainedExecution, useIncrementalRetainedExecution,
-    withFrameScheduler}
+import cui.core.{AccessibilityAdapter, CursorShape, FrameSchedule, FrameScheduler, RetainedFrameDamage,
+    RetainedGraphDiagnostics, StateStore, Theme, UiContext, Widget, broadcastEvent, buildRoot,
+    collectRootLayoutStateReads, collectRootPaintStateReads, commitSemanticsForStore, dispatchEventRecord,
+    dispatchFrameSubscribers, drawTooltip, frameSubscriberCount, retainedGraphDiagnostics, takeRetainedFrameDamage,
+    enableAutomaticComposition, useFullRetainedExecution, useIncrementalRetainedExecution, withFrameScheduler}
 
 // Long enough for the first paint to settle and for background work started at launch
 // (dialog-free examples fetch data on worker threads) to land in the frame.
@@ -77,6 +77,7 @@ private class StableLayout {
 public class DesktopApp {
     private let window: SdlWindow
     private let ctx: UiContext
+    private let accessibility: DesktopAccessibilityHub
     private let frameDelay: UInt32
     private let vsync: Bool
     private let resources = ArrayList<Resource>()
@@ -111,6 +112,7 @@ public class DesktopApp {
     ) {
         this.window = configuredWindow(spec, metadata, hints)
         this.ctx = UiContext(window.renderer, theme)
+        this.accessibility = DesktopAccessibilityHub(window)
         this.ctx.displayScale = window.scale * window.currentPixelDensity
         this.ctx.fontScale = max(0.1, fontScale)
         this.frameDelay = frameDelay
@@ -128,6 +130,9 @@ public class DesktopApp {
             Some(FrameProfiler(60))
         } else {
             None
+        }
+        if (accessibility.hasNativeBridge()) {
+            ctx.setAccessibilityAdapter(accessibility)
         }
     }
 
@@ -180,6 +185,32 @@ public class DesktopApp {
     public func lastFrameUsedPartialDamage(): Bool {
         ensureUiAccess("inspect retained frame damage")
         lastPartialDamage
+    }
+
+    /**
+     * Installs an external semantic-tree observer without replacing the native accessibility bridge.
+     * A rejected bootstrap quarantines only the observer and rethrows its exception to this caller.
+     */
+    public func setAccessibilityAdapter(adapter: AccessibilityAdapter): Unit {
+        ensureUiAccess("install an accessibility adapter")
+        accessibility.setExternalAdapter(adapter)
+        ctx.setAccessibilityAdapter(accessibility)
+        match (accessibility.takeExternalBootstrapFailure()) {
+            case Some(error) => throw error
+            case None => ()
+        }
+    }
+
+    /** Installs a non-blocking UI-thread callback for isolated accessibility delivery failures. */
+    public func setAccessibilityFailureHandler(handler: (AccessibilityFailure) -> Unit): Unit {
+        ensureUiAccess("install an accessibility failure handler")
+        accessibility.setFailureHandler(handler)
+    }
+
+    /** Returns and clears accessibility failures retained for deterministic diagnostics. */
+    public func takeAccessibilityFailures(): Array<AccessibilityFailure> {
+        ensureUiAccess("inspect accessibility failures")
+        accessibility.takeFailures()
     }
 
     /**
@@ -244,9 +275,13 @@ public class DesktopApp {
                 closeManagedResources()
             } finally {
                 try {
-                    stateStore.clear()
+                    accessibility.close()
                 } finally {
-                    window.close()
+                    try {
+                        stateStore.clear()
+                    } finally {
+                        window.close()
+                    }
                 }
             }
         }
@@ -272,7 +307,13 @@ public class DesktopApp {
             let viewportH = window.height
             ctx.viewportWidth = Float32(viewportW)
             ctx.viewportHeight = Float32(viewportH)
-            scheduler.transaction({=> drainPostedActions()})
+            scheduler.transaction(
+                {
+                    =>
+                        drainPostedActions()
+                        accessibility.drainActions()
+                }
+            )
             let stateGen = scheduler.generation
             let forced = snapshotPath.isSome() || profiler.isSome()
             let timerTriggered = schedule.isDue(frame.elapsedMs)
@@ -286,23 +327,16 @@ public class DesktopApp {
                     case None => ()
                 }
                 var stable = buildAndLayoutStable(body, viewportW, viewportH)
-                let eventWidget = stable.widget
-                let eventStart = frameProfileTimestamp(profiler)
-                scheduler.transaction(
-                    {
-                        =>
-                            dispatchEventRecordSequence(events, ctx, {event => preparePointer(event)}, {
-                                event => routeEvent(eventWidget, event)
-                            }, {event => completePointer(event)})
-                            dispatchFrameSubscribers(stateStore, ctx, frame)
-                    }
-                )
-                let eventEnd = frameProfileTimestamp(profiler)
-                if (scheduler.generation != stable.generation) {
-                    let reflected = buildAndLayoutStable(body, viewportW, viewportH)
-                    stable = StableLayout(reflected.widget, stable.buildNs + reflected.buildNs,
-                        stable.layoutNs + reflected.layoutNs, stable.passes + reflected.passes, reflected.generation)
+                var eventNs = UInt64(0)
+                for (record in events) {
+                    eventNs += dispatchInputEvent(stable.widget, record)
+                    stable = reflectStateChanges(stable, body, viewportW, viewportH)
                 }
+                eventNs += dispatchFrameTick(frame)
+                stable = reflectStateChanges(stable, body, viewportW, viewportH)
+                let semanticsStart = frameProfileTimestamp(profiler)
+                commitSemanticsForStore(ctx, stateStore)
+                let semanticsNs = frameProfileTimestamp(profiler) - semanticsStart
                 frames += 1
                 lastRenderedGen = stable.generation // writes made during draw intentionally schedule the next frame
                 let allowPartialDamage = retainedDamageEnabled && stateTriggered && events.isEmpty() && !timerTriggered &&
@@ -317,7 +351,7 @@ public class DesktopApp {
                 match (profiler) {
                     case Some(p) => p.record(
                         FrameProfileSample(
-                            FramePhaseTimes(stable.buildNs, stable.layoutNs, eventEnd - eventStart, beginNs, treeNs,
+                            FramePhaseTimes(stable.buildNs, stable.layoutNs, eventNs, semanticsNs, beginNs, treeNs,
                                 resolveNs, presentNs),
                             FrameProfileSignals(stable.passes, !events.isEmpty(), stateTriggered, timerTriggered,
                                 resized, forced, frameSubscriberCount(stateStore), lastPartialDamage),
@@ -330,6 +364,36 @@ public class DesktopApp {
             }
             waitForWork(schedule, frame.elapsedMs, scheduler.generation != lastRenderedGen)
         }
+    }
+
+    private func dispatchInputEvent(widget: Widget, record: UiEventRecord): UInt64 {
+        let eventStart = frameProfileTimestamp(profiler)
+        scheduler.transaction({
+            => dispatchEventRecord(record, ctx, {event => preparePointer(event)}, {
+                event => routeEvent(widget, event)
+            }, {event => completePointer(event)})
+        })
+        frameProfileTimestamp(profiler) - eventStart
+    }
+
+    private func dispatchFrameTick(frame: FrameInfo): UInt64 {
+        let eventStart = frameProfileTimestamp(profiler)
+        scheduler.transaction({=> dispatchFrameSubscribers(stateStore, ctx, frame)})
+        frameProfileTimestamp(profiler) - eventStart
+    }
+
+    private func reflectStateChanges(
+        stable: StableLayout,
+        body: () -> Unit,
+        viewportW: Int32,
+        viewportH: Int32
+    ): StableLayout {
+        if (scheduler.generation == stable.generation) {
+            return stable
+        }
+        let reflected = buildAndLayoutStable(body, viewportW, viewportH)
+        StableLayout(reflected.widget, stable.buildNs + reflected.buildNs, stable.layoutNs + reflected.layoutNs,
+            stable.passes + reflected.passes, reflected.generation)
     }
 
     private func buildAndLayoutStable(body: () -> Unit, viewportW: Int32, viewportH: Int32): StableLayout {
@@ -354,10 +418,11 @@ public class DesktopApp {
     private func buildAndLayoutOnce(body: () -> Unit, viewportW: Int32, viewportH: Int32): LayoutAttempt {
         let startGeneration = scheduler.generation
         ctx.clearActiveOverlay()
+        ctx.clearSemantics()
         let buildStart = frameProfileTimestamp(profiler)
         let widget = buildRoot(body, stateStore)
         let layoutStart = frameProfileTimestamp(profiler)
-        ctx.adoptFocusRing(stateStore.focusRing())
+        stateStore.adoptFocus(ctx)
         collectRootLayoutStateReads(stateStore, {
             => widget.layout(ctx, Rect(0.0, 0.0, Float32(viewportW), Float32(viewportH)))
         })
@@ -723,6 +788,7 @@ public class DesktopApp {
         closeResourcesInReverse(resources)
     }
 
+    /* Throws `IllegalStateException` when the public one-run lifecycle contract is violated. */
     private func beginRun(): Unit {
         var accepted = false
         synchronized(lifecycleLock) {
@@ -738,6 +804,10 @@ public class DesktopApp {
         }
     }
 
+    /*
+     * Guards every UI-affine public operation. Throws `IllegalStateException` after shutdown or
+     * when the caller is not the scheduler's owner thread.
+     */
     private func ensureUiAccess(operation: String): Unit {
         var stopped = false
         synchronized(lifecycleLock) {

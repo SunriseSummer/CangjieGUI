@@ -1,5 +1,7 @@
 package cui.core
 
+import std.collection.HashMap
+
 /** Fenwick-tree extent index: point updates and prefix/range lookup stay O(log N). */
 class LazyExtentIndex {
     private var heights = Array<Float32>(0, {_ => 0.0})
@@ -50,6 +52,7 @@ class LazyExtentIndex {
         }
     }
 
+    /* Throws `IllegalArgumentException` when the public row index precondition is violated. */
     func update(index: Int64, height: Float32): Bool {
         if (index < 0 || index >= heights.size) {
             throw IllegalArgumentException("Lazy list extent index is out of range")
@@ -153,7 +156,10 @@ public class LazyListExtents {
         index.heightAt(row)
     }
 
-    /** Updates one row height in O(log N); returns whether the value changed. */
+    /**
+     * Updates one row height in O(log N); returns whether the value changed.
+     * Throws `IllegalArgumentException` when `row` is outside `0..<count`.
+     */
     public func update(row: Int64, height: Float32): Bool {
         if (index.update(row, height)) {
             revisionSignal.value += 1
@@ -212,5 +218,136 @@ class LazyExtentCache {
             }
         }
         index
+    }
+}
+
+/*
+ * Retained extent knowledge for self-measuring lazy rows. Unknown rows keep one cheap estimate;
+ * visible measurements atomically update the Fenwick index and schedule a single stabilization
+ * pass. Width/environment changes invalidate measured heights but preserve the structural version,
+ * so the viewport keeps its stable-key anchor while recomputing geometry.
+ */
+class LazyMeasuredExtentCache {
+    private let index = LazyExtentIndex()
+    private let revisionSignal = State<Int64>(0)
+    private var initialized = false
+    private var cachedCount: Int64 = -1
+    private var cachedEstimate: Float32 = -1.0
+    private var cachedSpacing: Float32 = -1.0
+    private var cachedRevision: UInt64 = UInt64(0)
+    private var measuredWidth: Float32 = -1.0
+    private var measuredEnvironment: ?UiEnvironmentKey = None
+    private var hasMeasurements = false
+    private var contentRevisionValue: UInt64 = UInt64(0)
+    private var structuralRevisionValue: UInt64 = UInt64(0)
+    private var publishedSignalRevision: UInt64 = UInt64(0)
+    private var keyMigrationEnabled = false
+    private let measuredHeightsByKey = HashMap<String, Float32>()
+
+    func prepare(
+        count: Int64,
+        estimatedHeight: Float32,
+        spacing: Float32,
+        revision: UInt64,
+        migrateByKey: Bool,
+        keyForIndex: (Int64) -> String
+    ): LazyExtentIndex {
+        let resolvedCount = max(Int64(0), count)
+        let resolvedEstimate = max(1.0, estimatedHeight)
+        let resolvedSpacing = max(0.0, spacing)
+        if (!initialized || resolvedCount != cachedCount || revision != cachedRevision || resolvedEstimate.toBits() !=
+            cachedEstimate.toBits() || resolvedSpacing.toBits() != cachedSpacing.toBits() || migrateByKey !=
+            keyMigrationEnabled) {
+            let structureChanged = !initialized || resolvedCount != cachedCount || revision != cachedRevision
+            let measurementConfigChanged = !initialized || resolvedEstimate.toBits() != cachedEstimate.toBits() ||
+                resolvedSpacing.toBits() != cachedSpacing.toBits() || migrateByKey != keyMigrationEnabled
+            let canMigrate = structureChanged && !measurementConfigChanged && migrateByKey && hasMeasurements
+            let nextHeights = if (canMigrate) {
+                Array<Float32>(resolvedCount, {
+                    row => match (measuredHeightsByKey.get(keyForIndex(row))) {
+                        case Some(height) => height
+                        case None => resolvedEstimate
+                    }
+                })
+            } else {
+                Array<Float32>(resolvedCount, {_ => resolvedEstimate})
+            }
+            index.reset(resolvedCount, {row => nextHeights[row]}, resolvedSpacing)
+            initialized = true
+            cachedCount = resolvedCount
+            cachedEstimate = resolvedEstimate
+            cachedSpacing = resolvedSpacing
+            cachedRevision = revision
+            keyMigrationEnabled = migrateByKey
+            if (!canMigrate) {
+                measuredWidth = -1.0
+                measuredEnvironment = None
+                hasMeasurements = false
+                measuredHeightsByKey.clear()
+            }
+            contentRevisionValue = nextRevision(contentRevisionValue)
+            if (structureChanged) {
+                structuralRevisionValue = nextRevision(structuralRevisionValue)
+            }
+        }
+        index
+    }
+
+    /* Commits only after every visible child measured successfully; one State write covers the batch. */
+    func commitMeasurements(
+        width: Float32,
+        environment: UiEnvironmentKey,
+        measurements: Array<(Int64, String, Float32)>
+    ): Bool {
+        let environmentChanged = match (measuredEnvironment) {
+            case Some(value) => !sameUiEnvironment(value, environment) || measuredWidth.toBits() != width.toBits()
+            case None => false
+        }
+        var changed = false
+        if (environmentChanged) {
+            index.reset(cachedCount, {_ => cachedEstimate}, cachedSpacing)
+            changed = hasMeasurements
+            hasMeasurements = false
+            measuredHeightsByKey.clear()
+        }
+        measuredWidth = width
+        measuredEnvironment = Some(environment)
+        for (measurement in measurements) {
+            let (row, key, height) = measurement
+            let resolvedHeight = max(1.0, height)
+            if (index.update(row, resolvedHeight)) {
+                changed = true
+            }
+            if (keyMigrationEnabled) {
+                rememberMeasuredHeight(key, resolvedHeight)
+            }
+        }
+        if (!measurements.isEmpty()) {
+            hasMeasurements = true
+        }
+        if (changed) {
+            contentRevisionValue = nextRevision(contentRevisionValue)
+            revisionSignal.value += 1
+            publishedSignalRevision = revisionSignal.revision
+        }
+        changed
+    }
+
+    private func rememberMeasuredHeight(key: String, height: Float32): Unit {
+        match (measuredHeightsByKey.add(key, height)) {
+            case Some(_) => ()
+            case None => ()
+        }
+    }
+
+    func contentRevision(): UInt64 {
+        if (revisionSignal.revision != publishedSignalRevision) {
+            throw IllegalStateException("Self-measuring extent revision publication diverged")
+        }
+        contentRevisionValue
+    }
+
+    func structuralRevision(): UInt64 {
+        structuralRevisionValue
     }
 }

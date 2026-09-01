@@ -6,24 +6,27 @@ class PendingRetainedReplacement {
     let revision: UInt64
     let cachePaint: Bool
     let child: Widget
-    let frameSubscribers: Array<FrameSubscriber>
+    let focusFragment: FocusSnapshot
+    let frameSubscribers: FrameSubscriptionSnapshot
 
     init(
         record: RetainedRecord,
         revision: UInt64,
         cachePaint: Bool,
         child: Widget,
-        frameSubscribers: Array<FrameSubscriber>
+        focusFragment: FocusSnapshot,
+        frameSubscribers: FrameSubscriptionSnapshot
     ) {
         this.record = record
         this.revision = revision
         this.cachePaint = cachePaint
         this.child = child
+        this.focusFragment = focusFragment
         this.frameSubscribers = frameSubscribers
     }
 
     func commit(): Unit {
-        record.replace(revision, cachePaint, child, frameSubscribers)
+        record.replace(revision, cachePaint, child, focusFragment, frameSubscribers)
     }
 }
 
@@ -33,7 +36,10 @@ func stageRetainedReplacement(
     revision: UInt64,
     cachePaint: Bool,
     child: Widget,
-    frameSubscribers: Array<FrameSubscriber>
+    focusFragment: FocusSnapshot,
+    frameSubscribers: FrameSubscriptionSnapshot
 ): Unit {
-    store.retainedReplacements.add(PendingRetainedReplacement(record, revision, cachePaint, child, frameSubscribers))
+    store
+        .retainedReplacements
+        .add(PendingRetainedReplacement(record, revision, cachePaint, child, focusFragment, frameSubscribers))
 }

@@ -1,7 +1,7 @@
 package cui.controls
 
 import sdl.{MouseButton, Rect, Renderer, Size, UiEvent}
-import cui.core.{Spacer, State, Theme, UiContext, Widget, emit}
+import cui.core.{PaintOutset, Spacer, State, Theme, UiContext, Widget, emit}
 
 private func reorderTestContext(): UiContext {
     UiContext(Renderer.headless(), Theme.light())
@@ -89,7 +89,7 @@ func reorderableContentPressDoesNotDrag(): Unit {
     @Expect(moved.value, "")
 }
 
-// Records the clip in effect while it draws, to verify the row slot leaves shadow clearance.
+// Records the clip in effect while it draws, to verify the row slot consumes explicit paint overflow.
 private class ClipProbe <: Widget {
     var seen: ?Rect = None
 
@@ -106,10 +106,13 @@ private class ClipProbe <: Widget {
     public func handle(_: UiContext, _: UiEvent): Bool {
         false
     }
+
+    public func paintOutset(): PaintOutset {
+        PaintOutset(left: 21.0, top: 13.0, right: 29.0, bottom: 17.0)
+    }
 }
 
-// The row slot clips defensively but must leave CUI_SHADOW_CLEARANCE so a row card's soft halo
-// wraps its rounded corners instead of being sliced into hard-edged bands.
+// The row slot clips defensively but preserves the row's declared asymmetric halo.
 @Test
 func reorderableRowClipLeavesShadowClearance(): Unit {
     let ctx = reorderTestContext()
@@ -120,9 +123,8 @@ func reorderableRowClipLeavesShadowClearance(): Unit {
     list.layout(ctx, Rect(0.0, 0.0, 400.0, 200.0))
     list.draw(ctx)
     let clip = probe.seen.getOrThrow()
-    // The slot clip is widened on every side (no enclosing scroll axis of its own).
-    @Expect(clip.x < 0.0)
-    @Expect(clip.y < 0.0)
-    @Expect(clip.right() > 400.0)
-    @Expect(clip.bottom() > 50.0)
+    @Expect(clip.x, Float32(-21.0))
+    @Expect(clip.y, Float32(-13.0))
+    @Expect(clip.right(), Float32(429.0))
+    @Expect(clip.bottom(), Float32(67.0))
 }

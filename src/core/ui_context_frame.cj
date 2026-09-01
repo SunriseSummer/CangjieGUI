@@ -34,6 +34,10 @@ extend UiContext {
         retainedDamage.isSome()
     }
 
+    func retainedDamageRegion(): ?Rect {
+        retainedDamage
+    }
+
     /**
      * Requests that the next frame be rendered even if no input arrived and no state changed. Call this
      * from a widget that animates on the frame clock (a caret, a spinner, a countdown); without it the

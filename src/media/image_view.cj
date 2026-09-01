@@ -1,6 +1,6 @@
 package cui.media
 
-import sdl.{Rect, Size, Texture, UiEvent}
+import sdl.{Rect, Renderer, Size, Texture, UiEvent}
 import cui.core.{Length, LengthUnit, UiContext, Widget, emit}
 
 /*
@@ -15,10 +15,11 @@ public enum ImageFit {
 }
 
 /*
- * Displays an image loaded from a file. Decoded textures live in the shared, path-keyed
- * texture cache (see texture_cache.cj), so an ImageView is declared inline like any other
- * widget — the per-frame rebuild costs one cache lookup, not a disk load. After overwriting
- * an image file, call `invalidateImage(path)` to refresh it.
+ * Displays an image loaded from a file. Decoded textures live in the thread- and renderer-scoped,
+ * bounded path cache (see texture_cache.cj), so an ImageView is declared inline like any other
+ * widget — the per-frame rebuild costs one cache lookup, not a disk load. A stable view also keeps
+ * its resolved entry until the global invalidation revision changes. After overwriting an image
+ * file, call `invalidateImage(path)` to refresh it.
  *
  * The class still implements `Resource` for source compatibility with the earlier
  * hoist-and-`manage` pattern; `close()` only retires this view (the cache owns the texture).
@@ -30,6 +31,7 @@ public class ImageView <: Widget & Resource {
     private let preferredHeight: Length
     private var frame = Rect.zero()
     private var closed = false
+    private var resolvedSlot: ?ImageCacheFastSlot = None
 
     public init(
         path: String,
@@ -68,7 +70,7 @@ public class ImageView <: Widget & Resource {
         if (closed) {
             return
         }
-        match (sharedTexture(ctx.renderer, path)) {
+        match (textureForDraw(ctx.renderer)) {
             case Some(image) =>
                 let destination = fittedRect(Size(image.width, image.height), frame, imageFit)
                 match (imageFit) {
@@ -94,6 +96,29 @@ public class ImageView <: Widget & Resource {
     /** Releases the view's claim on its texture; the shared cache owns the actual texture. */
     public func close(): Unit {
         closed = true
+    }
+
+    private func textureForDraw(renderer: Renderer): ?Texture {
+        let revision = currentImageCacheRevision()
+        match (resolvedSlot) {
+            case Some(slot) =>
+                if (slot.revision == revision && refEq(slot.renderer, renderer) && slot.entry.active) {
+                    match (slot.entry.cached) {
+                        case Some(texture) =>
+                            if (!texture.isClosed()) {
+                                slot.entry.recentlyUsed = true
+                                return Some(texture)
+                            }
+                        case None =>
+                            slot.entry.recentlyUsed = true
+                            return None
+                    }
+                }
+            case None => ()
+        }
+        let slot = sharedImageSlotAtRevision(renderer, path, revision)
+        resolvedSlot = Some(slot)
+        slot.entry.cached
     }
 }
 

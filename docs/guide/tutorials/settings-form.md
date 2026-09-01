@@ -22,9 +22,9 @@
 
 ## 操作步骤
 
-### 1. 为每份事实使用稳定键
+### 1. 在固定声明中创建位置状态
 
-在 `app.run` 中创建 `form.name`、`form.accepted` 和 `form.message`。前缀把表单状态与页面其他局部状态区分，键在当前作用域内唯一。
+在 `app.run` 的固定声明顺序中创建姓名、同意状态和提示。keyless 位置槽由框架保留并验证形状，不需要为每个字段发明字符串；若以后把字段放进条件、循环或可重排区域，再改用显式键与 `Keyed`/`ForEach`。
 
 ### 2. 把输入控件绑定到事实
 
@@ -48,9 +48,9 @@ import cui.*
 main(): Unit {
     let app = DesktopApp(WindowSpec("账户设置", 460, 320))
     app.run {
-        let name = rememberState<String>("form.name") {""}
-        let accepted = rememberState<Bool>("form.accepted") {false}
-        let message = rememberState<String>("form.message") {"请填写表单"}
+        let name = rememberState<String> {""}
+        let accepted = rememberState<Bool> {false}
+        let message = rememberState<String> {"请填写表单"}
 
         VStack(spacing: 12.vp) {
             Label("创建账户").bold()
@@ -109,7 +109,7 @@ Label("姓名长度：${name.value.size}").muted()
 
 ## 如果没有成功
 
-- **输入后立即清空**：检查是否使用 `rememberState`，键是否稳定，文本框是否接收同一状态。
+- **输入后立即清空**：检查是否使用 `rememberState`，位置槽是否保持固定（动态结构则检查显式键），文本框是否接收同一状态。
 - **点击始终走同一分支**：确认回调读取 `.value`，且没有在构建阶段重置状态。
 - **Tab 顺序混乱**：按任务顺序声明可聚焦控件，不要用纯视觉偏移掩盖代码顺序。
 - **按钮点击但提示不变**：标签应读取 `message.value`，回调也必须写入同一对象。

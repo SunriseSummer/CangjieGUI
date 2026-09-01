@@ -80,10 +80,12 @@ func retainedDiagnosticsAreStableStructuredAndExplainDirtyPropagation(): Unit {
 }
 
 func retainedScopeAt(scopes: Array<RetainedScopeDiagnostics>, path: String): RetainedScopeDiagnostics {
-    for (scope in scopes) {
-        if (scope.path == path) {
-            return scope
+    var index: Int64 = 0
+    while (index < scopes.size) {
+        if (scopes[index].path == path) {
+            return scopes[index]
         }
+        index += 1
     }
     throw IllegalStateException("Missing retained diagnostic scope '${path}'")
 }

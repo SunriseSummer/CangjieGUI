@@ -12,6 +12,7 @@ struct AutomaticRenderStats {
     let paintCommandCount: Int64
     let paintEstimatedBytes: UInt64
     let paintBypassRemaining: Int64
+    let sceneRevision: UInt64
 
     init(
         nodeCount: Int64,
@@ -23,7 +24,8 @@ struct AutomaticRenderStats {
         paintBudgetEvictions: UInt64,
         paintCommandCount: Int64,
         paintEstimatedBytes: UInt64,
-        paintBypassRemaining: Int64
+        paintBypassRemaining: Int64,
+        sceneRevision: UInt64
     ) {
         this.nodeCount = nodeCount
         this.layoutHits = layoutHits
@@ -35,6 +37,7 @@ struct AutomaticRenderStats {
         this.paintCommandCount = paintCommandCount
         this.paintEstimatedBytes = paintEstimatedBytes
         this.paintBypassRemaining = paintBypassRemaining
+        this.sceneRevision = sceneRevision
     }
 }
 
@@ -49,6 +52,7 @@ func automaticRenderStats(children: Array<Widget>): AutomaticRenderStats {
     var paintCommandCount: Int64 = 0
     var paintEstimatedBytes: UInt64 = UInt64(0)
     var paintBypassRemaining: Int64 = 0
+    var sceneRevision: UInt64 = UInt64(0)
     for (child in children) {
         match (child as AutomaticRenderNode) {
             case Some(node) =>
@@ -63,9 +67,11 @@ func automaticRenderStats(children: Array<Widget>): AutomaticRenderStats {
                 paintCommandCount += value.paintCommandCount
                 paintEstimatedBytes += value.paintEstimatedBytes
                 paintBypassRemaining = max(paintBypassRemaining, value.paintBypassRemaining)
+                sceneRevision += value.sceneRevision
             case None => ()
         }
     }
     AutomaticRenderStats(nodeCount, layoutHits, paintHits, paintRecordAttempts, paintDynamicBypasses,
-        paintRejectedCandidates, paintBudgetEvictions, paintCommandCount, paintEstimatedBytes, paintBypassRemaining)
+        paintRejectedCandidates, paintBudgetEvictions, paintCommandCount, paintEstimatedBytes, paintBypassRemaining,
+        sceneRevision)
 }

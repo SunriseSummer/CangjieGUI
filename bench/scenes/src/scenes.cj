@@ -10,7 +10,7 @@
  */
 package bench_scenes
 
-import cui.{FlowRow, FontSizes, Grid, Label, LazyColumn, LengthUnits, Panel, ProgressBar, ScrollView, Size, State,
+import cui.{FlowRow, FontSizes, Grid, Label, LazyColumn, LazyList, LengthUnits, Panel, ProgressBar, ScrollView, Size, State,
     UiContext, VStack, Widget}
 
 private let SCENE_HEADING: Float32 = 16.0
@@ -85,6 +85,14 @@ private func progressFor(index: Int64): Float32 {
  */
 public func lazyContentScrollScene(scroll: State<Float32>, blocks: Int64): Widget {
     LazyColumn(blocks, LAZY_BLOCK_HEIGHT, spacing: 12.0, scroll: scroll, id: "bench.lazy") {
+        index => contentBlock(index)
+    }
+}
+
+/** The same page through self-measuring virtualization; no per-row height model is supplied. */
+public func measuredContentScrollScene(scroll: State<Float32>, blocks: Int64): Widget {
+    LazyList.measured(blocks, estimatedHeight: 240.0, spacing: 12.0, scroll: scroll,
+        id: "bench.lazy.measured") {
         index => contentBlock(index)
     }
 }

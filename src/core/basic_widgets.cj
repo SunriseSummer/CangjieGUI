@@ -23,6 +23,10 @@ public class Spacer <: Widget {
         false
     }
 
+    public func pointerEventScope(): PointerEventScope {
+        PointerEventScope.LayoutBounds
+    }
+
     public func isFlexible(): Bool {
         true
     }
@@ -98,8 +102,17 @@ public class Button <: Widget {
         Size(min(available.w, max(72.0, ctx.renderer.textWidth(title, pointSize: ps) + 24.0)), CUI_CONTROL_H)
     }
 
-    public func layout(_: UiContext, rect: Rect): Unit {
+    public func layout(ctx: UiContext, rect: Rect): Unit {
         frame = rect
+        ctx.registerSemanticProvider(controlId, rect, [SemanticsAction.Activate],
+            {=> Semantics(label: title, role: SemanticsRole.Button)}, {
+                action => match (action) {
+                    case SemanticsAction.Activate =>
+                        onClick()
+                        true
+                    case _ => false
+                }
+            })
     }
 
     public func draw(ctx: UiContext): Unit {
@@ -116,6 +129,10 @@ public class Button <: Widget {
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
         handleButtonProtocol(ctx, event, frame, controlId, onClick)
+    }
+
+    public func pointerEventScope(): PointerEventScope {
+        PointerEventScope.LayoutBounds
     }
 
     public func focusableId(): ?String {

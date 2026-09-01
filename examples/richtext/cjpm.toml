@@ -4,6 +4,7 @@ name = "cui_richtext"
 version = "0.1.0"
 output-type = "executable"
 description = "CUI rich text release-notes example."
+compile-option = "-O2"
 
 [dependencies]
 cui = { path = "../.." }

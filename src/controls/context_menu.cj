@@ -1,7 +1,8 @@
 package cui.controls
 
 import sdl.{Key, MouseButton, Rect, Size, UiEvent}
-import cui.core.{Axis, CursorShape, Overlay, State, UiContext, Widget, resolveControlKey, buildChild, emit, localState}
+import cui.core.{Axis, CursorShape, Overlay, PaintOutset, State, UiContext, Widget, resolveControlKey, buildChild, emit,
+    localState}
 
 private let CONTEXT_MENU_MARGIN: Float32 = 4.0
 
@@ -94,6 +95,10 @@ public class ContextMenu <: Widget {
 
     public func participatesInLayout(): Bool {
         child.participatesInLayout()
+    }
+
+    public func paintOutset(): PaintOutset {
+        child.paintOutset()
     }
 
     public func focusableId(): ?String {

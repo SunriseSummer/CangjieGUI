@@ -51,7 +51,14 @@ class PendingLifecycleEffect {
 
 /** Mounts `setup` once for this identity and closes its Resource when the scope unmounts. */
 public func mountEffect(key: String, setup: () -> Resource): Unit {
-    lifecycleEffect(key, UInt64(0), setup)
+    declareLifecycleEffect(key, UInt64(0), setup, hasExternalRevision: false)
+}
+
+/** Mounts a Resource at the next guarded positional slot of the active declarative scope. */
+public func mountEffect(setup: () -> Resource): Unit {
+    let store = currentStateStore()
+    let (path, identity) = store.nextImplicitSlot(ImplicitSlotKind.MountEffect)
+    declareLifecycleEffectAt(store, path, identity, UInt64(0), setup, hasExternalRevision: false)
 }
 
 /**
@@ -59,10 +66,37 @@ public func mountEffect(key: String, setup: () -> Resource): Unit {
  * body succeeds, restarts after `revision` changes, and cleanup runs on replacement or unmount.
  */
 public func lifecycleEffect(key: String, revision: UInt64, setup: () -> Resource): Unit {
+    declareLifecycleEffect(key, revision, setup, hasExternalRevision: true)
+}
+
+/** Owns a revisioned Resource at the next guarded positional slot of the active scope. */
+public func lifecycleEffect(revision: UInt64, setup: () -> Resource): Unit {
+    let store = currentStateStore()
+    let (path, identity) = store.nextImplicitSlot(ImplicitSlotKind.LifecycleEffect)
+    declareLifecycleEffectAt(store, path, identity, revision, setup, hasExternalRevision: true)
+}
+
+private func declareLifecycleEffect(
+    key: String,
+    revision: UInt64,
+    setup: () -> Resource,
+    hasExternalRevision!: Bool
+): Unit {
     let store = currentStateStore()
     store.validateKey(key)
     let path = store.scopedKey(key)
-    visitLifecycleEffectKey(store, path, key)
+    declareLifecycleEffectAt(store, path, key, revision, setup, hasExternalRevision: hasExternalRevision)
+}
+
+private func declareLifecycleEffectAt(
+    store: StateStore,
+    path: String,
+    identity: String,
+    revision: UInt64,
+    setup: () -> Resource,
+    hasExternalRevision!: Bool
+): Unit {
+    visitLifecycleEffectKey(store, path, identity, hasExternalRevision)
     match (store.lifecycleEffects.get(path)) {
         case Some(record) where record.revision == revision => ()
         case _ => store.pendingLifecycleEffects.add(PendingLifecycleEffect(path, revision, setup))
@@ -91,10 +125,14 @@ func stageLifecycleEffectRemoval(store: StateStore, path: String): Unit {
 }
 
 func stageLifecycleEffectsInScope(store: StateStore, scope: StateMountScope): Unit {
-    var i = scope.effectKeys.size - 1
-    while (i >= 0) {
-        stageLifecycleEffectRemoval(store, scope.effectKeys[i])
-        i -= 1
+    match (scope.committedOwnership()) {
+        case Some(ownership) =>
+            var i = ownership.effectKeys.size - 1
+            while (i >= 0) {
+                stageLifecycleEffectRemoval(store, ownership.effectKeys[i])
+                i -= 1
+            }
+        case None => ()
     }
 }
 
@@ -177,38 +215,42 @@ func clearLifecycleEffects(store: StateStore): ?Exception {
 
 private func closeLifecycleEffectsInScope(store: StateStore, scope: StateMountScope): ?Exception {
     var firstFailure: ?Exception = None
-    var automaticIndex = scope.automaticKeys.size - 1
-    while (automaticIndex >= 0) {
-        match (store.automaticEntries.get(scope.automaticKeys[automaticIndex])) {
-            case Some(record) => firstFailure = keepFirstFailure(
-                firstFailure,
-                closeLifecycleEffectsInScope(store, record.mountScope)
-            )
-            case None => ()
-        }
-        automaticIndex -= 1
-    }
-    var retainedIndex = scope.retainedKeys.size - 1
-    while (retainedIndex >= 0) {
-        match (store.retainedEntries.get(scope.retainedKeys[retainedIndex])) {
-            case Some(record) => firstFailure = keepFirstFailure(
-                firstFailure,
-                closeLifecycleEffectsInScope(store, record.mountScope)
-            )
-            case None => ()
-        }
-        retainedIndex -= 1
-    }
-    var effectIndex = scope.effectKeys.size - 1
-    while (effectIndex >= 0) {
-        match (store.lifecycleEffects.remove(scope.effectKeys[effectIndex])) {
-            case Some(record) => firstFailure = keepFirstFailure(
-                firstFailure,
-                closeLifecycleResource(store, record.resource)
-            )
-            case None => ()
-        }
-        effectIndex -= 1
+    match (scope.committedOwnership()) {
+        case Some(ownership) =>
+            var automaticIndex = ownership.automaticKeys.size - 1
+            while (automaticIndex >= 0) {
+                match (store.automaticEntries.get(ownership.automaticKeys[automaticIndex])) {
+                    case Some(record) => firstFailure = keepFirstFailure(
+                        firstFailure,
+                        closeLifecycleEffectsInScope(store, record.mountScope)
+                    )
+                    case None => ()
+                }
+                automaticIndex -= 1
+            }
+            var retainedIndex = ownership.retainedKeys.size - 1
+            while (retainedIndex >= 0) {
+                match (store.retainedEntries.get(ownership.retainedKeys[retainedIndex])) {
+                    case Some(record) => firstFailure = keepFirstFailure(
+                        firstFailure,
+                        closeLifecycleEffectsInScope(store, record.mountScope)
+                    )
+                    case None => ()
+                }
+                retainedIndex -= 1
+            }
+            var effectIndex = ownership.effectKeys.size - 1
+            while (effectIndex >= 0) {
+                match (store.lifecycleEffects.remove(ownership.effectKeys[effectIndex])) {
+                    case Some(record) => firstFailure = keepFirstFailure(
+                        firstFailure,
+                        closeLifecycleResource(store, record.resource)
+                    )
+                    case None => ()
+                }
+                effectIndex -= 1
+            }
+        case None => ()
     }
     firstFailure
 }

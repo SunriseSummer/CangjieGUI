@@ -131,3 +131,134 @@ func duplicateExplicitFocusIdsKeepOneOrderedStop(): Unit {
     @Expect(ring[0], "shared")
     @Expect(ring[1], "tail")
 }
+
+@Test
+func focusTargetRejectsAReusedElementSlotWithTheSamePublicKey(): Unit {
+    let ctx = testContext()
+    let arena = ElementArena()
+    let first = arena.mount("first", arena.rootId, ElementKind.Automatic)
+    ctx.adoptFocusTargets([FocusTarget(first, "shared")])
+    ctx.focus("shared")
+
+    arena.release(first)
+    let replacement = arena.mount("replacement", arena.rootId, ElementKind.Automatic)
+    @Expect(first.slot, replacement.slot)
+    @Expect(first.generation != replacement.generation)
+    ctx.adoptFocusTargets([FocusTarget(replacement, "shared")])
+
+    @Expect(ctx.focusId, "")
+}
+
+@Test
+func retainedFocusTargetKeepsItsElementOwnerAcrossCacheHits(): Unit {
+    let ctx = testContext()
+    let store = StateStore()
+    let body = {
+        =>
+            let _ = RetainedSubtree("pane") {
+                Button("Editor", {=>}).key("editor")
+            }
+    }
+    let _ = buildRoot(body, store)
+    store.adoptFocus(ctx)
+    ctx.focus("editor")
+
+    let _ = buildRoot(body, store)
+    store.adoptFocus(ctx)
+
+    @Expect(ctx.focusId, "editor")
+
+    let firstStableRevision = ctx.focusGraphRevision
+    let _ = buildRoot(body, store)
+    store.adoptFocus(ctx)
+    @Expect(ctx.focusGraphRevision, firstStableRevision)
+}
+
+@Test
+func stableAutomaticFocusGraphReusesOneCommittedOrder(): Unit {
+    let ctx = testContext()
+    let store = StateStore()
+    enableAutomaticComposition(store)
+    let body: () -> Unit = {
+        => VStack {
+            Button("First", {=>}).key("first")
+            Button("Second", {=>}).key("second")
+        }
+        ()
+    }
+
+    let _ = buildRoot(body, store)
+    store.adoptFocus(ctx)
+    let _ = buildRoot(body, store)
+    store.adoptFocus(ctx)
+    let firstStableRevision = ctx.focusGraphRevision
+    let _ = buildRoot(body, store)
+    store.adoptFocus(ctx)
+
+    @Expect(ctx.focusGraphRevision, firstStableRevision)
+}
+
+@Test
+func dirtyAutomaticBranchComposesCleanFocusFragmentsInOrder(): Unit {
+    let store = StateStore()
+    enableAutomaticComposition(store)
+    let showMiddle = State<Bool>(false)
+    let body: () -> Unit = {
+        => VStack {
+            VStack {
+                Button("First", {=>}).key("first")
+            }
+            VStack {
+                if (showMiddle.value) {
+                    Button("Middle", {=>}).key("middle")
+                }
+            }
+            VStack {
+                Button("Last", {=>}).key("last")
+            }
+        }
+        ()
+    }
+
+    let _ = buildRoot(body, store)
+    expectFocusRing(store.focusRing(), ["first", "last"])
+    showMiddle.value = true
+    let _ = buildRoot(body, store)
+    expectFocusRing(store.focusRing(), ["first", "middle", "last"])
+    showMiddle.value = false
+    let _ = buildRoot(body, store)
+    let restored = store.focusRing()
+    @Expect(restored.size, Int64(2))
+    expectFocusRing(restored, ["first", "last"])
+}
+
+@Test
+func focusFragmentsKeepFirstDuplicateKeyAsTheOnlyTabStop(): Unit {
+    let store = StateStore()
+    enableAutomaticComposition(store)
+    let body: () -> Unit = {
+        => VStack {
+            VStack {
+                Button("First", {=>}).key("shared")
+            }
+            VStack {
+                Button("Second", {=>}).key("shared")
+                Button("Tail", {=>}).key("tail")
+            }
+        }
+        ()
+    }
+
+    let _ = buildRoot(body, store)
+    let _ = buildRoot(body, store)
+    let ring = store.focusRing()
+    @Expect(ring.size, Int64(2))
+    expectFocusRing(ring, ["shared", "tail"])
+}
+
+private func expectFocusRing(actual: Array<String>, expected: Array<String>): Unit {
+    @Expect(actual.size, expected.size)
+    for (index in 0..expected.size) {
+        @Expect(actual[index], expected[index])
+    }
+}

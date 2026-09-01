@@ -56,6 +56,21 @@ func richTextLaysASingleLineAndHugsItsWidth(): Unit {
 }
 
 @Test
+func richTextLayoutCacheDoesNotCrossMeasurementContexts(): Unit {
+    let firstContext = richTextTestContext()
+    let rich = RichText([RichSpan.text("measurement environment")])
+    let _ = rich.measure(firstContext, Size(400.0, 100.0))
+
+    let secondRenderer = Renderer.headless()
+    let secondContext = UiContext(secondRenderer, Theme.light())
+    secondRenderer.resetTextMeasureCount()
+    let _ = rich.measure(secondContext, Size(400.0, 100.0))
+
+    // One base line-height request plus fragment width/height work proves the layout was recomputed.
+    @Expect(secondRenderer.textMeasureCount() > UInt64(1))
+}
+
+@Test
 func richTextWrapsTextAtRuneBoundaries(): Unit {
     // 10 runes * 10px = 100px into a 50px width → 5 runes per line, two lines.
     let layout = runLayout([RichSpan.text("abcdefghij")], 50.0, 20.0, 16.0, 3.0, TEN_PX_PER_RUNE)

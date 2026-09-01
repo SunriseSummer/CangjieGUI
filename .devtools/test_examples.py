@@ -178,9 +178,18 @@ def write_report(results, selected, args):
     # Path arguments are not JSON serializable in vars(args).
     report["arguments"] = {key: str(value) if isinstance(value, Path) else value
                            for key, value in report["arguments"].items()}
-    path = RESULTS / "report.json"
+    path = RESULTS / report_filename(args)
     path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     return path
+
+
+def report_filename(args):
+    """Keep expensive full-consumer and real-window evidence from overwriting each other."""
+    if args.smoke_snapshots:
+        return "smoke-report.json"
+    if args.snapshot:
+        return "snapshot-report.json"
+    return "report.json"
 
 
 def main():

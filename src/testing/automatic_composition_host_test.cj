@@ -1,8 +1,8 @@
 package cui.testing
 
 import sdl.{Color, Rect, Size, UiEvent}
-import cui.core.{AutomaticScopeDiagnostics, HStack, Label, Overlay, Panel, RetainedSubtree, Spacer, State, UiContext,
-    VStack, Widget, emit}
+import cui.core.{AutomaticScopeDiagnostics, HStack, Label, Observable, Overlay, Panel, RetainedSubtree, Spacer, State,
+    UiContext, VStack, Widget, derive, emit}
 
 private class AutomaticBuildObservation {
     var calls: Int64 = 0
@@ -170,30 +170,69 @@ func automaticCompositionRebuildsDirtyPathButSkipsCleanSiblingBody(): Unit {
 }
 
 @Test
-func automaticRootRenderNodeCachesCleanLayoutAndRebuildsForPhaseState(): Unit {
+func automaticScopeOwnsOneLazyDerivedDependencyEdge(): Unit {
+    let states = Array<State<Int64>>(16, {index => State<Int64>(index)})
+    let sources = Array<Observable<Int64>>(states.size, {index => states[index]})
+    let computes = AutomaticBuildObservation()
+    let total = derive<Int64, Int64>(sources, {
+        values =>
+            var result: Int64 = 0
+            for (value in values) {
+                result += value
+            }
+            computes.record(result)
+            result
+    })
+    let host = WidgetTestHost()
+    let body: () -> Unit = {=> Label("${total.value}")}
+    let rect = Rect(0.0, 0.0, 200.0, 80.0)
+
+    let _ = host.frame(rect, body: body)
+    var maximumDependencies: Int64 = 0
+    for (scope in host.retainedDiagnostics().automaticScopes) {
+        maximumDependencies = max(maximumDependencies, scope.buildDependencyCount)
+    }
+    @Expect(maximumDependencies, Int64(1))
+    @Expect(computes.calls, Int64(1))
+
+    states[15].value = 100
+    @Expect(computes.calls, Int64(1))
+    let _ = host.frame(rect, body: body)
+    @Expect(computes.calls, Int64(2))
+    @Expect(computes.lastValue, Int64(205))
+}
+
+@Test
+func automaticRootRenderNodeCachesCompositionAndRerunsOnlyDirtyPhase(): Unit {
     let host = WidgetTestHost()
     let measureState = State<Int64>(0)
     let layoutState = State<Int64>(0)
     let paintState = State<Int64>(0)
+    let builds = AutomaticBuildObservation()
     let observation = AutomaticPhaseObservation()
     let body: () -> Unit = {
-        => VStack {Panel {AutomaticPhaseProbe(measureState, layoutState, paintState, observation)}}
+        =>
+            builds.record(0)
+            VStack {Panel {AutomaticPhaseProbe(measureState, layoutState, paintState, observation)}}
     }
     let rect = Rect(0.0, 0.0, 200.0, 80.0)
     let _ = host.frame(rect, body: body)
     let initialMeasures = observation.measures
     let initialLayouts = observation.layouts
+    @Expect(builds.calls, Int64(1))
 
     let _ = host.frame(rect, body: body)
     @Expect(observation.measures, initialMeasures)
     @Expect(observation.layouts, initialLayouts)
     @Expect(observation.draws, Int64(2))
+    @Expect(builds.calls, Int64(1))
 
     paintState.value = 3
     let _ = host.frame(rect, body: body)
     @Expect(observation.measures, initialMeasures)
     @Expect(observation.layouts, initialLayouts)
     @Expect(observation.paintValue, Int64(3))
+    @Expect(builds.calls, Int64(1))
 
     layoutState.value = 4
     let beforeLayoutMeasures = observation.measures
@@ -201,6 +240,7 @@ func automaticRootRenderNodeCachesCleanLayoutAndRebuildsForPhaseState(): Unit {
     let _ = host.frame(rect, body: body)
     @Expect(observation.measures > beforeLayoutMeasures)
     @Expect(observation.layouts > beforeLayoutLayouts)
+    @Expect(builds.calls, Int64(1))
 
     measureState.value = 5
     let beforeMeasureMeasures = observation.measures
@@ -208,6 +248,7 @@ func automaticRootRenderNodeCachesCleanLayoutAndRebuildsForPhaseState(): Unit {
     let _ = host.frame(rect, body: body)
     @Expect(observation.measures > beforeMeasureMeasures)
     @Expect(observation.layouts > beforeMeasureLayouts)
+    @Expect(builds.calls, Int64(1))
 }
 
 @Test

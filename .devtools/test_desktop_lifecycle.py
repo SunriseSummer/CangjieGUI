@@ -35,12 +35,16 @@ def parse_args(argv=None):
     parser.add_argument("--repeat", type=int, default=1,
                         help="run the already-built real-window fixture N times (default 1)")
     parser.add_argument("--timeout", type=int, default=120,
-                        help="timeout for build and each fixture run in seconds (default 120)")
+                        help="timeout for each already-built fixture scenario in seconds (default 120)")
+    parser.add_argument("--build-timeout", type=int, default=120,
+                        help="independent cold-build timeout in seconds (default 120)")
     args = parser.parse_args(argv)
     if args.repeat < 1:
         parser.error("--repeat must be at least 1")
     if args.timeout < 1:
         parser.error("--timeout must be at least 1")
+    if args.build_timeout < 1:
+        parser.error("--build-timeout must be at least 1")
     return args
 
 
@@ -62,7 +66,7 @@ def compare_damage(run_log):
 def main():
     args = parse_args()
     build_command = ["cjpm", "build"]
-    build_code, build_seconds, build_log = run_stage(build_command, args.timeout)
+    build_code, build_seconds, build_log = run_stage(build_command, args.build_timeout)
     runs = []
     if build_code == 0:
         for index in range(args.repeat):
@@ -126,6 +130,8 @@ def main():
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "ok": ok,
         "repeat": args.repeat,
+        "scenario_timeout_seconds": args.timeout,
+        "build_timeout_seconds": args.build_timeout,
         "build": {"command": build_command, "returncode": build_code,
                   "seconds": build_seconds, "log": build_log},
         "run": {key: last_run[key] for key in ("command", "returncode", "seconds", "log")},

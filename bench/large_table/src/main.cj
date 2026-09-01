@@ -27,8 +27,13 @@ private func columns(): Array<TableColumn> {
 
 main(): Int64 {
     if (pairedArgument()) {
-        runLargeTable(500)
-        runLargeTable(ROW_COUNT)
+        if (reverseArgument()) {
+            runLargeTable(ROW_COUNT)
+            runLargeTable(500)
+        } else {
+            runLargeTable(500)
+            runLargeTable(ROW_COUNT)
+        }
         return 0
     }
     runLargeTable(ROW_COUNT)
@@ -52,6 +57,15 @@ private func runLargeTable(rowCount: Int64): Unit {
 private func pairedArgument(): Bool {
     for (argument in getCommandLine()) {
         if (argument == "pair") {
+            return true
+        }
+    }
+    false
+}
+
+private func reverseArgument(): Bool {
+    for (argument in getCommandLine()) {
+        if (argument == "reverse") {
             return true
         }
     }

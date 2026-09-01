@@ -36,27 +36,43 @@ public class Tooltip <: Widget {
     public func layout(ctx: UiContext, rect: Rect): Unit {
         frame = rect
         child.layout(ctx, rect)
+        // Layout still visits a clipped subtree. Reset the dwell when scrolling moves the anchor
+        // away from the pointer, even when paint culling legitimately omits the following draw.
+        if (!frame.contains(ctx.mouseX, ctx.mouseY)) {
+            if (hoverStart.value != UInt64.Max) {
+                hoverStart.value = UInt64.Max
+            }
+        }
     }
 
     public func draw(ctx: UiContext): Unit {
         child.draw(ctx)
         let now = ctx.frame.elapsedMs
+        let hoverStartedAt = hoverStart.value
         if (frame.contains(ctx.mouseX, ctx.mouseY)) {
-            if (hoverStart.value == UInt64.Max) {
+            if (hoverStartedAt == UInt64.Max) {
                 hoverStart.value = now
-            } else if (now >= hoverStart.value && now - hoverStart.value >= TOOLTIP_DELAY_MS) {
+            } else if (now >= hoverStartedAt && now - hoverStartedAt >= TOOLTIP_DELAY_MS) {
                 ctx.showTooltip(text, frame)
             } else {
                 // Nothing changes before the dwell deadline, so let the shell sleep until then.
-                ctx.requestFrameAt(hoverStart.value + TOOLTIP_DELAY_MS)
+                ctx.requestFrameAt(hoverStartedAt + TOOLTIP_DELAY_MS)
             }
-        } else if (hoverStart.value != UInt64.Max) {
+        } else if (hoverStartedAt != UInt64.Max) {
             hoverStart.value = UInt64.Max // reset once; a per-frame write would be wasted churn
         }
     }
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
         child.handle(ctx, event)
+    }
+
+    public func pointerEventScope(): PointerEventScope {
+        child.pointerEventScope()
+    }
+
+    public func paintOutset(): PaintOutset {
+        child.paintOutset()
     }
 
     public func isFlexible(): Bool {
@@ -73,6 +89,10 @@ public class Tooltip <: Widget {
 
     public func participatesInLayout(): Bool {
         child.participatesInLayout()
+    }
+
+    public func needsDetachedLayout(): Bool {
+        child.needsDetachedLayout()
     }
 
     public func focusableId(): ?String {

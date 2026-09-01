@@ -20,6 +20,24 @@ protected func dispatchEventSequence(
     }
 }
 
+/** Dispatches one deferred native event while installing its event-time metadata snapshot. */
+protected func dispatchEventRecord(
+    record: UiEventRecord,
+    context: UiContext,
+    prepare: (UiEvent) -> Unit,
+    route: (UiEvent) -> Unit,
+    complete: (UiEvent) -> Unit
+): Unit {
+    context.beginEvent(record.metadata)
+    try {
+        prepare(record.event)
+        route(record.event)
+        complete(record.event)
+    } finally {
+        context.endEvent()
+    }
+}
+
 /** Dispatches deferred native events while installing each event-time metadata snapshot. */
 protected func dispatchEventRecordSequence(
     events: Iterable<UiEventRecord>,
@@ -29,13 +47,6 @@ protected func dispatchEventRecordSequence(
     complete: (UiEvent) -> Unit
 ): Unit {
     for (record in events) {
-        context.beginEvent(record.metadata)
-        try {
-            prepare(record.event)
-            route(record.event)
-            complete(record.event)
-        } finally {
-            context.endEvent()
-        }
+        dispatchEventRecord(record, context, prepare, route, complete)
     }
 }

@@ -27,7 +27,28 @@ import sdl.{Rect, Size, UiEvent}
  * is single-threaded; workers hand results to that thread through DesktopApp.post. Every block
  * balances its push and pop through `buildChildren`.
  */
-private let openBlocks = ArrayList<ArrayList<Widget>>()
+private struct FocusDeclarationRange {
+    let start: Int64
+    let end: Int64
+
+    init(start: Int64, end: Int64) {
+        this.start = start
+        this.end = end
+    }
+}
+
+private class BuildBlock {
+    let widgets = ArrayList<Widget>()
+    var nextFocusDeclaration: Int64
+    var lastFocusStart: Int64
+
+    init(nextFocusDeclaration: Int64) {
+        this.nextFocusDeclaration = nextFocusDeclaration
+        this.lastFocusStart = nextFocusDeclaration
+    }
+}
+
+private let openBlocks = ArrayList<BuildBlock>()
 var activeStateStore: ?StateStore = None // cjcheck-ignore: global-var # CUI builds on one SDL UI thread; workers use DesktopApp.post
 
 /*
@@ -38,7 +59,11 @@ var activeStateStore: ?StateStore = None // cjcheck-ignore: global-var # CUI bui
  */
 public func emit(widget: Widget): Unit {
     if (!openBlocks.isEmpty()) {
-        openBlocks[openBlocks.size - 1].add(widget)
+        let block = openBlocks[openBlocks.size - 1]
+        let end = currentFocusDeclarationCount()
+        block.widgets.add(widget)
+        block.lastFocusStart = block.nextFocusDeclaration
+        block.nextFocusDeclaration = end
     }
 }
 
@@ -53,12 +78,12 @@ protected func replaceLastEmission(original: Widget, replacement: Widget): Unit 
         return
     }
     let block = openBlocks[openBlocks.size - 1]
-    var i = block.size - 1
+    var i = block.widgets.size - 1
     while (i >= 0) {
-        if (let Some(candidate) <- (block[i] as Object)) {
+        if (let Some(candidate) <- (block.widgets[i] as Object)) {
             if (let Some(source) <- (original as Object)) {
                 if (refEq(candidate, source)) {
-                    block[i] = replacement
+                    block.widgets[i] = replacement
                     return
                 }
             }
@@ -68,21 +93,60 @@ protected func replaceLastEmission(original: Widget, replacement: Widget): Unit 
     // The original was never emitted into this block (a stored widget decorated inside a
     // later block). Append the decorated node at the decoration point — overwriting the
     // last element here would silently destroy an unrelated sibling.
-    block.add(replacement)
+    block.widgets.add(replacement)
+    let current = currentFocusDeclarationCount()
+    block.lastFocusStart = current
+    block.nextFocusDeclaration = current
+}
+
+/* Owner-preserving focus fragment attached to an emitted value; stored widgets return None. */
+func focusFragmentForEmission(widget: Widget): ?FocusSnapshot {
+    if (openBlocks.isEmpty()) {
+        return None
+    }
+    let block = openBlocks[openBlocks.size - 1]
+    if (block.widgets.isEmpty() || !sameWidgetIdentity(block.widgets[block.widgets.size - 1], widget)) {
+        return None
+    }
+    let range = FocusDeclarationRange(block.lastFocusStart, block.nextFocusDeclaration)
+    if (range.start < 0 || range.end <= range.start) {
+        return None
+    }
+    match (currentStateStoreIfActive()) {
+        case Some(store) => Some(store.focusFragmentBetween(range.start, range.end))
+        case None => None
+    }
 }
 
 /*
  * Run a builder block and return every widget it declares, in order.
  */
 private func buildChildrenRaw(body: () -> Unit): Array<Widget> {
-    let block = ArrayList<Widget>()
+    let block = BuildBlock(currentFocusDeclarationCount())
     openBlocks.add(block)
     try {
         body()
     } finally {
         openBlocks.remove(at: openBlocks.size - 1)
     }
-    block.toArray()
+    block.widgets.toArray()
+}
+
+func currentFocusDeclarationCount(): Int64 {
+    match (currentStateStoreIfActive()) {
+        case Some(store) => store.focusDeclarationCount()
+        case None => -1
+    }
+}
+
+private func sameWidgetIdentity(left: Widget, right: Widget): Bool {
+    match (left as Object) {
+        case Some(leftObject) => match (right as Object) {
+            case Some(rightObject) => refEq(leftObject, rightObject)
+            case None => false
+        }
+        case None => false
+    }
 }
 
 private func buildChildRaw(body: () -> Unit): Widget {
@@ -136,7 +200,7 @@ protected func buildRoot(body: () -> Unit, stateStore: StateStore): Widget {
     stateStore.beginBuild()
     try {
         let root = try {
-            buildChild("Root", body)
+            buildAutomaticRootChild(body, stateStore)
         } catch (error: Exception) {
             let rollbackFailure = stateStore.cancelBuild()
             match (rollbackFailure) {
@@ -165,6 +229,11 @@ protected func buildRoot(body: () -> Unit, stateStore: StateStore): Widget {
     }
 }
 
+/* Keeps the implicit zero/one/many-child root wrapper inside the automatic scope it represents. */
+private func buildAutomaticRootChild(body: () -> Unit, stateStore: StateStore): Widget {
+    stateStore.composeChildren("Root", {=> [buildChildRaw(body)]})[0]
+}
+
 /** Builds one identity scope without changing the normal widget collection rules. */
 protected func buildKeyedChild(key: String, body: () -> Unit): Widget {
     match (currentStateStoreIfActive()) {
@@ -180,12 +249,19 @@ protected func buildKeyedChild(key: String, body: () -> Unit): Widget {
 }
 
 /** Builds or reuses one explicit retained subtree in the active StateStore. */
-func buildRetainedChild(key: String, revision: UInt64, cachePaint: Bool, body: () -> Unit): RetainedRecord {
+func buildRetainedChild(
+    key: String,
+    revision: UInt64,
+    cachePaint: Bool,
+    body: () -> Unit,
+    hasExternalRevision!: Bool
+): RetainedRecord {
     match (currentStateStoreIfActive()) {
         // RetainedSubtree is already an explicit restart boundary. Nesting an automatic boundary
         // here would steal its State dependencies and hide explicit revision changes from its
         // established diagnostic and invalidation contract.
-        case Some(store) => store.retainWidget(key, revision, cachePaint, {=> buildChildRaw(body)})
+        case Some(store) => store.retainWidget(key, revision, cachePaint, {=> buildChildRaw(body)},
+            hasExternalRevision: hasExternalRevision)
         case None => RetainedRecord(revision, cachePaint, buildChildRaw(body))
     }
 }
@@ -261,7 +337,7 @@ protected func controlIdentity(base: String): String {
  */
 protected func registerFocusable(id: String): Unit {
     match (currentStateStoreIfActive()) {
-        case Some(store) => store.registerFocusable(id)
+        case Some(store) => store.registerFocusable(FocusTarget(currentMountScope(store).elementId, id))
         case None => ()
     }
 }
@@ -352,6 +428,10 @@ class EmptyView <: Widget {
 
     public func handle(_: UiContext, _: UiEvent): Bool {
         false
+    }
+
+    public func pointerEventScope(): PointerEventScope {
+        PointerEventScope.LayoutBounds
     }
 }
 

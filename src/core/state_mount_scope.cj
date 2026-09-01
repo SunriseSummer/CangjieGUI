@@ -1,21 +1,18 @@
 package cui.core
 
-import std.collection.{ArrayList, HashMap, HashSet}
+import std.collection.HashMap
 
 /* Persistent ownership node for a rebuild boundary; child scopes isolate retained dependencies. */
 class StateMountScope {
+    let elementId: ElementId
     let parent: ?StateMountScope
     let diagnosticPath: String
     let depth: Int64
     var ownerRecord: ?RetainedRecord = None
     private var automaticDamageSink: ?(() -> Unit) = None
     private var automaticPhaseSink: ?AutomaticRenderPhaseSink = None
-    let stateKeys = ArrayList<String>()
-    let retainedKeys = ArrayList<String>()
-    let automaticKeys = ArrayList<String>()
-    let effectKeys = ArrayList<String>()
-    let buildDependencies = ArrayList<StateReadDependency>()
-    let buildDependenciesByState = HashMap<UInt64, StateReadDependency>()
+    var mountOwnership: ?CommittedMountOwnership = None
+    var buildDependencyFacet: ?CommittedBuildDependencies = None
     var buildDirty = false
     var buildSelfDirty = false
     var buildDescendantDirty = false
@@ -24,6 +21,14 @@ class StateMountScope {
     var buildInvalidations: UInt64 = UInt64(0)
 
     init() {
+        this.elementId = ElementId.detached()
+        this.parent = None
+        this.diagnosticPath = "<root>"
+        this.depth = 0
+    }
+
+    init(elementId: ElementId) {
+        this.elementId = elementId
         this.parent = None
         this.diagnosticPath = "<root>"
         this.depth = 0
@@ -34,6 +39,11 @@ class StateMountScope {
     }
 
     init(parent: StateMountScope, diagnosticPath: String) {
+        this(parent, diagnosticPath, ElementId.detached())
+    }
+
+    init(parent: StateMountScope, diagnosticPath: String, elementId: ElementId) {
+        this.elementId = elementId
         this.parent = Some(parent)
         this.diagnosticPath = diagnosticPath
         this.depth = parent.depth + 1
@@ -69,17 +79,111 @@ class StateMountScope {
     }
 
     func closeBuildDependencies(): Unit {
-        for (dependency in buildDependencies) {
-            dependency.close()
-        }
-        buildDependencies.clear()
-        buildDependenciesByState.clear()
+        this.discardBuildDependencies()
         buildDirty = false
         buildSelfDirty = false
         buildDescendantDirty = false
         buildDirtyReason = ""
         automaticDamageSink = None
         automaticPhaseSink = None
+    }
+
+    func requiresExternalDeclarationReplay(): Bool {
+        match (mountOwnership) {
+            case Some(ownership) => ownership.hasExternalRetainedRevision || ownership.hasExternalEffectRevision
+            case None => false
+        }
+    }
+
+    func clearCommittedOwnership(): Unit {
+        mountOwnership = None
+    }
+
+    func committedOwnership(): ?CommittedMountOwnership {
+        mountOwnership
+    }
+
+    func ensureCommittedOwnership(): CommittedMountOwnership {
+        match (mountOwnership) {
+            case Some(ownership) => ownership
+            case None =>
+                let ownership = CommittedMountOwnership()
+                mountOwnership = Some(ownership)
+                ownership
+        }
+    }
+
+    func stateKeyCount(): Int64 {
+        match (mountOwnership) {
+            case Some(ownership) => ownership.stateKeys.size
+            case None => 0
+        }
+    }
+
+    func retainedKeyCount(): Int64 {
+        match (mountOwnership) {
+            case Some(ownership) => ownership.retainedKeys.size
+            case None => 0
+        }
+    }
+
+    func automaticKeyCount(): Int64 {
+        match (mountOwnership) {
+            case Some(ownership) => ownership.automaticKeys.size
+            case None => 0
+        }
+    }
+
+    func effectKeyCount(): Int64 {
+        match (mountOwnership) {
+            case Some(ownership) => ownership.effectKeys.size
+            case None => 0
+        }
+    }
+
+    func hasCommittedImplicitSlotShapes(): Bool {
+        match (mountOwnership) {
+            case Some(ownership) => ownership.implicitSlotShapes.isSome()
+            case None => false
+        }
+    }
+
+    func committedImplicitSlotShapes(): ?HashMap<String, ImplicitSlotShape> {
+        match (mountOwnership) {
+            case Some(ownership) => ownership.implicitSlotShapes
+            case None => None
+        }
+    }
+
+    func committedBuildDependencies(): ?CommittedBuildDependencies {
+        buildDependencyFacet
+    }
+
+    func ensureBuildDependencies(): CommittedBuildDependencies {
+        match (buildDependencyFacet) {
+            case Some(dependencies) => dependencies
+            case None =>
+                let dependencies = CommittedBuildDependencies()
+                buildDependencyFacet = Some(dependencies)
+                dependencies
+        }
+    }
+
+    func buildDependencyCount(): Int64 {
+        match (buildDependencyFacet) {
+            case Some(dependencies) => dependencies.dependencies.size
+            case None => 0
+        }
+    }
+
+    func discardBuildDependencies(): Unit {
+        match (buildDependencyFacet) {
+            case Some(dependencies) => for (dependency in dependencies.dependencies) {
+                dependency.close()
+            }
+            case None => ()
+        }
+        buildDependencyFacet = None
     }
 
     func attachOwner(record: RetainedRecord): Unit {
@@ -172,152 +276,6 @@ class StateMountScope {
     }
 }
 
-/*
- * A build-local transaction for one mount scope. Persistent ownership is replaced only after
- * the complete root build succeeds, so a later exception cannot partially unmount the old tree.
- */
-class StateMountBuild {
-    let scope: StateMountScope
-    let stateKeys = ArrayList<String>()
-    let retainedKeys = ArrayList<String>()
-    let automaticKeys = ArrayList<String>()
-    let effectKeys = ArrayList<String>()
-    private let visitedState = HashSet<String>()
-    private let visitedRetained = HashSet<String>()
-    private let visitedAutomatic = HashSet<String>()
-    private let visitedEffect = HashSet<String>()
-    private let collectStateReads: Bool
-    private let invalidate: () -> Unit
-    private let dependencies = ArrayList<StateReadDependency>()
-    private let dependencySources: HashSet<UInt64>
-    private let newDependencies = ArrayList<StateReadDependency>()
-    private let dirtyVersionAtStart: UInt64
-    let forceAutomaticDescendants: Bool
-    var automaticSubtreeWeight: Int64
-    var automaticMaxBranching: Int64 = 0
-
-    init(
-        scope: StateMountScope,
-        collectStateReads!: Bool,
-        invalidate!: () -> Unit,
-        forceAutomaticDescendants!: Bool = false,
-        automaticSubtreeWeight!: Int64 = 0
-    ) {
-        this.scope = scope
-        this.collectStateReads = collectStateReads
-        this.invalidate = invalidate
-        this.dependencySources = HashSet<UInt64>(max(Int64(16), scope.buildDependencies.size))
-        this.dirtyVersionAtStart = scope.dirtyVersion
-        this.forceAutomaticDescendants = forceAutomaticDescendants
-        this.automaticSubtreeWeight = automaticSubtreeWeight
-    }
-
-    func visitState(path: String, key: String): Unit {
-        if (visitedState.contains(path)) {
-            throw IllegalStateException("Duplicate remembered state key '${key}' in the same scope")
-        }
-        visitedState.add(path)
-        stateKeys.add(path)
-    }
-
-    func visitRetained(path: String, key: String): Unit {
-        if (visitedRetained.contains(path)) {
-            throw IllegalStateException("Duplicate retained subtree key '${key}' in the same scope")
-        }
-        visitedRetained.add(path)
-        retainedKeys.add(path)
-    }
-
-    func visitAutomatic(path: String, key: String): Unit {
-        if (visitedAutomatic.contains(path)) {
-            throw IllegalStateException("Duplicate automatic composition identity '${key}' in the same scope")
-        }
-        visitedAutomatic.add(path)
-        automaticKeys.add(path)
-        automaticMaxBranching = max(automaticMaxBranching, automaticKeys.size)
-    }
-
-    func visitEffect(path: String, key: String): Unit {
-        if (visitedEffect.contains(path)) {
-            throw IllegalStateException("Duplicate lifecycle effect key '${key}' in the same scope")
-        }
-        visitedEffect.add(path)
-        effectKeys.add(path)
-    }
-
-    func containsState(path: String): Bool {
-        visitedState.contains(path)
-    }
-
-    func containsRetained(path: String): Bool {
-        visitedRetained.contains(path)
-    }
-
-    func containsAutomatic(path: String): Bool {
-        visitedAutomatic.contains(path)
-    }
-
-    func containsEffect(path: String): Bool {
-        visitedEffect.contains(path)
-    }
-
-    func absorbAutomaticSubtree(weight: Int64, maxBranching: Int64): Unit {
-        automaticSubtreeWeight += weight
-        automaticMaxBranching = max(automaticMaxBranching, maxBranching)
-    }
-
-    func readState<T>(source: State<T>): Unit {
-        if (!collectStateReads) {
-            return
-        }
-        let identity = source.dependencyIdentity()
-        if (!dependencySources.add(identity)) {
-            return
-        }
-        match (scope.buildDependenciesByState.get(identity)) {
-            case Some(dependency) =>
-                dependencies.add(dependency)
-                return
-            case None => ()
-        }
-        let dependency = TypedStateReadDependency<T>(source, invalidate)
-        dependencies.add(dependency)
-        newDependencies.add(dependency)
-    }
-
-    func commitStateReads(): Unit {
-        if (!collectStateReads) {
-            return
-        }
-        for (previous in scope.buildDependencies) {
-            if (!dependencySources.contains(previous.sourceIdentity)) {
-                previous.close()
-            }
-        }
-        scope.buildDependencies.clear()
-        scope.buildDependenciesByState.clear()
-        for (dependency in dependencies) {
-            scope.buildDependencies.add(dependency)
-            scope.buildDependenciesByState.add(dependency.sourceIdentity, dependency)
-        }
-        newDependencies.clear()
-        let invalidatedDuringBuild = scope.dirtyVersion != dirtyVersionAtStart
-        scope.buildDirty = invalidatedDuringBuild
-        if (!invalidatedDuringBuild) {
-            scope.buildSelfDirty = false
-            scope.buildDescendantDirty = false
-            scope.buildDirtyReason = ""
-        }
-    }
-
-    func cancelStateReads(): Unit {
-        for (dependency in newDependencies) {
-            dependency.close()
-        }
-        newDependencies.clear()
-    }
-}
-
 private func sameMountScope(left: StateMountScope, right: StateMountScope): Bool {
     refEq((left as Object).getOrThrow(), (right as Object).getOrThrow()) // cjcheck-ignore: unchecked-cast # mount scopes are internal class identities
 }
@@ -329,9 +287,12 @@ func beginMountBuild(store: StateStore): Unit {
     store.stateAddedDuringBuild.clear()
     store.retainedAddedDuringBuild.clear()
     store.automaticAddedDuringBuild.clear()
+    store.elementAddedDuringBuild.clear()
     store.retainedReplacements.clear()
     store.automaticReplacements.clear()
-    let root = StateMountBuild(
+    store.mountBuildArenaCursor = 0
+    let root = acquireMountBuild(
+        store,
         store.rootMountScope,
         collectStateReads: true,
         invalidate: {
@@ -341,6 +302,7 @@ func beginMountBuild(store: StateStore): Unit {
         },
         forceAutomaticDescendants: store.rootMountScope.buildSelfDirty
     )
+    registerCurrentImplicitSlotScope(store, root)
     store.mountBuilds.add(root)
     store.activeMountBuilds.add(root)
 }
@@ -358,32 +320,31 @@ func recordStateInsertion(store: StateStore, path: String): Unit {
     }
 }
 
-func recordMountStateRead<T>(store: StateStore, source: State<T>): Unit {
-    if (!store.activeMountBuilds.isEmpty()) {
-        currentMountBuild(store).readState(source)
-    }
+func beginMountStateReadCollection(store: StateStore): Unit {
+    beginStateReadCollection(StateReadCollector.Mount(currentMountBuild(store)))
 }
 
 func currentMountScope(store: StateStore): StateMountScope {
     currentMountBuild(store).scope
 }
 
-func visitRetainedChild(store: StateStore, path: String, key: String): Unit {
-    currentMountBuild(store).visitRetained(path, key)
+func visitRetainedChild(store: StateStore, path: String, key: String, hasExternalRevision: Bool): Unit {
+    currentMountBuild(store).visitRetained(path, key, hasExternalRevision)
 }
 
-func visitLifecycleEffectKey(store: StateStore, path: String, key: String): Unit {
-    currentMountBuild(store).visitEffect(path, key)
+func visitLifecycleEffectKey(store: StateStore, path: String, key: String, hasExternalRevision: Bool): Unit {
+    currentMountBuild(store).visitEffect(path, key, hasExternalRevision)
 }
 
 func beginRetainedMount(store: StateStore, scope: StateMountScope): Unit {
     // Executing a manual retained body means either mount, explicit revision change, or invalidation;
     // ordinary nested bodies must therefore refresh captured values conservatively.
-    let build = StateMountBuild(scope, collectStateReads: true, invalidate: {=> scope.markBuildDirty()},
+    let build = acquireMountBuild(store, scope, collectStateReads: true, invalidate: {=> scope.markBuildDirty()},
         forceAutomaticDescendants: true)
+    registerCurrentImplicitSlotScope(store, build)
     store.mountBuilds.add(build)
     store.activeMountBuilds.add(build)
-    beginStateReadCollection()
+    beginMountStateReadCollection(store)
 }
 
 func endRetainedMount(store: StateStore): Unit {
@@ -404,6 +365,12 @@ func finishMountBuild(store: StateStore): Unit {
     }
     store.activeMountBuilds.remove(at: 0)
 
+    // Shape checks run before any ownership mutation, so a positional-slot error can roll the
+    // complete root build back without partially committing child scopes.
+    for (build in store.mountBuilds) {
+        build.validateImplicitSlotShape()
+    }
+
     // Children commit before parents. Parent pruning can then recursively remove only
     // genuinely absent child scopes, never a scope that is still being rebuilt.
     var i = store.mountBuilds.size - 1
@@ -423,6 +390,9 @@ func finishMountBuild(store: StateStore): Unit {
 func cancelMountBuild(store: StateStore): Unit {
     for (build in store.mountBuilds) {
         build.cancelStateReads()
+    }
+    for (replacement in store.automaticReplacements) {
+        replacement.cancel()
     }
     // Newly inserted retained records may be nested. Reverse order closes children first;
     // persistent ownership was not committed, so each path is removed exactly once here.
@@ -451,33 +421,30 @@ func cancelMountBuild(store: StateStore): Unit {
     for (path in store.stateAddedDuringBuild) {
         let _ = store.entries.remove(path) // cjcheck-ignore: ignore-result # rollback removes an insertion journal entry
     }
+    i = store.elementAddedDuringBuild.size - 1
+    while (i >= 0) {
+        store.elementArena.releaseIfLive(store.elementAddedDuringBuild[i])
+        i -= 1
+    }
     clearBuildTransaction(store)
 }
 
 func clearMountedState(store: StateStore): Unit {
     for ((_, record) in store.retainedEntries) {
         record.close()
-        record.mountScope.stateKeys.clear()
-        record.mountScope.retainedKeys.clear()
-        record.mountScope.automaticKeys.clear()
-        record.mountScope.effectKeys.clear()
+        record.mountScope.clearCommittedOwnership()
         record.mountScope.closeBuildDependencies()
     }
     for ((_, record) in store.automaticEntries) {
         record.closeRenderNodes()
-        record.mountScope.stateKeys.clear()
-        record.mountScope.retainedKeys.clear()
-        record.mountScope.automaticKeys.clear()
-        record.mountScope.effectKeys.clear()
+        record.mountScope.clearCommittedOwnership()
         record.mountScope.closeBuildDependencies()
     }
     store.entries.clear()
     store.retainedEntries.clear()
     store.automaticEntries.clear()
-    store.rootMountScope.stateKeys.clear()
-    store.rootMountScope.retainedKeys.clear()
-    store.rootMountScope.automaticKeys.clear()
-    store.rootMountScope.effectKeys.clear()
+    store.elementArena.clear()
+    store.rootMountScope.clearCommittedOwnership()
     clearBuildTransaction(store)
 }
 
@@ -486,4 +453,10 @@ func currentMountBuild(store: StateStore): StateMountBuild {
         throw IllegalStateException("Remembered state must be accessed during a build")
     }
     store.activeMountBuilds[store.activeMountBuilds.size - 1]
+}
+
+func registerCurrentImplicitSlotScope(store: StateStore, build: StateMountBuild): Unit {
+    if (build.hasCommittedImplicitSlotShapes()) {
+        build.registerImplicitSlotScope(store.implicitSlotNamespace())
+    }
 }

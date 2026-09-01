@@ -5,8 +5,9 @@ import sdl.{FrameInfo, Key, MouseButton, Rect, Renderer, UiEvent, UiEventRecord}
 import sdl.system.PerformanceClock
 import cui.core.{FrameSchedule, FrameScheduler, RetainedGraphDiagnostics, StateStore, Theme, UiContext, Widget,
     broadcastEvent, buildRoot, collectRootLayoutStateReads, collectRootPaintStateReads, consumeFullRetainedFrameDamage,
-    dispatchEventRecordSequence, dispatchFrameSubscribers, enableAutomaticComposition, frameSubscriberCount,
-    retainedGraphDiagnostics, useFullRetainedExecution, useIncrementalRetainedExecution, withFrameScheduler}
+    commitSemanticsForStore, dispatchEventRecord, dispatchFrameSubscribers, enableAutomaticComposition,
+    frameSubscriberCount, frameSubscriptionSnapshotCreations, overlayFragmentReplayVisits, retainedGraphDiagnostics,
+    useFullRetainedExecution, useIncrementalRetainedExecution, withFrameScheduler}
 
 private let TEST_MAX_STABILIZATION_PASSES: Int64 = 3
 
@@ -21,6 +22,7 @@ public struct TestFrameMetrics {
     public let buildNs: UInt64
     public let layoutNs: UInt64
     public let eventNs: UInt64
+    public let semanticsNs: UInt64
     public let drawNs: UInt64
     public let stabilizationPasses: Int64
     public let textMeasures: UInt64
@@ -40,8 +42,8 @@ public struct TestFrameMetrics {
         textDraws: UInt64,
         overlayCount: Int64
     ) {
-        this(buildNs, layoutNs, eventNs, drawNs, stabilizationPasses, textMeasures, textComputes, textDraws, 0,
-            overlayCount)
+        this(buildNs, layoutNs, eventNs, UInt64(0), drawNs, stabilizationPasses, textMeasures, textComputes, textDraws,
+            0, overlayCount)
     }
 
     public init(
@@ -56,9 +58,27 @@ public struct TestFrameMetrics {
         frameSubscribers: Int64,
         overlayCount: Int64
     ) {
+        this(buildNs, layoutNs, eventNs, UInt64(0), drawNs, stabilizationPasses, textMeasures, textComputes, textDraws,
+            frameSubscribers, overlayCount)
+    }
+
+    public init(
+        buildNs: UInt64,
+        layoutNs: UInt64,
+        eventNs: UInt64,
+        semanticsNs: UInt64,
+        drawNs: UInt64,
+        stabilizationPasses: Int64,
+        textMeasures: UInt64,
+        textComputes: UInt64,
+        textDraws: UInt64,
+        frameSubscribers: Int64,
+        overlayCount: Int64
+    ) {
         this.buildNs = buildNs
         this.layoutNs = layoutNs
         this.eventNs = eventNs
+        this.semanticsNs = semanticsNs
         this.drawNs = drawNs
         this.stabilizationPasses = stabilizationPasses
         this.textMeasures = textMeasures
@@ -70,7 +90,7 @@ public struct TestFrameMetrics {
 
     /** Complete CPU-side frame time represented by the measured phases. */
     public func totalNs(): UInt64 {
-        buildNs + layoutNs + eventNs + drawNs
+        buildNs + layoutNs + eventNs + semanticsNs + drawNs
     }
 }
 
@@ -167,7 +187,11 @@ public class WidgetTestHost {
         frameRecords(rect, elapsedMs: elapsedMs, deltaMs: deltaMs, events: records.toArray(), damage: damage, body: body)
     }
 
-    /** Runs a frame with native event-time metadata, including deterministic modifier snapshots. */
+    /**
+     * Runs a frame with native event-time metadata, including deterministic modifier snapshots.
+     * Exceptions from callbacks propagate unchanged. `IllegalStateException` otherwise denotes an
+     * internal completion-invariant violation, never a partially returned frame.
+     */
     public func frameRecords(
         rect: Rect,
         elapsedMs!: UInt64 = UInt64(0),
@@ -190,6 +214,21 @@ public class WidgetTestHost {
         retainedGraphDiagnostics(stateStore)
     }
 
+    /** Revision of the committed focus graph; stable fragment reuse leaves it unchanged. */
+    public func focusGraphRevision(): UInt64 {
+        context.committedFocusGraphRevision()
+    }
+
+    /** Cumulative immutable frame-subscription fragments created by committed and attempted builds. */
+    public func frameSubscriptionSnapshotCreations(): UInt64 {
+        frameSubscriptionSnapshotCreations(stateStore)
+    }
+
+    /** Cumulative declarations visited while composing overlay fragments instead of adopting one. */
+    public func overlayFragmentReplayVisits(): UInt64 {
+        overlayFragmentReplayVisits(context)
+    }
+
     /** Clears retained state and shared interaction state before the next test frame. */
     public func reset(): Unit {
         stateStore.clear()
@@ -201,6 +240,7 @@ public class WidgetTestHost {
         context.leftMouseDown = false
         context.shouldClose = false
         context.clearActiveOverlay()
+        context.resetSemantics()
         context.clearTooltip()
         context.clearTextInputAnchor()
         context.clearFrameSchedule()
@@ -225,34 +265,49 @@ public class WidgetTestHost {
         context.viewportHeight = rect.h
         context.renderer.resetTextMeasureCount()
         var stable = stableLayout(rect, body)
-        let eventNs = dispatchFrameEvents(stable.widget, events)
-        if (scheduler.generation != stable.generation) {
-            let reflected = stableLayout(rect, body)
-            stable = TestLayoutResult(reflected.widget, stable.buildNs + reflected.buildNs,
-                stable.layoutNs + reflected.layoutNs, stable.passes + reflected.passes, reflected.generation)
+        var eventNs = UInt64(0)
+        for (record in events) {
+            eventNs += dispatchFrameEvent(stable.widget, record)
+            stable = reflectStateChanges(stable, rect, body)
         }
+        eventNs += dispatchFrameTick()
+        stable = reflectStateChanges(stable, rect, body)
+        let semanticsStart = now()
+        commitSemanticsForStore(context, stateStore)
+        let semanticsNs = elapsed(semanticsStart, now())
         let drawNs = drawFrame(rect, damage, stable.widget)
         let schedule = context.takeFrameSchedule()
         completed = Some(
             TestFrameResult(stable.widget,
-                TestFrameMetrics(stable.buildNs, stable.layoutNs, eventNs, drawNs, stable.passes,
+                TestFrameMetrics(stable.buildNs, stable.layoutNs, eventNs, semanticsNs, drawNs, stable.passes,
                     context.renderer.textMeasureCount(), context.renderer.textComputeCount(),
                     context.renderer.textDrawCount(), frameSubscriberCount(stateStore), context.overlayCount()),
                 schedule))
     }
 
-    private func dispatchFrameEvents(widget: Widget, events: Array<UiEventRecord>): UInt64 {
+    private func dispatchFrameEvent(widget: Widget, record: UiEventRecord): UInt64 {
         let eventStart = now()
-        scheduler.transaction(
-            {
-                =>
-                    dispatchEventRecordSequence(events, context, {event => preparePointer(event)}, {
-                        event => routeEvent(widget, event)
-                    }, {event => completePointer(event)})
-                    dispatchFrameSubscribers(stateStore, context, context.frame)
-            }
-        )
+        scheduler.transaction({
+            => dispatchEventRecord(record, context, {event => preparePointer(event)}, {
+                event => routeEvent(widget, event)
+            }, {event => completePointer(event)})
+        })
         elapsed(eventStart, now())
+    }
+
+    private func dispatchFrameTick(): UInt64 {
+        let eventStart = now()
+        scheduler.transaction({=> dispatchFrameSubscribers(stateStore, context, context.frame)})
+        elapsed(eventStart, now())
+    }
+
+    private func reflectStateChanges(stable: TestLayoutResult, rect: Rect, body: () -> Unit): TestLayoutResult {
+        if (scheduler.generation == stable.generation) {
+            return stable
+        }
+        let reflected = stableLayout(rect, body)
+        TestLayoutResult(reflected.widget, stable.buildNs + reflected.buildNs, stable.layoutNs + reflected.layoutNs,
+            stable.passes + reflected.passes, reflected.generation)
     }
 
     private func drawFrame(rect: Rect, damage: ?Rect, widget: Widget): UInt64 {
@@ -302,10 +357,11 @@ public class WidgetTestHost {
     private func layoutOnce(rect: Rect, body: () -> Unit): TestLayoutAttempt {
         let startGeneration = scheduler.generation
         context.clearActiveOverlay()
+        context.clearSemantics()
         let buildStart = now()
         let widget = buildRoot(body, stateStore)
         let layoutStart = now()
-        context.adoptFocusRing(stateStore.focusRing())
+        stateStore.adoptFocus(context)
         collectRootLayoutStateReads(stateStore, {=> widget.layout(context, rect)})
         let layoutEnd = now()
         TestLayoutAttempt(widget, elapsed(buildStart, layoutStart), elapsed(layoutStart, layoutEnd), startGeneration,

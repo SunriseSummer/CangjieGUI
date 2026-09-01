@@ -76,8 +76,7 @@ public class Panel <: Widget {
         let insets = ctx.resolve(panelInsets)
         let inner = Size(max(0.0, available.w - insets.horizontal()), max(0.0, available.h - insets.vertical()))
         let measured = child.measure(ctx, inner)
-        Size(min(available.w, measured.w + insets.horizontal()),
-            min(available.h, measured.h + insets.vertical()))
+        Size(min(available.w, measured.w + insets.horizontal()), min(available.h, measured.h + insets.vertical()))
     }
 
     public func layout(ctx: UiContext, rect: Rect): Unit {
@@ -95,6 +94,18 @@ public class Panel <: Widget {
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
         child.handle(ctx, event)
+    }
+
+    public func pointerEventScope(): PointerEventScope {
+        child.pointerEventScope()
+    }
+
+    public func paintOutset(): PaintOutset {
+        let own = match (customStyle) {
+            case Some(value) => surfacePaintOutset(value)
+            case None => PaintOutset.all(CUI_SHADOW_CLEARANCE)
+        }
+        child.paintOutset().join(own)
     }
 
     public func isFlexible(): Bool {

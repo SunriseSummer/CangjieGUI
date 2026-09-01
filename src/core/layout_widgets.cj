@@ -41,8 +41,15 @@ class Stack <: Widget {
     private var measureCacheAvailable = Size(-1.0, -1.0)
     private var measureCacheInnerAvailable = Size(-1.0, -1.0)
     private var measureCacheResult = Size.zero()
+    private var measureCacheEnvironment: ?UiEnvironmentKey = None
     private let childMeasureCache: Array<Size>
     private let childMeasureValid: Array<Bool>
+    // Transient layout-owned bounds used only by the following draw. They do not survive the
+    // immediate Stack instance and therefore cannot diverge from retained Element geometry.
+    private let childLayoutBounds: Array<Rect>
+    private let childLayoutValid: Array<Bool>
+    private let paintOverflow: PaintOutset
+    private var eventTopology: ChildEventTopology
 
     init(
         axis: Axis,
@@ -58,6 +65,10 @@ class Stack <: Widget {
         this.flexible = flexible
         this.childMeasureCache = Array<Size>(children.size, {_ => Size.zero()})
         this.childMeasureValid = Array<Bool>(children.size, repeat: false)
+        this.childLayoutBounds = Array<Rect>(children.size, {_ => Rect.zero()})
+        this.childLayoutValid = Array<Bool>(children.size, repeat: false)
+        this.paintOverflow = aggregatePaintOutsets(children)
+        this.eventTopology = ChildEventTopology(children.size)
     }
 
     func setSpacing(value: Length): Unit {
@@ -76,11 +87,16 @@ class Stack <: Widget {
         crossAlignment = value
     }
 
+    func bindEventTopology(owner: Widget): Unit {
+        eventTopology = activeAutomaticEventTopology(owner, children.size, eventTopology)
+    }
+
     // Content size along the main axis is the sum of child extents; the cross axis hugs
     // the tallest/widest child. This lets a container opt out of filling (flexible: false)
     // and be laid out at exactly the size of what it holds, e.g. a compact toolbar row.
     public func measure(ctx: UiContext, available: Size): Size {
-        if (measureCacheReady && sameLayoutSize(measureCacheAvailable, available)) {
+        let environment = ctx.uiEnvironmentKey()
+        if (measureCacheMatches(available, environment)) {
             return measureCacheResult
         }
         measureCacheReady = false
@@ -115,6 +131,7 @@ class Stack <: Widget {
         measureCacheAvailable = available
         measureCacheInnerAvailable = inner
         measureCacheResult = result
+        measureCacheEnvironment = Some(environment)
         measureCacheReady = true
         result
     }
@@ -124,6 +141,10 @@ class Stack <: Widget {
      * share the leftover space among flexible ones, then place everything.
      */
     public func layout(ctx: UiContext, rect: Rect): Unit {
+        eventTopology.beginLayout()
+        for (index in 0..childLayoutValid.size) {
+            childLayoutValid[index] = false
+        }
         let inner = rect.inset(ctx.resolve(contentPadding))
         let gap = resolvedGap(ctx)
         let count = children.size
@@ -135,6 +156,7 @@ class Stack <: Widget {
         let remaining = max(0.0, mainExtent(inner) - fixed.mainTotal - gaps)
         let flexTotal = measureFlexibleChildren(ctx, inner, gap, remaining, fixed, extents, crossSizes)
         placeChildren(ctx, inner, gap, fixed.mainTotal + flexTotal + gaps, fixed.participating, extents, crossSizes)
+        eventTopology.commitLayout(children, rect)
     }
 
     /** Measures non-flexible children into the slot arrays; returns totals and weights. */
@@ -167,13 +189,28 @@ class Stack <: Widget {
         FixedPass(mainTotal, weightTotal, flexCount, participating)
     }
 
-    private func cachedChildMeasure(ctx: UiContext, child: Widget, index: Int64, available: Size): Size {
-        if (measureCacheReady && childMeasureValid[index]) {
-            if (sameLayoutSize(measureCacheInnerAvailable, available)) {
-                return childMeasureCache[index]
-            }
+    private func cachedChildMeasure(
+        ctx: UiContext,
+        child: Widget,
+        index: Int64,
+        available: Size
+    ): Size {
+        if (measureCacheReady && childMeasureValid[index] && sameLayoutSize(measureCacheInnerAvailable, available)) {
+            return childMeasureCache[index]
         }
         child.measure(ctx, available)
+    }
+
+    private func measureCacheMatches(available: Size, environment: UiEnvironmentKey): Bool {
+        measureCacheReady && sameLayoutSize(measureCacheAvailable, available) && measureCacheEnvironmentMatches(
+            environment)
+    }
+
+    private func measureCacheEnvironmentMatches(environment: UiEnvironmentKey): Bool {
+        match (measureCacheEnvironment) {
+            case Some(value) => sameUiEnvironment(value, environment)
+            case None => false
+        }
     }
 
     /** Distributes `remaining` main-axis space to flexible children; returns their total. */
@@ -215,22 +252,44 @@ class Stack <: Widget {
         for (i in 0..children.size) {
             let child = children[i]
             if (!child.participatesInLayout()) {
+                layoutDetachedIfNeeded(child, ctx)
                 continue
             }
             let cross = crossPlacement(inner, crossSizes[i], child.acceptsStretch(crossAxis()))
-            child.layout(ctx, childRect(cursor, extents[i], cross[0], cross[1]))
+            let bounds = childRect(cursor, extents[i], cross[0], cross[1])
+            child.layout(ctx, bounds)
+            childLayoutBounds[i] = bounds
+            childLayoutValid[i] = true
+            eventTopology.noteChildLayout(i, bounds, child)
             cursor += extents[i] + plan[1]
         }
     }
 
     public func draw(ctx: UiContext): Unit {
-        for (child in children) {
-            child.draw(ctx)
+        match (ctx.currentSpatialPaintBounds()) {
+            case Some(clip) => for (index in 0..children.size) {
+                let child = children[index]
+                if (!childLayoutValid[index] || paintBoundsIntersect(
+                    child.paintOutset().expand(childLayoutBounds[index]), clip)) {
+                    child.draw(ctx)
+                }
+            }
+            case None => for (child in children) {
+                child.draw(ctx)
+            }
         }
     }
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
-        dispatchChildren(children, ctx, event)
+        eventTopology.dispatch(children, ctx, event)
+    }
+
+    public func pointerEventScope(): PointerEventScope {
+        eventTopology.pointerEventScope()
+    }
+
+    public func paintOutset(): PaintOutset {
+        paintOverflow
     }
 
     public func isFlexible(): Bool {
@@ -378,6 +437,11 @@ class Stack <: Widget {
             case Axis.Horizontal => Rect(mainPos, crossPos, mainSize, crossSize)
         }
     }
+}
+
+private func paintBoundsIntersect(left: Rect, right: Rect): Bool {
+    let overlap = left.intersection(right)
+    overlap.w > 0.0 && overlap.h > 0.0
 }
 
 private func sameLayoutSize(left: Size, right: Size): Bool {

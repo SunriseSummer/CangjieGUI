@@ -18,9 +18,14 @@ import bench_harness.{BenchResult, ScrollSweep, nowNanos, printSection, report, 
 public func runRebuildPhaseBench(): Unit {
     printSection("每帧重建相分解（构建 / 布局 / 绘树）")
     measureRebuildPhases("内容页 12 区块", 12, 120, false)
-    measureRebuildPhases("内容页 48 区块", 48, 40, false)
     measureRebuildPhases("控件表单 12 分区", 12, 120, true)
-    measureRebuildPhases("控件表单 40 分区", 40, 40, true)
+    measureRebuildPhases("控件表单 40 分区", 40, 120, true)
+}
+
+/** Keeps the allocation-heavy 48-block phase split in an independent heap lifetime. */
+public func runLargeRebuildPhaseBench(): Unit {
+    printSection("大内容每帧重建相分解（独立堆生命周期）")
+    measureRebuildPhases("内容页 48 区块", 48, 200, false)
 }
 
 private func measureRebuildPhases(name: String, count: Int64, frames: Int64, form: Bool): Unit {
@@ -71,9 +76,14 @@ private func buildRebuildScene(scroll: State<Float32>, count: Int64, form: Bool)
 public func runInstanceReuseBench(): Unit {
     printSection("实例复用对布局的影响（同一场景：每帧重建 vs 复用实例）")
     measureReuseAB("内容页 12 区块", 12, 120, false)
-    measureReuseAB("内容页 48 区块", 48, 40, false)
     measureReuseAB("控件表单 12 分区", 12, 120, true)
-    measureReuseAB("控件表单 40 分区", 40, 40, true)
+    measureReuseAB("控件表单 40 分区", 40, 120, true)
+}
+
+/** Isolates the allocation-heavy 48-block cold-layout curve in its own process lifetime. */
+public func runLargeInstanceReuseBench(): Unit {
+    printSection("大内容实例复用（独立堆生命周期）")
+    measureReuseAB("内容页 48 区块", 48, 200, false)
 }
 
 private func measureReuseAB(name: String, count: Int64, frames: Int64, form: Bool): Unit {

@@ -1,8 +1,9 @@
 package cui.controls
 
 import sdl.{FontSizes, Key, MouseButton, Pen, Rect, Size, UiEvent}
-import cui.core.{handleButtonProtocol, clampItemIndex, Bindable, CUI_CONTROL_H, CursorShape, Spring, UiContext, Widget, requireControlId, claimHoverIfInside, drawFocusRing,
-    drawSurface, emit, focusableControlIdentity, localState, reregisterFocusable, registerFocusable, resolveControlKey}
+import cui.core.{handleButtonProtocol, clampItemIndex, Bindable, CUI_CONTROL_H, CursorShape, Spring, UiContext, Widget,
+    requireControlId, claimHoverIfInside, drawFocusRing, drawSurface, emit, focusableControlIdentity, localState,
+    reregisterFocusable, registerFocusable, resolveControlKey}
 
 private let SWITCH_TRACK_W: Float32 = 40.0
 private let SWITCH_TRACK_H: Float32 = 22.0
@@ -134,8 +135,10 @@ public class RadioButton <: Widget {
         let centerX = frame.x + 9.0
         let centerY = frame.centerY()
         ctx.renderer.fillCircle(centerX, centerY, 9.0, ctx.theme.field)
-        ctx.renderer.strokeCircle(centerX, centerY, 8.5,
-            Pen(width: 1.5, color: ctx.theme.panelEdge.lerp(ctx.theme.accent, t)), segments: 32)
+        ctx
+            .renderer
+            .strokeCircle(centerX, centerY, 8.5, Pen(width: 1.5, color: ctx.theme.panelEdge.lerp(ctx.theme.accent, t)),
+                segments: 32)
         // Grows from nothing to the full 4.5-radius dot as the option is selected.
         if (t > 0.001) {
             ctx.renderer.fillCircle(centerX, centerY, 4.5 * t, ctx.theme.accent)
@@ -268,6 +271,10 @@ public class Stepper <: Widget {
     private var stepSize: Int64 = 1
     private var frame = Rect.zero()
 
+    /**
+     * Creates a stepper and clamps the bound value into the normalized inclusive range.
+     * Throws `IllegalArgumentException` when `step` is not positive or an explicit `key` is empty.
+     */
     public init(
         value: Bindable<Int64>,
         key!: ?String = None,
@@ -412,7 +419,6 @@ public class Stepper <: Widget {
         Rect(frame.x + STEPPER_BUTTON_W, frame.y, max(0.0, frame.w - STEPPER_BUTTON_W * 2.0), frame.h)
     }
 }
-
 
 /** Throws `IllegalArgumentException` when a focusable control receives an empty ID. */
 private func validateControlId(id: String, kind: String): Unit {

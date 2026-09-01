@@ -49,6 +49,7 @@ main(): Unit {
 | [`get()`](#get) | 读取当前值。 |
 | [`observe(callback: (T, T) -> Unit)`](#observe) | 观察后续变更，返回可取消的观察句柄。 |
 | [`map<U>(transform: (T) -> U)`](#map) | 返回一个只读状态，其值为对本值应用 `transform` 的结果。 |
+| [`map<U>(transform: (T) -> U, policy: StateMutationPolicy<U>)`](#map) | 创建按结果等价类过滤失效的派生状态。 |
 
 ## 属性
 
@@ -94,11 +95,17 @@ func observe(callback: (T, T) -> Unit): StateObservation<T>
 
 ```cangjie
 func map<U>(transform: (T) -> U): DerivedState<U>
+
+func map<U>(
+    transform: (T) -> U,
+    policy!: StateMutationPolicy<U>
+): DerivedState<U>
 ```
 
 **参数**
 
 - `transform`: `(T) -> U` — 由当前值计算派生值。
+- `policy`: [`StateMutationPolicy`](StateMutationPolicy.md)`<U>` — 可选的结果观察等价关系。传入后，有订阅者时会在上游提交点计算投影；等价结果不推进派生 revision，也不传播 retained 失效。
 
 **返回值** [`DerivedState`](DerivedState.md)`<U>` — 跟随本值的只读派生状态。
 
@@ -106,3 +113,4 @@ func map<U>(transform: (T) -> U): DerivedState<U>
 
 - [Bindable](Bindable.md) — 在可观察值基础上增加写入与字段绑定能力的子接口。
 - [derive](functions.md#derive) — 从多个源计算派生状态。
+- [StateMutationPolicy](StateMutationPolicy.md) — State 与派生结果共用的观察等价关系。

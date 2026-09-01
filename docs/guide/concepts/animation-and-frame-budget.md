@@ -24,7 +24,7 @@ CUI 提供三种不同的动画方式。`Spring` 根据当前位置、速度和�
 时间，让循环在中间休眠；只有弹簧、补间和 Pulse 这类每个刷新点都会改变画面的动画才立即续帧。
 开启垂直同步时，呈现本身负责节奏，循环不会再叠加固定 16ms 延时。
 
-动画对象必须跨构建保留。可以放进应用模型，或放在稳定局部状态/对象中。不要在 draw 中创建新 Animator，也不要在构建函数中按墙钟直接计算并写 State；构建只描述目标，draw 或 FrameHandler 推进当前值。
+动画对象必须跨构建保留。可以放进应用模型，或在固定声明中用 `remember<Animator> { ... }` 保留；动态列表中的动画对象使用显式 key/`Keyed`。不要在 draw 中创建新 Animator，也不要在构建函数中按墙钟直接计算并写 State；构建只描述目标，draw 或 FrameHandler 推进当前值。
 
 ## 选择与取舍
 
@@ -68,7 +68,7 @@ if (model.running.value) {
 - **“所有动画都应该用 FrameHandler。”** 动画器已经包含推进和稳定判断，FrameHandler 适合通用时钟或轮询。
 - **“动画停住是 Easing 错了。”** 先检查对象是否稳定保留、是否调用带 UiContext 的 animate、是否还有续帧请求。
 - **“Pulse 到达 1 就结束。”** Pulse 是循环时间线，没有 settled 终点。
-- **“帧率低就关闭超采样。”** 先读阶段剖析；可见节点、文本成形或几何可能才是主要耗时。
+- **“帧率低就关闭超采样。”** 默认 Auto 已按物理后备密度在 1x/2x 间选择；先读阶段剖析中的 build/layout/tree/resolve/present，只有 present/resolve 主导时才用显式 `supersample: 1`/`2` 做受控对照。可见节点、文本成形或几何仍可能才是主要耗时。
 
 ## 相关 API
 

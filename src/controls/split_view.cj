@@ -2,8 +2,8 @@ package cui.controls
 
 import std.collection.ArrayList
 import sdl.{Color, Key, MouseButton, Rect, Size, UiEvent, clampF32}
-import cui.core.{Axis, Bindable, CursorShape, State, UiContext, Widget, broadcastEvent, resolveControlKey, buildChild,
-    drawFocusRing, emit, localState, registerFocusable}
+import cui.core.{Axis, Bindable, CursorShape, PaintOutset, State, UiContext, Widget, broadcastEvent, resolveControlKey,
+    buildChild, drawFocusRing, emit, localState, registerFocusable}
 
 // The hit area of the divider is widened by this many logical pixels on each side of its
 // visual strip, so a thin divider stays easy to grab without enlarging the seam on screen.
@@ -113,9 +113,10 @@ public class SplitView <: Widget {
         // even as it strays past the seam. The first claim per move wins, so this beats a pane
         // control that also sits under the pointer in the widened hit band.
         match (event) {
-            case UiEvent.MouseMove(x, y) => if (hit.contains(x, y) || ctx.isDragging(dividerId)) {
-                ctx.claimHover(dividerId, resizeShape())
-            }
+            case UiEvent.MouseMove(x, y) =>
+                if (hit.contains(x, y) || ctx.isDragging(dividerId)) {
+                    ctx.claimHover(dividerId, resizeShape())
+                }
             case _ => ()
         }
         match (event) {
@@ -123,23 +124,27 @@ public class SplitView <: Widget {
                 broadcastEvent(first, ctx, event)
                 broadcastEvent(second, ctx, event)
                 return false
-            case UiEvent.MouseDown(MouseButton.Left, x, y) => if (hit.contains(x, y)) {
-                ctx.focus(dividerId)
-                ctx.beginDrag(dividerId)
-                grabOffset.value = mainOf(x, y) - dividerStart()
-                return true
-            }
-            case UiEvent.MouseMove(x, y) => if (ctx.isDragging(dividerId) && ctx.leftMouseDown) {
-                ratio.value = ratioForPointer(mainOf(x, y))
-                return true
-            }
-            case UiEvent.MouseUp(MouseButton.Left, x, y) => if (ctx.isDragging(dividerId)) {
-                ratio.value = ratioForPointer(mainOf(x, y))
-                return true
-            }
-            case UiEvent.KeyDown(key, _) => if (ctx.hasFocus(dividerId) && nudge(key)) {
-                return true
-            }
+            case UiEvent.MouseDown(MouseButton.Left, x, y) =>
+                if (hit.contains(x, y)) {
+                    ctx.focus(dividerId)
+                    ctx.beginDrag(dividerId)
+                    grabOffset.value = mainOf(x, y) - dividerStart()
+                    return true
+                }
+            case UiEvent.MouseMove(x, y) =>
+                if (ctx.isDragging(dividerId) && ctx.leftMouseDown) {
+                    ratio.value = ratioForPointer(mainOf(x, y))
+                    return true
+                }
+            case UiEvent.MouseUp(MouseButton.Left, x, y) =>
+                if (ctx.isDragging(dividerId)) {
+                    ratio.value = ratioForPointer(mainOf(x, y))
+                    return true
+                }
+            case UiEvent.KeyDown(key, _) =>
+                if (ctx.hasFocus(dividerId) && nudge(key)) {
+                    return true
+                }
             case _ => ()
         }
         // Panes are disjoint, so dispatch order is a formality; follow the reverse-declaration
@@ -164,6 +169,10 @@ public class SplitView <: Widget {
             ids.add(id)
         }
         ids.toArray()
+    }
+
+    public func paintOutset(): PaintOutset {
+        first.paintOutset().join(second.paintOutset())
     }
 
     private func drawDivider(ctx: UiContext): Unit {
@@ -225,8 +234,8 @@ public class SplitView <: Widget {
     private func dividerHitRect(): Rect {
         let strip = dividerRect()
         match (axis) {
-            case Axis.Horizontal => Rect(strip.x - SPLIT_HANDLE_HIT_PAD, strip.y,
-                strip.w + SPLIT_HANDLE_HIT_PAD * 2.0, strip.h)
+            case Axis.Horizontal => Rect(strip.x - SPLIT_HANDLE_HIT_PAD, strip.y, strip.w + SPLIT_HANDLE_HIT_PAD * 2.0,
+                strip.h)
             case Axis.Vertical => Rect(strip.x, strip.y - SPLIT_HANDLE_HIT_PAD, strip.w,
                 strip.h + SPLIT_HANDLE_HIT_PAD * 2.0)
         }

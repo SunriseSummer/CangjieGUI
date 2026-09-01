@@ -48,6 +48,7 @@ main(): Unit {
 | 成员 | 说明 |
 |---|---|
 | [`remember<T>(key: String, initial: () -> T)`](#remember) | 返回当前作用域下键 `key` 对应的状态，首次使用时以 `initial` 创建。 |
+| [`remember<T>(key: String, policy: StateMutationPolicy<T>, initial: () -> T)`](#remember) | 以显式观察等价策略首次创建键控状态。 |
 | [`clear()`](#clear) | 移除全部保留状态并关闭挂载的 lifecycle effect。 |
 
 ## 构造函数
@@ -72,9 +73,14 @@ public init()
 public func remember<T>(key: String, initial: () -> T): State<T>
 ```
 
+```cangjie
+public func remember<T>(key: String, policy: StateMutationPolicy<T>, initial: () -> T): State<T>
+```
+
 **参数**
 
 - `key`: `String` — 状态标识键，不得为空；实际存储键还带上当前 `Keyed` 作用域前缀。
+- `policy`: [`StateMutationPolicy`](StateMutationPolicy.md)`<T>` — 仅在首次创建时采用的观察等价策略。
 - `initial`: `() -> T` — 首次使用时的初值工厂。
 
 **返回值** [`State`](State.md)`<T>` — 保留的状态实例。
@@ -83,6 +89,8 @@ public func remember<T>(key: String, initial: () -> T): State<T>
 
 - `IllegalArgumentException` — 键为空。
 - `IllegalStateException` — 同一作用域同一构建内键重复，或键对应的值类型改变。
+
+后续使用同一键时返回原 State；与 `initial` 相同，新传入的 `policy` 不会替换首次创建时的配置。
 
 ### clear
 

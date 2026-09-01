@@ -70,6 +70,11 @@ private class RememberedStateCapture {
     var value: ?State<Int64> = None
 }
 
+private class RetainedSubscriptionRevision {
+    var revision: UInt64 = UInt64(0)
+    var reject = false
+}
+
 @Test
 func widgetTestHostReflectsEventStateBeforeTheSameFrameDraw(): Unit {
     let host = WidgetTestHost()
@@ -93,6 +98,39 @@ func widgetTestHostReflectsEventStateBeforeTheSameFrameDraw(): Unit {
     @Expect(observation.calls, Int64(2))
     @Expect(observation.lastValue, Int64(1))
     @Expect(result.metrics.stabilizationPasses, Int64(2))
+}
+
+@Test
+func widgetTestHostReconcilesBetweenDiscreteEvents(): Unit {
+    let host = WidgetTestHost()
+    let phase = State<Int64>(0)
+    let secondHandlerRan = State<Bool>(false)
+
+    let _ = host.frame(Rect(0.0, 0.0, 200.0, 80.0),
+        events: [UiEvent.KeyDown(Key.Enter, false), UiEvent.KeyDown(Key.Space, false)]) {
+        if (phase.value == 0) {
+            let _ = EventHandler(onEvent: {
+                event => match (event) {
+                    case UiEvent.KeyDown(Key.Enter, _) =>
+                        phase.value = 1
+                        true
+                    case _ => false
+                }
+            }) {Label("first")}
+        } else {
+            let _ = EventHandler(onEvent: {
+                event => match (event) {
+                    case UiEvent.KeyDown(Key.Space, _) =>
+                        secondHandlerRan.value = true
+                        true
+                    case _ => false
+                }
+            }) {Label("second")}
+        }
+    }
+
+    @Expect(phase.value, Int64(1))
+    @Expect(secondHandlerRan.value)
 }
 
 @Test
@@ -210,6 +248,41 @@ func retainedFrameSubscriptionsReplayInParentBeforeChildOrder(): Unit {
 
     @Expect(builds.calls, Int64(1))
     @Expect(order.toArray(), ["parent", "child"])
+}
+
+@Test
+func failedRetainedReplacementKeepsCommittedFrameSubscriptionFragment(): Unit {
+    let host = WidgetTestHost()
+    let builds = BuildObservation()
+    let callbacks = BuildObservation()
+    let control = RetainedSubscriptionRevision()
+    let body: () -> Unit = {
+        => RetainedSubtree("transactional-subscription", control.revision) {
+            builds.record(0)
+            FrameHandler(onFrame: {_ => callbacks.record(1)}) {Spacer()}
+        }
+        if (control.reject) {
+            throw IllegalStateException("reject retained subscription replacement")
+        }
+    }
+
+    let _ = host.frame(Rect(0.0, 0.0, 200.0, 80.0), body: body)
+    control.revision = UInt64(1)
+    control.reject = true
+    var rejected = false
+    try {
+        let _ = host.frame(Rect(0.0, 0.0, 200.0, 80.0), body: body)
+    } catch (_: IllegalStateException) {
+        rejected = true
+    }
+    control.revision = UInt64(0)
+    control.reject = false
+    let result = host.frame(Rect(0.0, 0.0, 200.0, 80.0), body: body)
+
+    @Expect(rejected)
+    @Expect(builds.calls, Int64(2))
+    @Expect(callbacks.calls, Int64(2))
+    @Expect(result.metrics.frameSubscribers, Int64(1))
 }
 
 @Test

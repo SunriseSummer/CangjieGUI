@@ -18,7 +18,7 @@
 
 `DesktopApp` 创建并持有底层窗口、渲染环境、帧循环和状态存储。它收集 SDL 事件，确定是否需要重绘，按 `State` 的真实读取依赖只执行脏的声明作用域，再完成必要的测量、布局和绘制。闲置时不会为了“声明式”而无意义地持续刷新；状态写入、输入、动画或主动请求帧会推进更新。普通 `VStack`、`Panel` 等 builder body 自动进入组合图；框架还会自动晋升少量复杂渲染边界、缓存稳定显示列表并计算局部 damage，开发者不需要添加 memo、revision、`cachePaint` 或 retained 包装。
 
-构建函数中的 `VStack { Label(...); Button(...) }` 描述父子关系。控件对象可以在本次构建中创建，但业务事实不能依赖这些临时对象的身份。`rememberState` 和 `Keyed`/`ForEach` 通过稳定键把需要跨构建保留的数据与逻辑位置对应起来。
+构建函数中的 `VStack { Label(...); Button(...) }` 描述父子关系。顶层直接声明零个、一个或多个控件也会自动形成可复用的逻辑根，不必为了性能额外包一层 `VStack`。控件对象可以在本次构建中创建，但业务事实不能依赖这些临时对象的身份。固定结构中的 `remember`、`rememberState`、keyless `mountEffect` / `lifecycleEffect` 共用受形状守卫的位置槽，分别保留稳定对象、可写状态与资源生命周期；`Keyed`/`ForEach` 与显式键把动态数据身份带入逻辑位置。
 
 事件回调是改变状态的边界。按钮点击、文本输入或键盘动作在事件事务中写入模型；`State` 写推进应用级调度代数，宿主在本帧 draw 前稳定重建，使可见结果立即反映。只改普通 `var` 不会触发这一步。不要在构建阶段主动调用控件的 `handle`、`layout` 或伪造输入事件，这会绕过应用正常协议，也不能代表用户真的能完成交互。
 
@@ -38,7 +38,7 @@
 
 ```cangjie role=contrast
 app.run {
-    let count = rememberState<Int64>("counter.value") {0}
+    let count = rememberState<Int64> {0}
     VStack {
         Label("计数：${count.value}")
         Button("加一", {=> count.value += 1})
@@ -47,7 +47,7 @@ app.run {
 ```
 
 这段代码从语义上持续描述标签和按钮；运行时只在 `counter` 变化所覆盖的脏路径执行相关 body。
-`counter.value` 对应的值由应用状态存储保留。回调只改事实，不直接寻找并修改旧标签对象。
+位置槽对应的值由应用状态存储保留。回调只改事实，不直接寻找并修改旧标签对象；若这段状态进入条件或循环，应改用显式键与 `Keyed`/`ForEach`。
 
 如果要加载文件，不应在每次构建都 `read`。后台线程也不能直接写 UI `State`。下面的信箱只让工作线程发布普通字符串；`FrameHandler` 的回调运行在 UI 帧中，取出结果后才更新 `status`。把信箱和 `status` 创建在 `app.run` 外，避免构建时重复启动任务：
 

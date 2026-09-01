@@ -4,7 +4,7 @@
 
 `cui.media` 包中的 public class
 
-显示从文件加载的图像。解码后的纹理放在按路径键控的进程级共享缓存里，ImageView 像普通组件一样内联声明——每帧重建只花一次缓存查找、不碰磁盘。覆盖写过图像文件后调用 [`invalidateImage`](functions.md#invalidateimage) 刷新。
+显示从文件加载的图像。解码后的纹理放在按 UI 线程和渲染器隔离、按路径键控的有界加权 LRU 中（逐帧快命中有二次机会），ImageView 像普通组件一样内联声明——每帧重建只查缓存、不碰磁盘；同一实例重复绘制还会复用已解析结果。覆盖写过图像文件后调用 [`invalidateImage`](functions.md#invalidateimage) 刷新。
 
 ## 声明
 
@@ -18,7 +18,7 @@ public class ImageView <: Widget & Resource
 
 ## 说明
 
-`Resource` 实现用于兼容早期“先在外部创建，再交给 `manage`”的写法：[close()](#close) 只停用这个图像视图，纹理由共享缓存管理。图像不存在或解码失败时不绘制内容，也不会中断帧循环；失败结果会被缓存，避免每帧重复读取磁盘。未设置 `preferredWidth` 时占满可用宽度；设置后按指定宽度显示，可以和其他控件排在同一行。
+`Resource` 实现用于兼容早期“先在外部创建，再交给 `manage`”的写法：[close()](#close) 只停用这个图像视图，纹理由线程缓存管理。缓存默认限制为 256 项和估算 128 MiB，淘汰会确定关闭纹理；单张超过预算的纹理可作为唯一条目保留，避免逐帧重新解码。图像不存在或解码失败时不绘制内容，也不会中断帧循环；失败结果同样受条目上限约束。未设置 `preferredWidth` 时占满可用宽度；设置后按指定宽度显示，可以和其他控件排在同一行。
 
 ## 示例
 
@@ -198,4 +198,5 @@ public func close(): Unit
 
 - [`ImageFit`](ImageFit.md) — 适配方式。
 - [`invalidateImage`](functions.md#invalidateimage) / [`clearImageCache`](functions.md#clearimagecache) — 缓存刷新入口。
+- [`ImageCacheStats`](ImageCacheStats.md) / [`imageCacheStats`](functions.md#imagecachestats) — 缓存容量与运行统计。
 - [`CanvasWidget`](CanvasWidget.md) — 自由绘制表面。

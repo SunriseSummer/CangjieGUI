@@ -64,6 +64,9 @@ main(): Unit {
 | [`batch(...)`](#batch) | 在 UI 线程把多次状态写合并为一次视觉失效。 |
 | [`retainedDiagnostics()`](#retaineddiagnostics) | 获取最近一次已提交 retained 执行图的结构化诊断快照。 |
 | [`lastFrameUsedPartialDamage()`](#lastframeusedpartialdamage) | 查询当前/最近一帧是否被后端实际接受为局部 damage。 |
+| [`setAccessibilityAdapter(...)`](#setaccessibilityadapter) | 安装平台原生或外部无障碍语义树 adapter。 |
+| [`setAccessibilityFailureHandler(...)`](#setaccessibilityfailurehandler) | 安装无障碍分支故障的即时通知回调。 |
+| [`takeAccessibilityFailures()`](#takeaccessibilityfailures) | 取得并清空结构化无障碍失败。 |
 | [`post(...)`](#post) | 从任意线程投递短动作，并唤醒 UI 事件等待。 |
 | [`clearRememberedState()`](#clearrememberedstate) | 在下一次重建前丢弃全部 `rememberState` 局部值。 |
 | [`openFileDialog(...)`](#openfiledialog) | 发起系统"打开文件"对话框，返回可轮询的请求。 |
@@ -157,8 +160,10 @@ public func clearRememberedState(): Unit
 public func batch(action: () -> Unit): Unit
 ```
 
-在 UI 线程执行动作；其中的多次 `State` 写入只推进一次应用失效代数。跨线程调用会快速失败，后台结果
-应使用 `post`。
+在 UI 线程执行原子动作：多次 `State` 写入只推进一次应用失效代数；同一状态的观察通知合并为
+`(批次前值, 最终值)`，派生观察者在全部源稳定后运行一次。观察者失败不会截断其后的 State/Derived 依赖失效；
+框架保留首错、继续稳定事务，再把异常交还调用方。观察者中的嵌套批次加入当前不动点，仍只在最外层提交。
+跨线程调用会快速失败，后台结果应使用 `post`。
 
 ### retainedDiagnostics
 
@@ -178,6 +183,37 @@ public func lastFrameUsedPartialDamage(): Bool
 返回当前或最近完成绘制的帧是否**实际**采用自动 retained 局部 damage。框架计划了区域但 Renderer 因没有兼容
 持久目标等原因回退全帧时返回 `false`。应从 UI 线程的 widget draw、事件或 `post` 动作读取；跨线程调用被拒绝。
 此值用于剖析和 E2E 断言，不应改变业务 UI。
+
+### setAccessibilityAdapter
+
+在 UI 线程安装 [`AccessibilityAdapter`](../core/AccessibilityAdapter.md)。首次调用立即发送当前语义树 bootstrap；
+以后每次稳定布局提交只发送真实增量。Windows 桌面应用会自动保留内建 UI Automation provider；这里安装的
+adapter 作为并行观察者接收同一事务，不会替换或关闭原生 provider。方法不接管外部 adapter 的资源生命周期。
+每个分支持有独立 revision 游标：安装新观察器只向它重放当前快照，不会让已经同步的原生 provider 收到重复
+bootstrap。观察器拒绝 bootstrap 时只隔离该观察器，同时把原始异常重新抛给调用者。
+
+```cangjie
+public func setAccessibilityAdapter(adapter: AccessibilityAdapter): Unit
+```
+
+### setAccessibilityFailureHandler
+
+在 UI 线程安装无障碍故障通知回调。原生桥、外部观察器和回调本身分别形成独立故障域；某一分支抛异常后只
+隔离该分支，其余分支和帧循环继续工作。回调在语义提交或原生动作排空边界同步执行，必须快速、非阻塞，适合
+记录遥测或更新轻量诊断状态。回调自身抛异常时会自动卸载，其异常仍可由 `takeAccessibilityFailures` 取得。
+
+```cangjie
+public func setAccessibilityFailureHandler(handler: (AccessibilityFailure) -> Unit): Unit
+```
+
+### takeAccessibilityFailures
+
+返回并清空尚未取得的 [`AccessibilityFailure`](AccessibilityFailure.md)，用于测试、诊断面板或关闭后的故障汇总。
+该方法只能在 DesktopApp 的 UI 线程调用；读取是破坏性的，不会重复返回同一条记录。
+
+```cangjie
+public func takeAccessibilityFailures(): Array<AccessibilityFailure>
+```
 
 ### post
 

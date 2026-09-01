@@ -1,7 +1,6 @@
 package cui.core
 
-import std.collection.ArrayList
-import sdl.{Rect, RenderCommandBuffer, Size, UiEvent}
+import sdl.{Rect, Size, UiEvent}
 
 private let activeAutomaticRenderNode = ThreadLocal<AutomaticRenderNode>()
 
@@ -18,27 +17,20 @@ private let AUTOMATIC_PAINT_DYNAMIC_BYPASS_MAX_FRAMES: Int64 = 256
 
 /*
  * A persistent phase proxy for one emitted widget slot. The wrapped widget value may change after
- * a successful composition commit, while the proxy keeps constraints, geometry, overlay replay,
- * phase dependencies, and event identity stable across frames.
+ * a successful composition commit. The proxy keeps phase dependencies and event identity stable;
+ * its Element scene slot owns measure, layout geometry, overlay/semantics replay and paint output.
  */
 class AutomaticRenderNode <: Widget {
     private var child: Widget
+    private let sceneNode: ElementSceneNode
     private let paintBudget: AutomaticPaintBudget
-    private let invalidateComposition: () -> Unit
     private let invalidateDamage: (Rect) -> Unit
     private var parent: ?AutomaticRenderNode = None
-    private var measuredAvailable = Size.zero()
-    private var measured = Size.zero()
-    private var measureValid = false
-    private var laidOutRect = Rect.zero()
-    private var layoutValid = false
-    private var layoutOverlays: Array<Overlay> = []
     private var measureDependencies: ?PhaseStateDependencies = None
     private var layoutDependencies: ?PhaseStateDependencies = None
     private var paintDependencies: ?PhaseStateDependencies = None
-    private var paintCommands: ?RenderCommandBuffer = None
-    private var paintBounds: ?Rect = None
     private var paintWarmupRemaining = AUTOMATIC_PAINT_WARMUP_FRAMES
+    private var paintEstablished = false
     private var paintBypassRemaining: Int64 = 0
     private var paintDynamicWindow: Int64 = 0
     private var layoutHits: UInt64 = UInt64(0)
@@ -49,12 +41,17 @@ class AutomaticRenderNode <: Widget {
     private var paintBudgetEvictions: UInt64 = UInt64(0)
     private var reservedPaintBytes: UInt64 = UInt64(0)
     private var paintLastUse: UInt64 = UInt64(0)
+    private var eventTopologyVisited = false
+    private var closed = false
 
-    init(child: Widget, paintBudget: AutomaticPaintBudget, invalidateComposition: () -> Unit,
-        invalidateDamage: (Rect) -> Unit) {
+    init(child: Widget, paintBudget: AutomaticPaintBudget, invalidateDamage: (Rect) -> Unit) {
+        this(child, detachedElementSceneNode(), paintBudget, invalidateDamage)
+    }
+
+    init(child: Widget, sceneNode: ElementSceneNode, paintBudget: AutomaticPaintBudget, invalidateDamage: (Rect) -> Unit) {
         this.child = child
+        this.sceneNode = sceneNode
         this.paintBudget = paintBudget
-        this.invalidateComposition = invalidateComposition
         this.invalidateDamage = invalidateDamage
         this.measureDependencies = Some(PhaseStateDependencies({=> invalidateMeasureFromState()}))
         this.layoutDependencies = Some(PhaseStateDependencies({=> invalidateLayoutFromState()}))
@@ -66,91 +63,132 @@ class AutomaticRenderNode <: Widget {
             return
         }
         child = next
-        measureStateDependencies().close()
-        layoutStateDependencies().close()
-        paintStateDependencies().close()
+        // Dependencies guard the last committed phase result, not the transient Widget value.
+        // Keep that frontier until the replacement phase commits; collection will reuse an equal
+        // trace or atomically reconcile a changed one, while failure preserves the old commit.
         invalidateMeasure()
     }
 
     func close(): Unit {
+        if (closed) {
+            return
+        }
         measureStateDependencies().close()
         layoutStateDependencies().close()
         paintStateDependencies().close()
         invalidatePaintCache(resetWarmup: true)
+        sceneNode.close()
         parent = None
+        closed = true
     }
 
     public func measure(ctx: UiContext, available: Size): Size {
         attachToActiveParent()
-        if (measureValid && sameAutomaticSize(measuredAvailable, available)) {
-            return measured
+        let environment = ctx.uiEnvironmentKey()
+        if (sceneNode.measureMatches(available, environment)) {
+            return sceneNode.measuredSize()
         }
-        measuredAvailable = available
+        let hadCommittedMeasure = sceneNode.hasMeasure()
         let dependencies = measureStateDependencies()
-        measured = withActiveNode({=> collectPhaseStateReads(dependencies, {=> child.measure(ctx, available)})})
-        measureValid = !dependencies.collectionWasInvalidated
-        layoutValid = false
+        let measured = withActiveNode({=> collectPhaseStateReads(dependencies, {=> child.measure(ctx, available)})})
+        if (hadCommittedMeasure) {
+            noteDamage()
+            invalidatePaintCache(resetWarmup: true)
+        }
+        if (!dependencies.collectionWasInvalidated) {
+            sceneNode.publishMeasure(available, environment, measured)
+        } else {
+            sceneNode.invalidateMeasure()
+        }
         measured
     }
 
     public func layout(ctx: UiContext, rect: Rect): Unit {
         attachToActiveParent()
-        if (layoutValid && sameAutomaticRect(laidOutRect, rect)) {
-            for (overlay in layoutOverlays) {
-                ctx.setOverlay(overlay)
-            }
+        let spatialVisibility = ctx.currentSpatialVisibility()
+        let paintOutset = child.paintOutset()
+        let environment = ctx.uiEnvironmentKey()
+        if (sceneNode.layoutMatches(rect, spatialVisibility, paintOutset, environment)) {
+            sceneNode.replayLayout(ctx)
             layoutHits += UInt64(1)
             return
         }
+        let paintEnvironmentChanged = if (sceneNode.hasLayout()) {
+            !sceneNode.layoutEnvironmentMatches(environment)
+        } else {
+            false
+        }
         let overlayStart = ctx.overlayRegistrationCount()
+        let semanticStart = ctx.semanticRegistrationCount()
         let dependencies = layoutStateDependencies()
-        withActiveNode {
-            =>
-                collectPhaseStateReads(dependencies, {=> child.layout(ctx, rect)})
-                let geometryChanged = !sameAutomaticRect(laidOutRect, rect)
-                if (geometryChanged) {
-                    noteDamage()
-                    invalidatePaintCache(resetWarmup: true)
-                }
-                laidOutRect = rect
-                if (geometryChanged) {
-                    noteDamage()
-                }
-                layoutValid = !dependencies.collectionWasInvalidated
-                layoutOverlays = ctx.overlayRegistrationsFrom(overlayStart)
+        try {
+            withActiveNode {
+                =>
+                    eventTopologyVisited = false
+                    collectPhaseStateReads(dependencies, {=> child.layout(ctx, rect)})
+                    if (!dependencies.collectionWasInvalidated) {
+                        let eventTopology = if (eventTopologyVisited) {
+                            sceneNode.stagedEventTopologyCommit()
+                        } else {
+                            ElementEventTopologyCommit.Clear
+                        }
+                        let geometryChanged = !sceneNode.paintGeometryMatches(rect, paintOutset)
+                        let paintInputsChanged = geometryChanged || paintEnvironmentChanged
+                        if (paintInputsChanged) {
+                            noteDamage()
+                            invalidatePaintCache(resetWarmup: true)
+                        }
+                        sceneNode.publishLayout(
+                            ElementLayoutCommit(rect, spatialVisibility, paintOutset, environment,
+                                ElementLayoutEffects(ctx.overlaySnapshotIfAnyFrom(overlayStart),
+                                    ctx.semanticFragmentIfAnyFrom(semanticStart), eventTopology: eventTopology)))
+                        if (paintInputsChanged) {
+                            noteDamage()
+                        }
+                    } else {
+                        sceneNode.invalidateLayout()
+                    }
+            }
+        } finally {
+            sceneNode.discardStagedEventTopology()
         }
     }
 
     public func draw(ctx: UiContext): Unit {
-        if (paintCommands.isSome() && !ctx.retainedPaintIntersects(automaticPaintRect())) {
+        if (sceneNode.hasCommands() && !ctx.retainedPaintIntersects(automaticPaintRect())) {
             return
         }
-        match (paintCommands) {
-            case Some(commands) =>
-                if (commands.replay(ctx.renderer)) {
-                    paintHits += UInt64(1)
-                    paintBudget.touch(this)
-                } else {
-                    invalidatePaintCache(resetWarmup: true)
-                    drawDirect(ctx)
-                }
-            case None =>
-                if (ctx.retainedPartialDamageActive()) {
-                    drawDirect(ctx)
-                } else if (paintWarmupRemaining > 0) {
-                    paintWarmupRemaining -= 1
-                    drawDirect(ctx)
-                } else if (paintBypassRemaining > 0) {
-                    paintBypassRemaining -= 1
-                    drawDirect(ctx)
-                } else {
-                    recordAndDraw(ctx)
-                }
+        if (sceneNode.hasCommands()) {
+            if (sceneNode.replay(ctx.renderer, ctx.retainedDamageRegion())) {
+                paintHits += UInt64(1)
+                paintBudget.touch(this)
+            } else {
+                clearLocalPaintCache(resetWarmup: false)
+                recordAndDraw(ctx)
+            }
+        } else if (ctx.retainedPartialDamageActive()) {
+            drawDirect(ctx)
+        } else if (paintWarmupRemaining > 0) {
+            paintWarmupRemaining -= 1
+            drawDirect(ctx)
+        } else if (paintBypassRemaining > 0) {
+            paintBypassRemaining -= 1
+            drawDirect(ctx)
+        } else {
+            recordAndDraw(ctx)
         }
     }
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
         child.handle(ctx, event)
+    }
+
+    public func pointerEventScope(): PointerEventScope {
+        child.pointerEventScope()
+    }
+
+    public func paintOutset(): PaintOutset {
+        child.paintOutset()
     }
 
     public func isFlexible(): Bool {
@@ -167,6 +205,10 @@ class AutomaticRenderNode <: Widget {
 
     public func participatesInLayout(): Bool {
         child.participatesInLayout()
+    }
+
+    public func needsDetachedLayout(): Bool {
+        child.needsDetachedLayout()
     }
 
     public func focusableId(): ?String {
@@ -198,9 +240,11 @@ class AutomaticRenderNode <: Widget {
     }
 
     private func invalidateMeasure(): Unit {
-        let shouldPropagate = measureValid || layoutValid
-        measureValid = false
-        layoutValid = false
+        var shouldPropagate = sceneNode.hasMeasure()
+        if (!shouldPropagate) {
+            shouldPropagate = sceneNode.hasLayout()
+        }
+        sceneNode.invalidateMeasure()
         clearLocalPaintCache(resetWarmup: true)
         if (shouldPropagate) {
             match (parent) {
@@ -211,8 +255,8 @@ class AutomaticRenderNode <: Widget {
     }
 
     private func invalidateLayout(): Unit {
-        let shouldPropagate = layoutValid
-        layoutValid = false
+        let shouldPropagate = sceneNode.hasLayout()
+        sceneNode.invalidateLayout()
         clearLocalPaintCache(resetWarmup: true)
         if (shouldPropagate) {
             match (parent) {
@@ -225,13 +269,11 @@ class AutomaticRenderNode <: Widget {
     private func invalidateMeasureFromState(): Unit {
         noteDamage()
         invalidateMeasure()
-        invalidateComposition()
     }
 
     private func invalidateLayoutFromState(): Unit {
         noteDamage()
         invalidateLayout()
-        invalidateComposition()
     }
 
     private func invalidatePaintFromState(): Unit {
@@ -263,17 +305,31 @@ class AutomaticRenderNode <: Widget {
                 collectPhaseStateReads(dependencies, {=> child.draw(ctx)})
             }
         }
-        paintBounds = commands.paintBounds()
-        let replayed = commands.replay(ctx.renderer)
+        sceneNode.observePaintBounds(commands.paintBounds())
         let stats = commands.stats()
-        if (layoutValid && !dependencies.collectionWasInvalidated && dynamicReason.isNone() && replayed &&
-            stats.commandCount >= AUTOMATIC_PAINT_MIN_COMMANDS && stats.estimatedBytes <= AUTOMATIC_PAINT_MAX_BYTES &&
-            paintBudget.admit(this, stats.estimatedBytes)) {
-            paintCommands = Some(commands)
+        let cacheWorthy = stats.commandCount >= AUTOMATIC_PAINT_MIN_COMMANDS || commands.hasSceneReferences()
+        let cacheEligible = sceneNode.hasLayout() && !dependencies.collectionWasInvalidated && dynamicReason.isNone() &&
+            commands.isReplayable(ctx.renderer) && cacheWorthy && stats.estimatedBytes <= AUTOMATIC_PAINT_MAX_BYTES
+        let admittedToPaintBudget = if (cacheEligible) {
+            // Admission mutates the global LRU and may evict another node, so keep that effect
+            // explicit and execute it only after every pure eligibility predicate succeeds.
+            paintBudget.admit(this, stats.estimatedBytes)
+        } else {
+            false
+        }
+        if (admittedToPaintBudget) {
+            sceneNode.publish(commands)
+            paintEstablished = true
             paintDynamicWindow = 0
             paintBypassRemaining = 0
+            if (!sceneNode.replay(ctx.renderer, ctx.retainedDamageRegion())) {
+                clearLocalPaintCache(resetWarmup: true)
+                drawDirect(ctx)
+            }
         } else {
-            paintCommands = None
+            sceneNode.invalidateCommands(resetBounds: false)
+            paintEstablished = false
+            let replayed = commands.replay(ctx.renderer)
             if (!replayed) {
                 collectPhaseStateReads(dependencies, {=> child.draw(ctx)})
             }
@@ -297,35 +353,34 @@ class AutomaticRenderNode <: Widget {
     }
 
     private func invalidatePaintCache(resetWarmup!: Bool): Unit {
+        let wasPatchBoundary = sceneNode.hasCommands()
         clearLocalPaintCache(resetWarmup: resetWarmup)
-        match (parent) {
-            case Some(value) => value.invalidatePaintCache(resetWarmup: resetWarmup)
-            case None => ()
+        if (!wasPatchBoundary) {
+            match (parent) {
+                case Some(value) => value.invalidatePaintCache(resetWarmup: resetWarmup)
+                case None => ()
+            }
         }
     }
 
     private func clearLocalPaintCache(resetWarmup!: Bool): Unit {
         paintBudget.release(this)
-        paintCommands = None
-        paintBounds = None
+        sceneNode.invalidateCommands(resetBounds: resetWarmup)
         paintBypassRemaining = 0
         paintDynamicWindow = 0
-        if (resetWarmup) {
+        if (resetWarmup && !paintEstablished) {
             paintWarmupRemaining = AUTOMATIC_PAINT_WARMUP_FRAMES
         }
     }
 
     private func automaticPaintRect(): Rect {
-        match (paintBounds) {
-            case Some(value) => value
-            case None => laidOutRect
-        }
+        sceneNode.paintBounds()
     }
 
     func noteDamage(): Unit {
         let rect = automaticPaintRect()
         if (rect.w > 0.0 && rect.h > 0.0) {
-            invalidateDamage(rect.inset(-CUI_SHADOW_CLEARANCE))
+            invalidateDamage(rect)
         }
     }
 
@@ -342,16 +397,23 @@ class AutomaticRenderNode <: Widget {
     }
 
     func stats(): AutomaticRenderStats {
-        let commandCount = match (paintCommands) {
-            case Some(value) => value.stats().commandCount
-            case None => 0
-        }
-        let estimatedBytes = match (paintCommands) {
-            case Some(value) => value.stats().estimatedBytes
-            case None => UInt64(0)
-        }
+        let (commandCount, estimatedBytes) = sceneNode.commandStats()
         AutomaticRenderStats(1, layoutHits, paintHits, paintRecordAttempts, paintDynamicBypasses,
-            paintRejectedCandidates, paintBudgetEvictions, commandCount, estimatedBytes, paintBypassRemaining)
+            paintRejectedCandidates, paintBudgetEvictions, commandCount, estimatedBytes, paintBypassRemaining,
+            sceneNode.contentRevision())
+    }
+
+    func ownerElementId(): ElementId {
+        sceneNode.id.owner
+    }
+
+    func eventTopologyFor(widget: Widget, childCount: Int64): ?ChildEventTopology {
+        if (sameWidget(child, widget)) {
+            eventTopologyVisited = true
+            Some(sceneNode.eventTopology(childCount))
+        } else {
+            None
+        }
     }
 
     func acceptPaintBudget(bytes: UInt64, lastUse: UInt64): Unit {
@@ -368,8 +430,7 @@ class AutomaticRenderNode <: Widget {
     }
 
     func evictPaintForBudget(): Unit {
-        paintCommands = None
-        paintBounds = None
+        sceneNode.invalidateCommands(resetBounds: false)
         reservedPaintBytes = UInt64(0)
         paintBypassRemaining = AUTOMATIC_PAINT_REJECT_BYPASS_FRAMES
         paintBudgetEvictions += UInt64(1)
@@ -384,108 +445,23 @@ class AutomaticRenderNode <: Widget {
     }
 }
 
-/* One existing proxy update, staged until the root composition transaction commits. */
-class PendingAutomaticRenderUpdate {
-    let node: AutomaticRenderNode
-    let child: Widget
-
-    init(node: AutomaticRenderNode, child: Widget) {
-        this.node = node
-        this.child = child
-    }
-
-    func commit(): Unit {
-        node.update(child)
+func activeAutomaticElementId(): ElementId {
+    match (activeAutomaticRenderNode.get()) {
+        case Some(node) => node.ownerElementId()
+        case None => ElementId.detached()
     }
 }
 
-/* Reconciliation output and deferred mutations for one automatic composition record. */
-class AutomaticRenderReconciliation {
-    let children: Array<Widget>
-    private let updates: Array<PendingAutomaticRenderUpdate>
-    private let removed: Array<AutomaticRenderNode>
-
-    init(
-        children: Array<Widget>,
-        updates: Array<PendingAutomaticRenderUpdate>,
-        removed: Array<AutomaticRenderNode>
-    ) {
-        this.children = children
-        this.updates = updates
-        this.removed = removed
-    }
-
-    func commit(): Unit {
-        for (update in updates) {
-            update.commit()
+func activeAutomaticEventTopology(
+    widget: Widget,
+    childCount: Int64,
+    fallback: ChildEventTopology
+): ChildEventTopology {
+    match (activeAutomaticRenderNode.get()) {
+        case Some(node) => match (node.eventTopologyFor(widget, childCount)) {
+            case Some(topology) => topology
+            case None => fallback
         }
-        for (node in removed) {
-            node.close()
-        }
+        case None => fallback
     }
-}
-
-func wrapAutomaticChildren(
-    children: Array<Widget>,
-    paintBudget: AutomaticPaintBudget,
-    invalidateComposition: () -> Unit,
-    invalidateDamage: (Rect) -> Unit
-): Array<Widget> {
-    Array<Widget>(children.size,
-        {index => AutomaticRenderNode(children[index], paintBudget, invalidateComposition, invalidateDamage)})
-}
-
-func reconcileAutomaticChildren(
-    previous: Array<Widget>,
-    next: Array<Widget>,
-    paintBudget: AutomaticPaintBudget,
-    invalidateComposition: () -> Unit,
-    invalidateDamage: (Rect) -> Unit
-): AutomaticRenderReconciliation {
-    let children = ArrayList<Widget>()
-    let updates = ArrayList<PendingAutomaticRenderUpdate>()
-    let removed = ArrayList<AutomaticRenderNode>()
-    var index: Int64 = 0
-    while (index < next.size) {
-        if (index < previous.size) {
-            match (previous[index] as AutomaticRenderNode) {
-                case Some(node) =>
-                    children.add(node)
-                    updates.add(PendingAutomaticRenderUpdate(node, next[index]))
-                case None => children.add(
-                    AutomaticRenderNode(next[index], paintBudget, invalidateComposition, invalidateDamage))
-            }
-        } else {
-            children.add(AutomaticRenderNode(next[index], paintBudget, invalidateComposition, invalidateDamage))
-        }
-        index += 1
-    }
-    while (index < previous.size) {
-        match (previous[index] as AutomaticRenderNode) {
-            case Some(node) => removed.add(node)
-            case None => ()
-        }
-        index += 1
-    }
-    AutomaticRenderReconciliation(children.toArray(), updates.toArray(), removed.toArray())
-}
-
-func closeAutomaticRenderChildren(children: Array<Widget>): Unit {
-    for (child in children) {
-        match (child as AutomaticRenderNode) {
-            case Some(node) => node.close()
-            case None => ()
-        }
-    }
-}
-
-func automaticRenderNodes(children: Array<Widget>): Array<AutomaticRenderNode> {
-    let result = ArrayList<AutomaticRenderNode>()
-    for (child in children) {
-        match (child as AutomaticRenderNode) {
-            case Some(node) => result.add(node)
-            case None => ()
-        }
-    }
-    result.toArray()
 }
