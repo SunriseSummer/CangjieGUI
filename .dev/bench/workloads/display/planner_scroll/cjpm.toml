@@ -1,0 +1,13 @@
+[package]
+cjc-version = "1.0.5"
+name = "bench_planner_scroll"
+version = "0.1.0"
+output-type = "executable"
+target-dir = "../../../../../target/bench/build/display/planner_scroll"
+description = "End-to-end (display) frame-rate benchmark: auto-scrolling a composed content page."
+compile-option = "-O2"
+
+[dependencies]
+cui = { path = "../../../../.." }
+bench_harness = { path = "../../shared/harness" }
+bench_scenes = { path = "../../shared/scenes" }

@@ -1,9 +1,0 @@
-[package]
-cjc-version = "1.0.5"
-name = "cui_desktop_lifecycle_test"
-version = "0.1.0"
-output-type = "executable"
-description = "Standalone DesktopApp lifecycle end-to-end fixture."
-
-[dependencies]
-cui = { path = "../../.." }

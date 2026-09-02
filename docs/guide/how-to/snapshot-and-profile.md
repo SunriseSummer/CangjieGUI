@@ -83,8 +83,8 @@ dirty 原因和命令规模，再用全量开关做像素差分；不要仅凭�
 `RenderCommandBufferStats.batchSubmissionCount` / `batchedCommandCount` 可确认相邻基础原语是否真正形成批次；
 批次为 0 不代表错误，圆角 mesh、文本、纹理或被 clip/颜色隔开的命令本来就不应强行合并。
 
-仓库开发者还可运行 `python bench/run.py` 生成 headless/显示基准报告，用
-`python .devtools/test_examples.py --smoke-snapshots` 运行跨特性端到端窗口看护。
+仓库开发者还可运行 `python .dev/cli.py bench run` 生成 headless/显示基准报告，用
+`python .dev/cli.py test examples --smoke-snapshots` 运行跨特性端到端窗口看护。
 
 ## 确认结果
 

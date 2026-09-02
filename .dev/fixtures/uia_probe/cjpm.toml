@@ -1,0 +1,10 @@
+[package]
+cjc-version = "1.0.5"
+name = "uia_probe"
+version = "0.1.0"
+output-type = "executable"
+target-dir = "../../../target/dev/build/fixtures/uia_probe"
+description = "Out-of-process Windows UI Automation provider probe."
+
+[dependencies]
+cui = { path = "../../.." }

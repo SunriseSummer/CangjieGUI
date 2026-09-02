@@ -14,7 +14,7 @@ Frame 订阅、透明绘制命令缓冲和保守局部 damage 均已实现。后
 **2026-08-24 自动化落地更新：**上述 retained 变体最初是隔离机制收益的显式实验，不再代表应用写法。
 普通 builder 现已自动形成组合依赖图；根输出持久化，复杂单根作用域按结构宽度/规模选择性晋升；稳定绘制
 自动录制透明命令，并受单候选 8 MiB、每应用 32 MiB LRU 预算约束；最近自动边界产生局部 damage。
-`bench/micro` 新增的普通代码 A/B 实测为：240 分支单点变化只执行 1 个 body，2.04 ms 对 3.51 ms；
+`.dev/bench/workloads/headless/micro` 新增的普通代码 A/B 实测为：240 分支单点变化只执行 1 个 body，2.04 ms 对 3.51 ms；
 96 个稳定绘制节点 12.9 μs 对强制直绘 130.1 μs，widget draw 访问 0 对 9600；复杂兄弟更新
 110.0 μs 对 368.3 μs，稳定子树 layout 访问 0 对 24。绝对时间随机器变化，确定性访问数和同进程比例
 才是门禁。这些结果证明自动化回收了实验收益，同时避免要求业务选择边界或 cache 开关。
@@ -24,14 +24,14 @@ Frame 订阅、透明绘制命令缓冲和保守局部 damage 均已实现。后
 在仓库根目录执行：
 
 ```text
-python bench/phase3_probe_test.py
-python bench/phase3_probe.py --samples 3
-python bench/run_all.py --samples 5 --display --check --timeout 240
-python .devtools/test_desktop_lifecycle.py
-python .devtools/test_examples.py --smoke-snapshots --retained-diff
+python .dev/cli.py test tools
+python .dev/cli.py bench probe --samples 3
+python .dev/cli.py bench suite --samples 5 --display --check --timeout 240
+python .dev/cli.py test desktop
+python .dev/cli.py test examples --smoke-snapshots --retained-diff
 ```
 
-`bench/phase3` 构造由指标卡、网格、文本和探针组成的复杂仪表盘，每帧严格只修改一个区域。六个变体共享
+`.dev/bench/workloads/diagnostics/phase3` 构造由指标卡、网格、文本和探针组成的复杂仪表盘，每帧严格只修改一个区域。六个变体共享
 内容和最终状态：
 
 - `full-tree`：普通声明式全树 build/layout/draw；
@@ -44,7 +44,7 @@ python .devtools/test_examples.py --smoke-snapshots --retained-diff
 另有 0～8192 个后代 State/effect 的完全命中实验；其 body 在计时段不执行，增长只可能来自所有权与订阅簿记。
 命令记录还输出每区命令数和保守估算字节。脚本按 `--samples` 启动独立进程并逐字段取中位数，要求每次输出完全相同的实验
 集合；当前留存报告使用三个样本，绝对时间受机器影响，同进程比例、访问数和规模曲线才是架构证据。真实后端另由
-`bench/incremental_dashboard` 对 96 区域的强制全量、命令全场重放和单区域 damage 做同场景 A/B。
+`.dev/bench/workloads/display/incremental_dashboard` 对 96 区域的强制全量、命令全场重放和单区域 damage 做同场景 A/B。
 
 ## 当前三样本结果（2026-08-22 22:55，原语批处理之后）
 
@@ -1183,7 +1183,7 @@ LazyColumn/LazyRow 和有可观察 extent 的 LazyList 进一步把连续 offset
 
 同 Host 800 帧 A/B 为：增量/全量 body 51/800，增量 pass 851，build 18.37/151.22 μs（8.23×），整帧
 213.05/285.32 μs（1.33×）。真实 planner 稳定 build 为约 0.04–0.11 ms，Auto 总帧约 3.00 ms；ss2 仍约
-10.49 ms，明确保留为 GPU fill/present 压力对照。`bench/run.py` 同时门禁 body 比率与 `passes = 800 + body`，
+10.49 ms，明确保留为 GPU fill/present 压力对照。`bench run` 同时门禁 body 比率与 `passes = 800 + body`，
 避免墙钟噪声或画面陈旧产生假优化。
 
 ## 后续定位反例触发的 index/key 双坐标控制器（2026-08-29）
@@ -1214,7 +1214,7 @@ Fenwick extent O(log N)，稳定 key 首次反向索引仍如实为 O(N) 且之�
 `TTF_MeasureString` 时，Direct3D11 实机出现约 1.7s 长帧；SDL_ttf 返回短前缀并不意味着内部只处理短前缀。
 最终实现把测量会话拆成一次 UTF-8 缓冲、边界对齐的 256B 初始 shaping window 和“整窗完全容纳才 4× 扩张”
 的探测；上层以 UAX #29 风格字素簇、UAX #14 风格合法断点独立收紧。20k 纯汉字另走 O(lines) 流式路径，
-不创建 20k cluster 数组。当前 `bench/results/check.json` 中，headless 20k 冷布局约 0.937 ms、热 LRU 约 0.0065 ms；真实
+不创建 20k cluster 数组。当前 `target/bench/results/check.json` 中，headless 20k 冷布局约 0.937 ms、热 LRU 约 0.0065 ms；真实
 窗口热缓存均值 0.376 ms，LRU 冷抖动均值 0.826 ms、P95 2.983 ms，两者 60fps 超限均为 0/100。组合附加符、ZWJ emoji、旗帜、
 NBSP、CRLF 和 CJK 标点均有专门测试；RichText
 也只在完整字素簇边界生成片段。

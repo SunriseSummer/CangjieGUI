@@ -12,7 +12,7 @@
 
 ## 准备工作
 
-确认目标机器的操作系统和处理器架构与构建产物一致。先在项目内运行首窗口，再找到 `cjpm build` 生成的可执行文件；SDL 动态库名称因平台不同，Windows 常见为 `SDL3.dll`，Linux 为对应的 `.so`。从源码构建 Windows 包时先运行 `.devtools/build_windows_uia.ps1` 生成同架构 UI Automation 桥。
+确认目标机器的操作系统和处理器架构与构建产物一致。先在项目内运行首窗口，再找到 `cjpm build` 生成的可执行文件；SDL 动态库名称因平台不同，Windows 常见为 `SDL3.dll`，Linux 为对应的 `.so`。从源码构建 Windows 包时先运行 `.dev/platform/windows/build_uia.ps1` 生成同架构 UI Automation 桥。
 
 ## 操作步骤
 
@@ -33,7 +33,7 @@ let app = DesktopApp(WindowSpec(
 
 ### 2. 建立干净目录
 
-交付目录至少包含可执行文件和匹配架构的 SDL 运行库。Windows 还要复制 `target/native/windows/<arch>/cui_uia.dll`；其源码位于 `platform/windows/accessibility/uia/`，由 `.devtools/build_windows_uia.ps1` 独立构建。框架在运行时动态加载 DLL，缺少时应用仍能启动，但原生 UI Automation provider 不可用。应用运行时读取的字体、图像或配置也按程序约定的相对路径复制。不要把整个源码仓库、编译缓存和测试快照一起打包。
+交付目录至少包含可执行文件和匹配架构的 SDL 运行库。Windows 还要复制 `target/native/windows/<arch>/cui_uia.dll`；其源码位于 `platform/windows/accessibility/uia/`，由 `.dev/platform/windows/build_uia.ps1` 独立构建。框架在运行时动态加载 DLL，缺少时应用仍能启动，但原生 UI Automation provider 不可用。应用运行时读取的字体、图像或配置也按程序约定的相对路径复制。不要把整个源码仓库、编译缓存和测试快照一起打包。
 
 ```cangjie role=variation
 // 资源路径以可执行文件所在目录为基准时，集中定义一次：

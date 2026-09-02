@@ -1,0 +1,13 @@
+[package]
+cjc-version = "1.0.5"
+name = "bench_text_layout"
+version = "0.1.0"
+output-type = "executable"
+target-dir = "../../../../../target/bench/build/display/text_layout"
+description = "Display benchmark for cold-churn and warm paragraph layout."
+compile-option = "-O2"
+
+[dependencies]
+cui = { path = "../../../../.." }
+bench_harness = { path = "../../shared/harness" }
+bench_scenes = { path = "../../shared/scenes" }

@@ -12,7 +12,7 @@
 
 ## 画廊
 
-下表截图由 `python .devtools/shoot_examples.py` 生成（各示例窗口的真实渲染快照，存放于
+下表截图由 `python .dev/cli.py gallery` 生成（各示例窗口的真实渲染快照，存放于
 `.images/`）；示例名即目录名，`cd examples/<名字> && cjpm run` 即可运行。
 
 封面是框架的同名示例「苍翠」——程序化绘制的千里江山式青绿山水横卷：

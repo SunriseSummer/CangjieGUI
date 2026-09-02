@@ -10,6 +10,9 @@
 - [示例应用](examples/)
 - [入门指南](docs/guide/index.md)
 - [API 文档](docs/api/index.md)
+- [技术博客：从声明式语法到增量 Element 内核](docs/cui-architecture-deep-dive.md)
+- [核心技术博客：状态管理与增量渲染内核](docs/cui-state-incremental-rendering-deep-dive.md)
+- [实战博客：从组合视图到完整自定义控件](docs/cui-custom-widget-practical-guide.md)
 
 ## 开发环境
 
@@ -18,7 +21,7 @@
   未完成验证项见[完成度审计](docs/next-generation-completion-audit.md)
 - 三平台构建、真实窗口、干净交付与性能证据由
   [cross-platform qualification](.github/workflows/cross-platform-qualification.yml) 统一编排；平台 runner 和动态库
-  前置契约见[开发工具说明](.devtools/README.md#跨平台-runtime-staging-与干净交付-smoke)
+  前置契约见[开发工具说明](.dev/README.md)
 - Linux x64/macOS arm64 另有全新 GitHub 托管机 portability lane：从带大小/SHA-256 的固定官方 SDK 与 SDL 源码
   开始，验证安全 bootstrap、源码链接、无头包测试和全部示例编译；真实桌面与性能结论仍只来自 qualification
 - 参阅 [`CangjieSDL`](https://github.com/SunriseSummer/CangjieSDL) 项目文档，根据目标平台规格配置 SDL 和 SDL_ttf 动态库

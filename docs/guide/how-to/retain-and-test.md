@@ -111,8 +111,8 @@ for (scope in graph.scopes) {
 `WidgetTestHost(retainedMode: RetainedTestMode.Full)`，比较业务状态、稳定树摘要、帧计划与渲染结果。
 Full 模式会故意关闭 retained 命中，只是正确性参照，不是性能对照组。
 
-微基准先预热，再分别测 revision 命中与逐帧变化。仓库内 `bench/micro` 已包含同一 24 区块内容页的
-A/B；`bench/phase3_probe.py` 还比较 full-tree、自动 retained、命令重放和 damage，用 `python bench/run.py`
+微基准先预热，再分别测 revision 命中与逐帧变化。仓库内 `.dev/bench/workloads/headless/micro` 已包含同一 24 区块内容页的
+A/B；`python .dev/cli.py bench probe` 还比较 full-tree、自动 retained、命令重放和 damage，用 `python .dev/cli.py bench run`
 生成普通报告。不要把单次运行、Debug 构建或开启垂直同步的帧率当优化证据。
 
 局部绘制必须同时验证“少画了”和“结果相同”。`WidgetTestHost(renderer: window.renderer)` 可接真实 Renderer；
@@ -124,13 +124,13 @@ A/B；`bench/phase3_probe.py` 还比较 full-tree、自动 retained、命令重�
 examples 同时是公开 API 的真实消费者。运行：
 
 ```text
-python .devtools/test_examples.py
-python .devtools/test_examples.py --smoke-snapshots
-python .devtools/test_examples.py --smoke-snapshots --retained-diff
+python .dev/cli.py test examples
+python .dev/cli.py test examples --smoke-snapshots
+python .dev/cli.py test examples --smoke-snapshots --retained-diff
 ```
 
 前者测试全部示例，后者真实开窗覆盖自绘、嵌套浮层、虚拟表格、文本编辑、密集表单和后台任务，并把
-逐用例结果写到 `examples/.e2e-results/report.json`。视觉基线可再传 `--baseline <BMP目录>`；
+逐用例结果写到 `target/dev/examples/report.json`。视觉基线可再传 `--baseline <BMP目录>`；
 `--retained-diff` 会为同一用例生成独立的全量执行快照，并与增量结果做容差内像素比较。
 
 ## 验收

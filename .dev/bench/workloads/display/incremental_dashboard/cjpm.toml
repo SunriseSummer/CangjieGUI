@@ -1,0 +1,12 @@
+[package]
+cjc-version = "1.0.5"
+name = "bench_incremental_dashboard"
+version = "0.1.0"
+output-type = "executable"
+target-dir = "../../../../../target/bench/build/display/incremental_dashboard"
+description = "Real-renderer A/B benchmark for retained command replay and partial damage."
+compile-option = "-O2"
+
+[dependencies]
+cui = { path = "../../../../.." }
+bench_harness = { path = "../../shared/harness" }

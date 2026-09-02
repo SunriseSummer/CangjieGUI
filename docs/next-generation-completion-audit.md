@@ -41,18 +41,18 @@
 
 ## 当前机器权威记录
 
-- `target/test-package-results/report.json`：controls 195/195、core 524/524、desktop 11/11、media 1/1、
-  testing 73/73、text 49/49，共 853/853；生产 166 文件，14610/18359 行，79.58%。
-- `bench/baseline.json` / `bench/baseline.meta.json`：125 项 Windows x86_64、AC、五样本活动基线；CPU affinity
+- `target/dev/test-package-results/report.json`：controls 195/195、core 524/524、desktop 12/12、media 12/12、
+  testing 73/73、text 49/49，共 865/865；生产 166 文件，14610/18359 行，79.58%。
+- `.dev/bench/baselines/default/baseline.json` / `.dev/bench/baselines/default/baseline.meta.json`：125 项 Windows x86_64、AC、五样本活动基线；CPU affinity
   `0xF`；候选由 `explicit-reviewed-candidate-v1` 显式晋升。
-- `bench/results/baseline-capture.json`：106 frame、213 micro、19 display；36 个物质级案例全部稳定、0 不稳定；
+- `target/bench/results/baseline-capture.json`：106 frame、213 micro、19 display；36 个物质级案例全部稳定、0 不稳定；
   106/106 headless 达到 120fps，display P95 19/19 达到 60fps、18/19 达到 120fps。
-- `bench/results/check.json`：独立全新构建五样本 PASS；18 个稳定物质级 headless 案例 factor 1.044、残差
+- `target/bench/results/check.json`：独立全新构建五样本 PASS；18 个稳定物质级 headless 案例 factor 1.044、残差
   ±2%、0 回归；lazy-index、lazy-scroll、observable-state 配对变化 0.96x/1.03x/0.95x。
-- `target/test-package-results/desktop-lifecycle.json`：20/20 真实窗口启动/退出，retained-damage/full 像素差 0。
-- `examples/.e2e-results/report.json`：48/48 示例包门禁。
-- `examples/.e2e-results/smoke-report.json`：8 个代表应用的 test/snapshot/retained-diff 共 24/24。
-- `target/cross-platform/windows-x86_64-delivery.json`：主程序、仓颉 runtime、bounds、SDL3、SDL3_ttf、UIA
+- `target/dev/test-package-results/desktop-lifecycle.json`：20/20 真实窗口启动/退出，retained-damage/full 像素差 0。
+- `target/dev/examples/report.json`：48/48 示例包门禁。
+- `target/dev/examples/smoke-report.json`：8 个代表应用的 test/snapshot/retained-diff 共 24/24。
+- `target/dev/release/windows-x86_64-delivery.json`：主程序、仓颉 runtime、bounds、SDL3、SDL3_ttf、UIA
   六个制品；retained-damage、automatic-partial、automatic-fallback、lifecycle 四场景通过，像素差 0。
 
 ## 允许保留但不能误述的边界

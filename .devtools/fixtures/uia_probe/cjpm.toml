@@ -1,9 +1,0 @@
-[package]
-cjc-version = "1.0.5"
-name = "uia_probe"
-version = "0.1.0"
-output-type = "executable"
-description = "Out-of-process Windows UI Automation provider probe."
-
-[dependencies]
-cui = { path = "../../.." }
