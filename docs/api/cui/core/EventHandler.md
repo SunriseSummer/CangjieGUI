@@ -2,7 +2,7 @@
 
 # EventHandler
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 在子树收到事件之前先把每个事件交给回调的透明包装组件，回调返回 `true` 即消费该事件。布局、绘制与弹性行为全部转发给子树，因此把它包在任意位置都不改变界面，只改变事件路由。
 
@@ -22,7 +22,7 @@ EventHandler <: [`Widget`](Widget.md)
 
 典型用法是处理应用级按键：把整个界面包进 `EventHandler`，在回调里处理回车、Escape、Delete 或 Ctrl/Cmd/Shift 组合键；回调不处理的事件继续交给子控件。`KeyDown` 的第二个载荷是 repeat `Bool`，不是修饰键。
 
-无需事件上下文时可使用单参数 `(UiEvent) -> Bool` 回调；组合键使用上下文感知的 `(UiContext, UiEvent) -> Bool` 重载，并从 [`UiContext.eventModifiers()`](UiContext.md#eventmetadata--eventmodifiers) 读取与当前事件一起采集的稳定快照。不要在延迟派发阶段查询全局 `Keyboard.modifiers()`，因为 SDL 队列可能已继续处理 KeyUp。构建时 `EventHandler` 会显式登记自己的 Frame 观察，子控件的帧订阅独立登记，回调不能拦截帧脉搏；需要每帧更新状态并自动续帧时改用 [`FrameHandler`](FrameHandler.md)。
+无需事件上下文时可使用单参数 `(UiEvent) -> Bool` 回调；组合键使用上下文感知的 `(UiContext, UiEvent) -> Bool` 重载，并从 [`UiContext.eventModifiers()`](UiContext.md#eventmetadata-eventmodifiers) 读取与当前事件一起采集的稳定快照。不要在延迟派发阶段查询全局 `Keyboard.modifiers()`，因为 SDL 队列可能已继续处理 KeyUp。构建时 `EventHandler` 会显式登记自己的 Frame 观察，子控件的帧订阅独立登记，回调不能拦截帧脉搏；需要每帧更新状态并自动续帧时改用 [`FrameHandler`](FrameHandler.md)。
 
 ## 示例
 
@@ -224,4 +224,4 @@ public func focusableIds(): Array<String>
 - [FrameHandler](FrameHandler.md) — 按帧回调的姊妹包装，用于动画与帧内轮询。
 - [EventListener](EventListener.md) — 分相、可组合的新事件传播 API。
 - [Widget](Widget.md) — 事件派发与消费语义的协议定义。
-- [UiContext](UiContext.md#eventmetadata--eventmodifiers) — 回调或自定义组件读取事件时刻修饰键与原始键元数据。
+- [UiContext](UiContext.md#eventmetadata-eventmodifiers) — 回调或自定义组件读取事件时刻修饰键与原始键元数据。

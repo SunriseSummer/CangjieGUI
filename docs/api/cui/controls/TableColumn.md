@@ -2,7 +2,7 @@
 
 # TableColumn
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 `Table` 数据表格的一列定义：表头标题、固定像素宽度与是否数值列。它被 [`Table`](Table.md) 消费；数值列右对齐并按数值（而非字典序）排序，可选的 `cell` 画笔用自定义绘制取代文本渲染。
 

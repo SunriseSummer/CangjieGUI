@@ -2,7 +2,7 @@
 
 # Bindable
 
-`cui.core` 包中的 public interface
+位于 `cui.core` 包的公开接口
 
 可读、可写并能通知变化的值。交互控件通过它接收状态，因此既可以直接传 [`State`](State.md)，也可以传指向大对象中某个字段的 [`Binding`](Binding.md)。`project` 会从整个模型中取出一个字段，并把对该字段的修改写回原模型；文本框（[`TextField`](../text/TextField.md)）等编辑控件通常用它绑定模型字段。
 
@@ -99,9 +99,7 @@ func update(transform: (T) -> T): Unit
 
 - `transform`: `(T) -> T` — 从当前快照生成下一值的纯变换；抛出异常时不执行写回。
 
-```cangjie
-subscribed.update({value => !value})
-```
+例如，`subscribed.update({value => !value})` 会基于当前布尔值完成一次取反写回。
 
 ### project
 
@@ -125,11 +123,8 @@ func project<U>(
 
 **返回值** [`Binding`](Binding.md)`<U>` — 指向该成分的双向绑定。
 
-```cangjie
-let form = State<Profile>(Profile("林", true))
-let name = form.project(get: {p => p.name}, set: {p, v => Profile(v, p.subscribed)})
-TextField(name)   // 编辑控件直接读写选中的成分
-```
+例如，可从 `State<Profile>` 投影出姓名 `Binding<String>` 并传给 `TextField`；输入框只修改姓名，`set` 负责保留
+`Profile` 的其他字段。
 
 ### project with Lens
 

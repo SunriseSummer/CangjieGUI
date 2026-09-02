@@ -2,7 +2,7 @@
 
 # ToastLayer
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 把一个 [`Toaster`](Toaster.md) 的通知渲染到视口右下角并驱动其时钟的浮层组件。在组件树根部附近放一次（例如根 [`ZStack`](../core/ZStack.md) 的最后一层）使其画在内容之上；它不占布局空间、从不消费事件，不打扰其下的应用。
 

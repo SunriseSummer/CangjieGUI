@@ -2,7 +2,7 @@
 
 # Switch
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 绑定布尔状态的桌面开关：滑轨带圆钮，点击（或聚焦后 Enter/Space）取反 `checked`，圆钮以弹簧动画滑向新位置。适合即时生效的开/关设置；需要“勾选”语义时用 [`Checkbox`](Checkbox.md)。
 

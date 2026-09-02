@@ -2,7 +2,7 @@
 
 # 媒体缓存与资源所有权
 
-## 先用一句话说明
+## 核心结论
 
 可重复声明的媒体由共享缓存复用，独占的长期资源交给应用所有者关闭，短期资源在使用点及时关闭。
 
@@ -43,27 +43,11 @@ CanvasWidget 不拥有传入的 Renderer。绘制回调只能在当前帧使用�
 
 ## 应用这个模型
 
-下面的对照展示图片覆盖后的正确刷新顺序。只创建新 ImageView 不代表缓存已经失效：
+覆盖预览图片时，顺序应是：写入文件，调用 `invalidateImage(path)`，再让下一次构建继续声明 `ImageView(path)`。仅重新创建 ImageView 不会主动丢弃已有缓存。
 
-```cangjie role=contrast
-writePreview("preview.bmp")
-invalidateImage("preview.bmp")
-ImageView("preview.bmp", fit: ImageFit.Contain)
-```
+生成预览所用的 Surface 属于短期资源：在函数内创建、保存并关闭，随后再使图片缓存失效。若文件由后台任务生成，后台只发布“路径已就绪”或错误文本；UI 线程收到结果后再刷新缓存和可见状态。不要在线程之间传递 Surface 或 Renderer。
 
-下面跟踪一个短期 Surface 的生命周期。文件写完后 Surface 关闭；下一次构建由 ImageView 缓存负责读取，生成对象不跨帧泄漏：
-
-```cangjie role=trace
-func createPreview(path: String): Unit {
-    try (surface = Surface.create(160, 90)) {
-        surface.clear(Color.rgb(35, 102, 210))
-        surface.saveBmp(path)
-    }
-    invalidateImage(path)
-}
-```
-
-若预览文件由后台任务生成，后台只发布“路径已就绪”或错误文本；UI 帧收到后再调用 invalidate 并更新可见状态。不要把 Surface 或 Renderer 通过信箱传回。
+完整可编译程序见[媒体预览面板](../tutorials/media-dashboard.md)。
 
 长期 Texture 的完整顺序可以记成一条短链：创建应用窗口（内部创建 Renderer）→ 从 Renderer 创建 Texture → `app.manage(texture)`；应用退出时则是 Texture → 窗口（内部释放 Renderer）。这正是“使用者先关、提供者后关”的具体结果。
 

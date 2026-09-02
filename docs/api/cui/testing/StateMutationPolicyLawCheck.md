@@ -2,7 +2,7 @@
 
 # StateMutationPolicyLawCheck
 
-`cui.testing` 包中的 public struct
+位于 `cui.testing` 包的公开结构体
 
 一个策略在三个具体值上的重复性和等价关系定律检查结果。它用于发现会错误吞掉状态、破坏事务端点商映射或让
 selector 失效不稳定的自定义策略。

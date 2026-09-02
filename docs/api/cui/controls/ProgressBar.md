@@ -2,7 +2,7 @@
 
 # ProgressBar
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 把可观察数值显示为水平填充条的只读进度指示，中央叠加百分比标签。值来源是 [`Observable`](../core/Observable.md)`<Float32>`——[`State`](../core/State.md) 与派生状态皆可驱动；环形变体见 [`ProgressRing`](ProgressRing.md)。
 

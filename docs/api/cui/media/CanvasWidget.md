@@ -2,7 +2,7 @@
 
 # CanvasWidget
 
-`cui.media` 包中的 public class
+位于 `cui.media` 包的公开类
 
 自由绘制表面：弹性填满分得的空间、画主题输入底色、裁剪到框，然后把原始 `Renderer` 与框矩形交给 `onDraw`——坐标是绝对的，绘制方从矩形偏移、不从零点起。输入事件连同同一矩形转给 `onEvent`，返回 `true` 即消费。
 

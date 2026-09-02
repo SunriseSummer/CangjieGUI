@@ -2,7 +2,7 @@
 
 # TreeNode
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 [`TreeView`](TreeView.md) 的一个节点：稳定的 `id`、显示用的 `label`、可选的前置 `icon` 与子节点数组，纯数据、构造后不可变。id 必须全树唯一——视图以它为键记录展开与选中，重复的 id 会让两个节点如同一个节点般联动展开与选中。
 

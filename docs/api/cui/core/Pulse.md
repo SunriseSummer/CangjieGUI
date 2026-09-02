@@ -2,7 +2,7 @@
 
 # Pulse
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 永动的循环时间线——骨架屏微光、呼吸状态点、加载脉冲。[`Spring`](Spring.md) 与 [`Animator`](Animator.md) 朝目标运动后稳定；Pulse 没有目标，会持续循环：值在 `period` 毫秒内从 0 变到 1，然后要么反向回到 0（`autoreverse: true`，适合呼吸效果），要么立即从 0 开始下一轮（适合不定进度条）。
 

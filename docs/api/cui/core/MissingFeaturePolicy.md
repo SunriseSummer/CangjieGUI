@@ -2,9 +2,9 @@
 
 # MissingFeaturePolicy
 
-`cui.core` 包中的 public enum
+位于 `cui.core` 包的公开枚举
 
-当子 Action 到达时，可选子状态已是 `None`、keyed 元素或正规化实体已经删除，决定 reducer 的处理方式。
+当子 Action 到达时，如果可选子状态已是 `None`，或目标集合元素、实体已经删除，本类型决定 reducer 的处理方式。
 
 ```cangjie
 public enum MissingFeaturePolicy {

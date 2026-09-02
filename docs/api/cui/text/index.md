@@ -6,7 +6,7 @@
 import cui.text.*
 ```
 
-文本编辑控件包：单行 [`TextField`](TextField.md)、多行 [`TextArea`](TextArea.md)、带建议列表的 [`ComboBox`](ComboBox.md)，以及三者共享的编辑模型 [`TextEditState`](TextEditState.md)（光标、选择与全部编辑操作）。控件负责绘制、命中与快捷键；文本、光标与锚点都是可绑定状态，应用可外部持有。
+文本编辑控件包：单行 [`TextField`](TextField.md)、多行 [`TextArea`](TextArea.md)、带建议列表的 [`ComboBox`](ComboBox.md)，以及共享的编辑模型 [`TextEditState`](TextEditState.md)。控件负责绘制、命中、选择和快捷键；文本值通过 Binding 由应用持有。
 
 ## 类型
 

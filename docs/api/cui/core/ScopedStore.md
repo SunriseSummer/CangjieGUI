@@ -2,10 +2,10 @@
 
 # ScopedStore
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
-根 [`ModelStore`](ModelStore.md) 或已连接 [`EffectStore`](EffectStore.md) 的特征局部门面。它只暴露局部 `Model` 和
-局部 `Action`，状态读取仍来自根模型，写入仍由根 reducer 完成；不会创建第二份可写状态或局部 setter。
+根 [`ModelStore`](ModelStore.md) 或已连接 [`EffectStore`](EffectStore.md) 的局部视图。它只暴露某个功能需要的
+`Model` 和 `Action`；状态仍从根模型读取，写入仍由根 reducer 完成，不会创建第二份可写状态。
 
 ```cangjie
 public class ScopedStore<Model, Action> <: Observable<Model>
@@ -13,25 +13,10 @@ public class ScopedStore<Model, Action> <: Observable<Model>
 
 实例由 `ModelStore.scope`、`EffectStore.connect` 或另一个 `ScopedStore.scope` 创建，不能直接构造。
 
-## 示例
+## 使用方式
 
-```cangjie
-let profile = app.scope<Profile, ProfileAction>(
-    state: profileLens,
-    action: {action => AppAction.profile(action)},
-    policy: structuralEqualityPolicy<Profile>()
-)
-
-let name = profile.binding<String>(
-    lens: profileNameLens,
-    action: {value => ProfileAction.rename(value)}
-)
-
-TextField(name)
-Button("重置", {=> profile.dispatch(ProfileAction.reset())})
-```
-
-子视图只需要认识 `Profile`、`ProfileAction` 和 `ScopedStore<Profile, ProfileAction>`，无需依赖根模型或根 Action。
+根 Store 可通过资料 Lens 和 Action 转换函数得到 `ScopedStore<Profile, ProfileAction>`，再从局部 Store 创建姓名
+Binding 交给 `TextField`。重置按钮只需派发局部 Action；子视图无需认识根模型和根 Action。
 
 ## 读取与观察
 
@@ -41,9 +26,9 @@ public prop revision: UInt64
 public func observe(callback: (Model, Model) -> Unit): StateObservation<Model>
 ```
 
-有真实状态投影时，值来自缓存只读节点，`revision` 是局部投影自己的修订号；`EffectStore.connect` 的 identity 门面
-直接共享根 revision，直到第一次真正 scope。默认 scope 在根 revision 改变后传播“可能变化”，显式等价策略可让
-未改变的局部商类保持 revision 和视图分支不动。
+经过 `scope` 后，值来自缓存的只读派生状态，`revision` 表示局部结果的版本。`EffectStore.connect` 返回的初始视图
+直接共享根版本，直到首次缩小状态范围。默认 scope 在根版本变化时传播“可能变化”；传入等价策略后，局部结果没有变化
+就不会增加版本或重建对应界面。
 
 ## Action
 
@@ -52,13 +37,13 @@ public func dispatch(action: Action): Unit
 public func dispatchAll(actions: Array<Action>): Unit
 ```
 
-`dispatch` 把局部 Action 逐层提升后交给根 Store。`dispatchAll` 按序提升并直接折叠到同一个根模型事务：不为每层
-scope 构造中间 Action 数组，空数组零工作，成功只提交一次根 revision，任一 reducer 调用失败则没有部分提交。
+`dispatch` 把局部 Action 逐层转换后交给根 Store。`dispatchAll` 按顺序转换，并在同一个根模型事务中处理：不会为每层
+scope 创建中间数组，空数组不执行操作，成功时只提交一次；任一 reducer 失败都不会产生部分提交。
 
 单 Action 的提升成本与 scope 深度线性相关。批量路径的 Action 映射工作是 `O(深度 × Action 数)`，但附加存储只与
-scope 深度相关。无策略的嵌套状态投影会融合到一个 Derived 节点：稳定缓存读取为常数路径，根变化后的首次求值只
-执行组合投影；显式等价策略是不可穿透的商边界，后续投影从该节点重新开始融合。通常应让视图边界保持浅而有业务
-意义，不要用大量恒等 scope 代替真正的特征建模。
+scope 深度相关。没有等价策略时，嵌套的状态投影会合并到一个 `DerivedState`；稳定读取直接使用缓存，根状态变化后才
+重新执行组合投影。每个显式策略独立过滤该层的变化，后续投影从这里继续组合。scope 应对应清晰的业务边界，避免创建
+大量不缩小模型的无意义层级。
 
 ## 选择
 
@@ -77,9 +62,8 @@ public func select<Value>(
 ): DerivedState<Value>
 ```
 
-这些方法与 `ModelStore.select` 语义相同，但 selector 的输入已经是局部模型。普通 scope 链会把局部投影和末端 selector
-继续组合到一个 [`DerivedState`](DerivedState.md)，而不是重新接在 scope 节点后；显式商边界仍不可穿透。所得节点继续
-共享同一根事实。
+这些方法与 `ModelStore.select` 相同，但选择器的输入已经是局部模型。普通 scope 链会把此前投影和最终选择器合并到
+一个 [`DerivedState`](DerivedState.md)；显式策略仍在各自层级过滤变化。所有派生状态继续共享同一个根模型。
 
 ## 继续聚焦
 
@@ -96,12 +80,28 @@ public func scope<LocalModel, LocalAction>(
 ): ScopedStore<LocalModel, LocalAction>
 
 public func scope<LocalModel, LocalAction>(
+    state!: Lens<Model, LocalModel>,
+    action!: (LocalAction) -> Action
+): ScopedStore<LocalModel, LocalAction>
+
+public func scope<LocalModel, LocalAction>(
+    state!: Lens<Model, LocalModel>,
+    action!: (LocalAction) -> Action,
+    policy!: StateMutationPolicy<LocalModel>
+): ScopedStore<LocalModel, LocalAction>
+
+public func scope<LocalModel, LocalAction>(
     path: FeaturePath<Model, Action, LocalModel, LocalAction>
+): ScopedStore<LocalModel, LocalAction>
+
+public func scope<LocalModel, LocalAction>(
+    path: FeaturePath<Model, Action, LocalModel, LocalAction>,
+    policy!: StateMutationPolicy<LocalModel>
 ): ScopedStore<LocalModel, LocalAction>
 ```
 
-`state` 也可传 `Lens<Model, LocalModel>`，并有相同的策略重载。嵌套 scope 组合状态投影和 Action 提升；若 Lens 满足
-Get-Put、Put-Get、Put-Put，嵌套状态边界与组合 Lens 的读取一致。Action 提升应是确定、无副作用的总函数。
+嵌套 scope 组合状态投影和 Action 提升；若 Lens 满足
+Get-Put、Put-Get、Put-Put，嵌套 scope 与组合 Lens 的读取结果一致。Action 转换函数应确定、无副作用，并处理所有输入。
 也可传 [`FeaturePath`](FeaturePath.md)；其 `then` 会同时组合 Lens 与 Prism，避免深层 Store 和 reducer 各自维护一套
 路由。路径重载同样支持显式 `policy`。
 
@@ -131,9 +131,8 @@ public func binding<Value>(
 ): Binding<Value>
 ```
 
-控件写入先构造局部 Action，再沿 scope 链提升到根 reducer。`Binding.update` 只读取一次当前局部模型，并保留根模型
-其他特征；它不授予局部模型写权限。策略重载把 scope、字段投影和最终等价关系融合到最近的商边界，兄弟 Action
-不会产生空字段通知；写入与效果交付路径保持不变。
+控件写入先构造局部 Action，再沿 scope 链转换为根 Action。`Binding.update` 只读取一次当前局部模型，并保留根模型
+其他部分；它不会绕过 reducer 直接修改局部模型。策略重载会过滤字段值未变化的通知，但不改变 Action 处理和效果交付。
 
 ## 生命周期与边界
 
@@ -146,7 +145,7 @@ ScopedStore 的投影和派发闭包会保持根状态路径可达；它本身�
 ## 另请参阅
 
 - [`ModelStore`](ModelStore.md) — 根状态所有者与 scope 创建入口。
-- [`EffectStore`](EffectStore.md#connect) — 固定效果解释器并创建相同的局部 UI 门面。
+- [`EffectStore`](EffectStore.md#connect) — 固定效果处理器并创建相同的局部 Store。
 - [`Reducer`](Reducer.md) — 通过 Lens pullback 把局部更新规则提升到根模型。
 - [`Lens`](Lens.md) — 可组合、可验证定律的状态投影。
 - [`Prism`](Prism.md) 与 [`FeaturePath`](FeaturePath.md) — Action 分支与完整特征路径。

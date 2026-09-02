@@ -2,7 +2,7 @@
 
 # Slider
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 拖动圆钮在闭区间内取值的滑杆，双向绑定 `Bindable<Float32>`：按下即跳到指针处并开始拖拽，`step` 为正时值吸附到 `lower + k·step` 的离散刻度，为 0（默认）则连续取值。
 

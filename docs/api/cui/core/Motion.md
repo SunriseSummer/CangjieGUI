@@ -2,7 +2,7 @@
 
 # Motion
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 动效令牌：三档标准动画时长（毫秒）与四条角色化缓动曲线，与 [`Animator`](Animator.md)、[`Spring`](Spring.md) 搭配使用。`fast` 适合小开关，`normal` 适合多数过渡，`slow` 适合大幅或强调性移动；缓动按标准/减速/加速的通行角色划分，`emphasized` 额外带轻微过冲。全静态字段，不可实例化。
 

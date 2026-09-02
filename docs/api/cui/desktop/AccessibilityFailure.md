@@ -2,7 +2,7 @@
 
 # AccessibilityFailure
 
-`cui.desktop` 包中的 public class
+位于 `cui.desktop` 包的公开类
 
 桌面无障碍分支被隔离时产生的结构化诊断。它保留失败来源、操作、对应语义 revision 与原始异常；框架不会把
 原生桥、外部观察器或故障回调中的一个失败扩散到其它分支。

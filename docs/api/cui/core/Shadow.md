@@ -2,7 +2,7 @@
 
 # Shadow
 
-`cui.core` 包中的 public struct
+位于 `cui.core` 包的公开结构体
 
 可配置的组件阴影，包含水平/垂直偏移、模糊、扩散和颜色，作用类似 CSS `box-shadow`。通过 [`Widget.shadow`](Widget.md#shadow) 把阴影画在组件后面；圆角组件通常让阴影使用相同圆角，轮廓才会贴合。
 

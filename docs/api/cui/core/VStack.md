@@ -2,7 +2,7 @@
 
 # VStack
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 沿垂直主轴排布子组件的弹性栈容器：以尾随 lambda 声明子组件，间距、主轴/交叉轴对齐与弹性参与可链式配置。弹性子组件（见 [`Flexible`](Flexible.md)）按权重分享剩余高度，其余子组件按内容高度排列。
 
@@ -202,7 +202,7 @@ public func draw(ctx: UiContext): Unit
 
 ### handle
 
-把事件派发给子组件并返回是否被消费。`Frame` 事件广播给全部子组件并返回 `false`；其余事件保持自后声明者向前、遇到消费者即停止的顺序。点事件会用布局提交的有序 AABB 树跳过不相交的 [`PointerEventScope.LayoutBounds`](PointerEventScope.md) 子树；无界兼容叶和活动捕获仍完整遍历。
+把事件按声明逆序交给子组件，遇到返回 `true` 的组件后停止。显式传入的 `Frame` 事件会广播给全部子组件并返回 `false`；桌面应用的正常帧回调使用独立订阅。对于声明了 [`PointerEventScope.LayoutBounds`](PointerEventScope.md) 的子树，指针事件可以跳过明显不相交的区域；活动手势仍采用保守路由。
 
 ```cangjie
 public func handle(ctx: UiContext, event: UiEvent): Bool

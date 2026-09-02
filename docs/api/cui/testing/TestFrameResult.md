@@ -7,6 +7,7 @@ public class TestFrameResult {
     public let widget: Widget
     public let metrics: TestFrameMetrics
     public let schedule: FrameSchedule
+    public init(widget: Widget, metrics: TestFrameMetrics, schedule: FrameSchedule)
 }
 ```
 

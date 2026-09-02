@@ -2,7 +2,7 @@
 
 # MenuItem
 
-`cui.controls` 包中的 public struct
+位于 `cui.controls` 包的公开结构体
 
 菜单中的一个条目：标签、选中时执行的动作、可选的右对齐快捷键提示与可用标记。被 [`ContextMenu`](ContextMenu.md) 与 [`MenuBar`](MenuBar.md) 共用；[`separator`](#separator) 生成组间分隔线。
 

@@ -2,9 +2,9 @@
 
 # State
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
-可写的单一数据源可观察状态：对 `value` 的有效赋值会推进修订号。事务外立即通知观察者；应用事件、`post` 或 [`DesktopApp.batch`](../desktop/DesktopApp.md#batch) 事务内，同一状态只在提交时通知一次。显式策略若判定事务首尾等价，则不通知也不请求新帧。只读展示走 [`Observable`](Observable.md) 抽象，双向输入走 [`Bindable`](Bindable.md)。`State` 是线程封闭对象，不是并发容器。
+保存一份可读写、可观察的数据。修改 `value` 会通知依赖它的界面和观察者；只读展示可以接收 [`Observable`](Observable.md)，输入控件可以接收 [`Bindable`](Bindable.md)。`State` 进入桌面应用后归该应用的 UI 线程所有，不是并发容器。
 
 ## 声明
 
@@ -16,9 +16,18 @@ public class State<T> <: Bindable<T>
 
 - 实现 [`Bindable`](Bindable.md)`<T>`，并经由它实现 [`Observable`](Observable.md)`<T>`。
 
-## 说明
+## 常用规则
 
-默认构造器把相等赋值也视为变化；要长期跳过空写，在构造时传 [`structuralEqualityPolicy`](functions.md#structuralequalitypolicy)，一次性判断可用 [`setIfChanged`](#setifchanged)。事务内多次写同一状态时，观察者收到 `(事务前值, 最终值)`；显式策略若判定两端等价（例如 `A → B → A`），整条路径不产生通知或帧失效。中间被策略接受的赋值仍各自推进 revision，因此 revision 是写入证据，不是提交通知计数。多个源的派生观察者等全部源稳定后只执行一次。通知按注册顺序遍历开始通知时已有的观察者；回调中取消尚未到达的观察者会使其跳过，中途新增的观察者从下一次赋值开始接收（同一回调触发的嵌套赋值也属于下一次）。单个回调抛异常不会阻断后续活动观察者；事务还会继续排空其他 State、Derived observer 及失败回调在抛出前产生的新写入，到达不动点后才重抛最先发生的用户异常。这样业务观察者不能截断框架依赖失效。这组语义不要求每次通知复制监听者数组。状态可以先在工作线程构造和顺序准备，再移交 UI；不可由多个线程并发访问。它进入运行中的界面后会绑定该应用的 UI 调度器，错误线程上的访问应改用 [`DesktopApp.post`](../desktop/DesktopApp.md#post)。同线程应用可在旧调度器空闲后顺序接管 State；旧事务仍活动时嵌套转交会被拒绝，避免两个原子边界交叉。
+- 默认构造器把每次赋值都视为变化，包括相等值。经常出现空写时，创建状态时传 [`structuralEqualityPolicy`](functions.md#structuralequalitypolicy)；只判断一次时可用 [`setIfChanged`](#setifchanged)。
+- 一次事件、`post` 动作或 [`DesktopApp.batch`](../desktop/DesktopApp.md#batch) 中多次写同一状态，观察者只收到“事务开始前的值 → 最终值”。由多个源组成的派生状态也只在所有写入稳定后通知。
+- 显式比较策略如果认为事务前后的值相同，则不通知观察者，也不请求新帧。修订号仍记录每次被策略接受的赋值，因此它表示写入版本，不等于通知次数。
+- 观察者按注册顺序运行。注册时不会立即回调；在一次通知中新增的观察者从下一次变化开始接收。
+- 某个观察者抛出异常时，框架仍会完成其余观察者和依赖失效，再把最先发生的异常交还调用方。
+- 状态进入应用后，读写、注册观察和关闭观察句柄都应在所属 UI 线程进行。后台结果通过 [`DesktopApp.post`](../desktop/DesktopApp.md#post) 投递。
+
+## 线程所有权
+
+`State` 可以先在一个线程中创建和顺序准备，再交给桌面应用。绑定应用后，不得由多个线程并发访问。同一线程中的另一个应用只有在原应用没有活动事务时才能接管该状态；事务期间转交会被拒绝。
 
 ## 示例
 
@@ -87,15 +96,13 @@ public init(value: T)
 public init(value: T, policy!: StateMutationPolicy<T>)
 ```
 
-```cangjie
-let selection = State<Int64>(0, policy: structuralEqualityPolicy<Int64>())
-```
+例如，为选中下标使用 `structuralEqualityPolicy<Int64>()` 后，重复写入同一下标不会触发界面更新。
 
 ## 属性
 
 ### revision
 
-每次被策略接受的赋值后递增。默认构造器接受相等值；显式策略可抑制等价写入。只读；[`DerivedState`](DerivedState.md) 与脏帧检测按它判断值是否可能变化。
+每次被比较策略接受的赋值后递增。默认构造器接受相等值；显式策略可以跳过等价值。该属性只读，派生状态和界面依赖用它判断值是否可能变化。
 
 ```cangjie
 public prop revision: UInt64
@@ -105,7 +112,7 @@ public prop revision: UInt64
 
 ### value
 
-读取或替换当前值。可读写；有效赋值推进修订号与写入代号。事务外立即以 `(旧值, 新值)` 回调；事务内推迟并合并为 `(首次旧值, 最终新值)`。显式策略判定这两个端点等价时不回调，默认策略仍保留一次事件式回调。
+读取或替换当前值。事务外的有效赋值会立即通知观察者；事务内的多次写入会合并为一次“初始值 → 最终值”通知。显式策略认为两者等价时不通知。
 
 ```cangjie
 public mut prop value: T
@@ -127,7 +134,7 @@ public func update(transform: (T) -> T): Unit
 
 ### observe
 
-观察后续变更，返回可取消的观察句柄。回调收到 `(旧值, 新值)`，注册时不会立即调用。一次通知只访问它开始时已有且到达时仍有效的观察者；回调中新增的观察者不会倒流收到当前变化。某个回调失败时其后的活动观察者仍会运行；调度事务内还会继续其他源和派生观察者，到达稳定状态后重抛第一个失败。状态绑定应用后，注册和句柄 `close()` 都必须在所属 UI 线程执行；取消被拒绝时句柄仍保持打开，可回到 UI 线程重试。
+观察后续变更，返回可取消的观察句柄。回调收到 `(旧值, 新值)`，注册时不会立即调用。在回调中新增的观察者从下一次变化开始接收；关闭尚未运行的观察者会让它跳过当前通知。某个回调失败时，其余活动观察者仍会运行，之后再抛出最先发生的异常。状态绑定应用后，注册和 `close()` 都必须在所属 UI 线程执行。
 
 ```cangjie
 public func observe(callback: (T, T) -> Unit): StateObservation<T>

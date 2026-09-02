@@ -40,41 +40,9 @@
 
 普通设置页用 `ScrollView` 包裹完整内容树；大量固定高行使用 `LazyColumn`；左右主从工作区使用 `SplitView`。若产品要求工具栏或提交按钮始终固定，应在页面根部再分出固定动作区，而不是只把几个字段塞进一个高度不明确的内层滚动区。
 
-若目标仍是设置表单，把 `app.run` 中原来的根 `VStack` 整体替换为下面的滚动内容。`name`、`accepted` 和 `message` 都沿用基页状态；校验动作保持原样。完整根替换避免出现“滚动字段只有不确定的剩余高度，标题初始帧反而被裁掉”的布局：
+设置表单需要适应小窗口时，可以用 `ScrollView` 包住原来的根 `VStack`，继续使用同一组 `name`、`accepted` 和 `message` 状态以及原校验动作。完整根替换能避免滚动区只得到不确定剩余高度，导致标题在初始帧被裁掉。
 
-```cangjie role=patch
-ScrollView {
-    VStack(spacing: 12.vp) {
-        Label("创建账户").bold()
-        TextField(name)
-        Checkbox("我已阅读并同意条款", accepted)
-        Button("提交", {=>
-            if (name.value.trimAscii().isEmpty()) {
-                message.value = "请输入姓名"
-            } else if (!accepted.value) {
-                message.value = "请先同意条款"
-            } else {
-                message.value = "欢迎，${name.value}"
-            }
-        }).role(ButtonRole.Primary)
-        Label(message.value)
-    }.padding(20.vp)
-}
-```
-
-如果常用窗口足够宽，希望标签与字段按等宽二维关系对齐，可以只把基页标题、输入与复选三行换成下面的网格，提交回调继续读取原来的 `name` 与 `accepted`，无须增加新模型：
-
-```cangjie role=variation
-VStack(spacing: 12.vp) {
-    Label("创建账户").bold()
-    Grid(2) {
-        Label("姓名")
-        TextField(name)
-        Label("条款")
-        Checkbox("我已阅读并同意条款", accepted)
-    }.spacing(10.vp)
-}
-```
+常用窗口足够宽、字段适合等宽二维排列时，可以在根 VStack 中放置 `Grid(2)`，依次声明“姓名”标签、TextField、“条款”标签和 Checkbox。提交回调继续读取原状态，无需增加新模型。可直接运行的基础程序见[设置表单](../tutorials/settings-form.md)。
 
 ### 6. 用窗口边界测试
 

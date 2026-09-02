@@ -2,7 +2,7 @@
 
 # Table
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 多列、可排序的数据表格：固定表头、窗口化滚动的正文与单行选择。行是按列索引的 `Array<Array<String>>` 单元格（类型化数据用 [`Table.of`](#of)），点击表头按该列排序、再点反向；只绘制可见行，长表依然轻量。
 

@@ -2,7 +2,7 @@
 
 # DatePicker
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 日期字段：点击弹出月历浮层，双向绑定一个 `Bindable<CalendarDate>`。闭合时显示当前绑定的日期，月历经交互浮层浮到组件树之上——点击不会被下方控件截走；点一天即选中并关闭。
 

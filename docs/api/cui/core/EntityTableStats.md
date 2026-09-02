@@ -2,7 +2,7 @@
 
 # EntityTableStats
 
-`cui.core` 包中的 public struct
+位于 `cui.core` 包的公开结构体
 
 [`EntityTable`](EntityTable.md) 的确定性结构诊断，不包含实体值。
 

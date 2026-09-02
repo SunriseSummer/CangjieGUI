@@ -2,7 +2,7 @@
 
 # LazyColumn
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 只构建视口附近行的定行高垂直滚动列表，构建、布局与绘制均为 O(可见) 而非 O(行数)。行按索引惰性（按需）构建，上千行任意组件的列表以一屏的成本滚动。
 
@@ -149,11 +149,7 @@ public static func of<T>(
 
 **返回值** `LazyColumn` — 配置好的列表。
 
-```cangjie
-LazyColumn.of(model.notesState, 72.0, key: {n => n.id}) {
-    note => noteRow(note)
-}
-```
+例如，可把便笺数组状态传给 `LazyColumn.of`，设置 72 逻辑像素行高，并用便笺 ID 作为稳定 key。
 
 ### measure
 

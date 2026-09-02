@@ -2,7 +2,7 @@
 
 # IconButton
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 以图标为面、可选带文字标签的按钮，激活方式与 [`Button`](Button.md) 完全相同。按钮内松开主键或聚焦时按 Enter/空格触发 `onClick`；`role` 与 `style` 以同样的方式为表面着色。
 

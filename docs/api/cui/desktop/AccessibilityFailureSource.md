@@ -2,7 +2,7 @@
 
 # AccessibilityFailureSource
 
-`cui.desktop` 包中的 public enum
+位于 `cui.desktop` 包的公开枚举
 
 标识被独立隔离的无障碍效果分支。
 

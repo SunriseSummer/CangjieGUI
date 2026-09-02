@@ -2,7 +2,7 @@
 
 # IdentifiedAction
 
-`cui.core` 包中的 public struct
+位于 `cui.core` 包的公开结构体
 
 把局部 Action 与目标元素或实体的稳定 ID 配对。位置索引不是身份，列表重排或关系重组后同一 Action 仍命中同一
 业务对象。
@@ -21,5 +21,5 @@ public struct IdentifiedAction<ID, Action> {
 ## 另请参阅
 
 - [`IdentifiedArray`](IdentifiedArray.md) — 保持顺序与唯一 ID 索引的持久集合。
-- [`EntityTable`](EntityTable.md) — 正规化实体的持久哈希目录。
+- [`EntityTable`](EntityTable.md) — 按业务 ID 存储的不可变实体表。
 - [`MissingFeaturePolicy`](MissingFeaturePolicy.md) — ID 已不存在时拒绝或忽略。

@@ -2,7 +2,7 @@
 
 # Stepper
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 带减/增按钮与键盘支持的整数值编辑器：两端 −/+ 各步进一次，值始终夹在闭区间内。范围与步长既可在构造时给出，也可链式调用 [`range`](#range) 与 [`step`](#step) 配置。
 

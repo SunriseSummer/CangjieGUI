@@ -2,7 +2,7 @@
 
 # EventOutcome
 
-`cui.core` 包中的 public enum
+位于 `cui.core` 包的公开枚举
 
 描述监听器对一次事件施加的两个正交效果：是否已处理、是否停止传播。
 

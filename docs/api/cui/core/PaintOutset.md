@@ -2,8 +2,8 @@
 
 # PaintOutset
 
-布局矩形之外的保守绘制溢出，单位为逻辑像素。四个方向在构造时收敛到非负值；`join` 逐分量取最大值，满足
-结合、交换和幂等，因此容器可按任意遍历分组安全聚合阴影、焦点环和自定义 Canvas 效果。
+声明组件在布局矩形之外额外绘制的范围，单位为逻辑像素。四个方向的负值会转为 0；`join` 分别取各方向最大值，
+容器可用它合并阴影、焦点环和自定义 Canvas 的额外范围。
 
 ```cangjie
 public struct PaintOutset {
@@ -20,12 +20,9 @@ public struct PaintOutset {
 }
 ```
 
-它只声明绘制域，不改变 `measure` 或 `layout`。内建 shadow/surface/focus ring 会自动产生声明；自定义绘制可覆盖
-[`Widget.paintOutset()`](Widget.md#paintoutset)，或用 `.paintOutset(...)` 包装。滚动容器仅在非滚动轴保留声明的
-overflow，滚动轴始终按 viewport 精确裁剪；ScenePatch、damage 与 lazy item clip 消费同一个值。
+它只声明绘制范围，不改变 `measure` 或 `layout`。内置阴影、表面和焦点环会自动声明；自定义绘制可覆盖
+[`Widget.paintOutset()`](Widget.md#paintoutset)，或用 `.paintOutset(...)` 包装。滚动容器在滚动方向仍按可视区域裁剪，
+只在另一个方向保留额外绘制范围。局部重绘和惰性列表裁剪也使用这个值。
 
-```cangjie
-CanvasWidget({renderer, rect =>
-    drawGlow(renderer, rect)
-}).paintOutset(PaintOutset(left: 32.0, right: 32.0))
-```
+例如，自定义光晕在左右各超出布局区域 32 像素时，应给 `CanvasWidget` 应用
+`.paintOutset(PaintOutset(left: 32.0, right: 32.0))`。

@@ -16,6 +16,18 @@ public struct ImageCacheStats {
     public let maxBytes: UInt64
     public let rendererChanges: UInt64
     public let oversizedAdmissions: UInt64
+    public init(
+        hits: UInt64,
+        misses: UInt64,
+        loadFailures: UInt64,
+        evictions: UInt64,
+        entries: Int64,
+        estimatedBytes: UInt64,
+        maxEntries: Int64,
+        maxBytes: UInt64,
+        rendererChanges: UInt64,
+        oversizedAdmissions: UInt64
+    )
 }
 ```
 

@@ -28,7 +28,7 @@
 
 下面探针故意使用不存在路径，只用于确认当前症状与失败占位一致：
 
-```cangjie role=probe
+```cangjie verify role=complete profile=gui-visual
 package docexample
 
 import cui.*
@@ -44,7 +44,7 @@ main(): Unit {
 
 若输出 `false` 且区域空白，先修路径与交付资源；不要修改布局或缓存。下面修复在启动窗口前生成确定 BMP，并在退出后清理，能同时排除路径、权限和解码格式不确定性：
 
-```cangjie role=fix
+```cangjie verify role=complete profile=gui-visual
 package docexample
 
 import cui.*

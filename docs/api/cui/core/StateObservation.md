@@ -2,7 +2,7 @@
 
 # StateObservation
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 由 [`Observable.observe`](Observable.md#observe) 返回的可取消的观察句柄：持有它就持续收到回调，`close()` 后不再收到。实现标准库 `Resource`，可放进 `try (…)` 资源块让观察随作用域自动结束。
 

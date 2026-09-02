@@ -156,19 +156,7 @@ main(): Unit {
 }
 ```
 
-要让键盘也复用相同请求动作，把完整程序根部的 `ZStack { ... }` 包进下面的处理器，并把原 `ZStack` 放回注释处。`EventHandler` 位于外层，会先于子树收到按键，所以动作入口必须检查 `confirming`。Modal 打开时 Delete 返回 `false`，不改写 `pendingId`，随后由 Modal 的事件边界接管；没有项目时也返回 `false`：
-
-```cangjie role=variation
-EventHandler(onEvent: {event =>
-    match (event) {
-        case UiEvent.KeyDown(Key.Delete, _) =>
-            if (model.confirming.value) { false } else { model.requestFirstDelete() }
-        case _ => false
-    }
-}) {
-    // 此处放回完整程序原有的整个 ZStack。
-}
-```
+完整程序已经用最外层 `EventHandler` 把 Delete 映射到 `requestFirstDelete()`。处理器先于子树收到按键，因此动作入口必须检查 `confirming`。Modal 打开或项目为空时返回 `false`，不修改 `pendingId`，随后由正常浮层路由继续处理。
 
 ### 4. 错误使用可恢复反馈
 

@@ -81,13 +81,7 @@ main(): Unit {
 
 ## 接着试一试
 
-把完整程序中 `VStack` 的按钮行替换为下面的横向按钮组；标签和两个按钮仍共享同一个 `count`：
-
-```cangjie role=variation
-HStack(spacing: 8.vp) {
-    Button("减一", {=> count.value = count.value - 1})
-    Button("加一", {=> count.value = count.value + 1})
-}
+把完整程序中的单个按钮改成 `HStack(spacing: 8.vp)`，在其中放置“减一”和“加一”两个按钮；两个回调分别对同一个 `count.value` 减一、加一。
 ```
 
 1. 连续执行减一、加一，让两个按钮修改同一 `count`，观察标签始终只有一个事实来源。

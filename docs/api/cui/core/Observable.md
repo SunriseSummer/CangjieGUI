@@ -2,7 +2,7 @@
 
 # Observable
 
-`cui.core` 包中的 public interface
+位于 `cui.core` 包的公开接口
 
 可读、可观察值的抽象：读取当前值、暴露修订号、订阅变更，并可 `map` 出派生状态。[`State`](State.md) 是其可写实现，[`DerivedState`](DerivedState.md) 是只读实现；只做展示的组件按 `Observable` 接收状态，两类实现都能驱动。
 

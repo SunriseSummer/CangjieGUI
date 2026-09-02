@@ -2,7 +2,7 @@
 
 # 布局约束、滚动与虚拟化
 
-## 先用一句话说明
+## 核心结论
 
 父容器把可用空间分配给子控件，滚动容器保存观看位置，虚拟化容器进一步只构建当前视口附近的数据项。
 
@@ -22,7 +22,7 @@
 
 `ScrollView` 持有滚动偏移并裁剪绘制；普通子树仍会被构建。固定高列表可用 `LazyColumn`，横向项目可用 `LazyRow`，变高消息列表优先用 `LazyList.measured`；已有缓存高度或外部测高管线时再用 `LazyList.of`/`LazyListExtents`。网格画廊使用 `LazyGrid`。自测量的估计值只决定未知区域的初始几何，行进入预取区后由真实测量替换，并以稳定 key 修正锚点。
 
-Lazy 列表进一步区分连续几何与离散拓扑：滚动偏移在已物化区间内变化时只重跑 layout/draw，不重新执行行声明；视口加预取首次越过区间边界，才在同一帧稳定化事务中物化下一组条目。应用无需选择优化开关，但变高 `heightOf` 若没有可观察数据源，就应提供 `revision`；否则框架为兼容任意闭包变化而保守重建。
+Lazy 列表会保留已经创建的可见区间。视口在该区间内移动时通常只重新布局和绘制；越过预取边界时，才创建下一组项目。应用无需选择优化开关。使用自定义 `heightOf` 计算可变行高时，如果高度来源不是可观察状态，应提供 `revision`；否则框架只能保守地重新检查项目。
 
 ## 选择与取舍
 
@@ -39,34 +39,11 @@ Lazy 列表进一步区分连续几何与离散拓扑：滚动偏移在已物化
 
 设置页可以用外层 `ScrollView` 包裹 `VStack`，让窗口变小时字段可达；数据表主从界面用 `SplitView` 分开表格和详情；聊天历史使用 `LazyList`，输入栏保留在滚动区域外。三者都“内容很多”，但约束和用户目标不同。
 
-下面的结构把“会增长的内容”和“始终可达的主要操作”分开。只有字段区滚动，保存按钮留在外层：
-
-```cangjie role=contrast
-VStack {
-    ScrollView {
-        VStack {
-            Label("账户")
-            TextField(name)
-            Checkbox("接收通知", notifications)
-        }.spacing(12.vp)
-    }.flex()
-    Button("保存", {=> save()}).role(ButtonRole.Primary)
-}
-```
+表单页面可以让外层 `VStack` 同时包含一个 `.flex()` 的 `ScrollView` 和底部保存按钮。这样只有会增长的字段区滚动，主要操作始终可达。完整表单结构见[设置表单教程](../tutorials/settings-form.md)。
 
 动态列表还需要数据身份。项目的选择、展开或编辑状态应跟随稳定 id，而不是数组位置；排序后第 0 行不一定还是同一条数据。稳定键只保护仍在构建树中的身份：虚拟行滚出视口后会被卸载，行内状态也会清理。需要跨滚动保留的状态应提升到以业务 id 为键的模型。布局负责位置，状态模型负责身份。
 
-下面的跟踪片段把选择放在列表外层，并让每行用业务 id 建立身份。滚出视口时行控件可以卸载，`selectedId` 仍存在；重新滚回或排序后，按钮文字仍由相同 id 判断：
-
-```cangjie role=trace
-let selectedId = rememberState<String>("tasks.selected") {""}
-LazyColumn.of(tasks.value, 44.0, key: {task => task.id}) {
-    task => Button(
-        if (selectedId.value == task.id) {"已选：${task.title}"} else {task.title},
-        {=> selectedId.value = task.id}
-    )
-}
-```
+选择状态应放在虚拟列表外层，并让每行通过业务 ID 建立身份。行控件滚出视口后可以卸载，`selectedId` 仍然保留；滚回或排序后，界面继续按同一 ID 判断选择。完整可编译示例见[虚拟化大数据](../how-to/virtualize-large-data.md)。
 
 ## 常见误解
 

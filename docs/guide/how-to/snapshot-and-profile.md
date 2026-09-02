@@ -54,14 +54,8 @@ cjpm run --run-args="--snapshot artifacts/release-check.bmp"
 
 ### 3. 为交互另写测试
 
-```cangjie role=variation
-// 快照覆盖初始画面；事件测试覆盖行为。
-let consumed = widget.handle(ctx, UiEvent.KeyDown(Key.Enter, false))
-@Expect(consumed)
-@Expect(model.submitted.value)
-```
-
-Modal 背景屏蔽、Tab 顺序、菜单 Escape、画布拖动都应通过控件事件测试或人工步骤验证。快照可作为补充，不能替代这些断言。
+使用 `WidgetTestHost.frame` 注入键盘或指针事件，并断言事件后的状态和帧结果。Modal 背景屏蔽、Tab 顺序、菜单
+Escape、画布拖动都应通过事件测试或人工步骤验证。快照可作为补充，不能替代这些断言。
 
 ### 4. 读取阶段帧报告
 

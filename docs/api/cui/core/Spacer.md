@@ -2,7 +2,7 @@
 
 # Spacer
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 测量为零并吸收所在栈剩余空间的空白弹性组件，把兄弟组件推向两端。在 [`HStack`](HStack.md) 尾部放一个 Spacer 即可把行尾控件推到最右，是右对齐行尾或分隔工具栏的惯用手段。
 

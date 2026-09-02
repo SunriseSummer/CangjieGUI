@@ -67,14 +67,7 @@ main(): Unit {
 
 ### 4. 完整处理拖动生命周期
 
-```cangjie role=variation
-case UiEvent.MouseUp(MouseButton.Left, x, y) =>
-    let wasDrawing = model.endStroke()
-    // 拖动画布后在外部松开，也必须结束手势；普通外部 MouseUp 则放行。
-    if (wasDrawing || frame.contains(x, y)) { return true }
-```
-
-按下必须在画布内才起笔；拖动期间可以选择裁剪到边界；松开即使发生在画布外也要结束已经开始的手势。若没有画布手势，外部松开返回 `false`，否则声明顺序靠前的画布可能吞掉工具栏按钮的松开阶段。
+按下必须在画布内才起笔；拖动期间可以选择裁剪到边界；处理 MouseUp 时先记录 `wasDrawing = model.endStroke()`。即使松开发生在画布外，也要结束已经开始的手势。只有 `wasDrawing` 或松开点位于画布内时才返回 `true`；普通外部松开应返回 `false`，否则画布可能吞掉工具栏按钮的松开阶段。
 
 ## 确认结果
 

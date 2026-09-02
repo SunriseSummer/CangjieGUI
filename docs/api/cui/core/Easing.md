@@ -2,7 +2,7 @@
 
 # Easing
 
-`cui.core` 包中的 public enum
+位于 `cui.core` 包的公开枚举
 
 把 `[0, 1]` 内的动画进度映射为缓动后进度的时序曲线。标准曲线严格从 0 起、到 1 止；`EaseOutBack` 会先冲过 1 再回落；`CubicBezier` 表达任意 CSS 式曲线。交给 [`Animator`](Animator.md) 使用，或直接调 [`ease`](#ease) 塑形任何归一化进度。
 

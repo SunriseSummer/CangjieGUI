@@ -79,18 +79,7 @@ main(): Unit {
 
 ### 第四步：比较 Cover 与 Contain
 
-只改变适配方式，保持同一个盒子，才能看清差别：
-
-```cangjie role=variation
-HStack(spacing: 16.vp) {
-    ImageView(PREVIEW_PATH, fit: ImageFit.Cover,
-        preferredWidth: Some(180.vp), preferredHeight: 180.vp)
-    ImageView(PREVIEW_PATH, fit: ImageFit.Contain,
-        preferredWidth: Some(180.vp), preferredHeight: 180.vp)
-}
-```
-
-左图填满正方形并裁掉宽边，右图完整显示宽图并在上下留空。如果列表中反复显示同一路径，CUI 的纹理缓存会复用解码结果；不要在每帧生成不同文件名来绕过缓存。
+在一个 `HStack` 中并排声明两个 180×180 的 ImageView，一个使用 `ImageFit.Cover`，另一个使用 `ImageFit.Contain`。左图会填满正方形并裁掉宽边，右图完整显示宽图并在上下留空。保持相同盒子，才能只比较适配方式。如果列表中反复显示同一路径，CUI 的纹理缓存会复用解码结果；不要在每帧生成不同文件名来绕过缓存。
 
 ## 确认结果
 

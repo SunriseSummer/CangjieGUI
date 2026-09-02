@@ -6,10 +6,9 @@
 import cui.desktop.*
 ```
 
-桌面应用对象包：[`DesktopApp`](DesktopApp.md) 拥有 SDL 窗口与渲染循环，驱动事务式失效、分相 retained
-执行、透明命令重放、保守局部 damage、事件后同帧一致性重建与绘制，并提供跨线程动作投递、资源管理、系统
-文件对话框、基础光标、无障碍故障隔离与最小窗口尺寸等设施。空闲时阻塞等待事件或截止时间；
-`--snapshot`/`--profile` 与 retained 对照开关内置。
+桌面应用包。[`DesktopApp`](DesktopApp.md) 拥有 SDL 窗口和按需帧循环，负责事件、状态事务、增量更新、资源清理与 UI 线程边界。它还提供后台动作投递、系统文件对话框、基础光标、无障碍故障隔离和最小窗口尺寸。
+
+应用空闲时会阻塞等待，不持续占用渲染资源。`--snapshot`、`--profile` 和增量/全量对照开关用于测试与排错。
 
 ## 类型
 
@@ -18,7 +17,7 @@ import cui.desktop.*
 | 类型 | 说明 |
 |---|---|
 | [`AccessibilityFailure`](AccessibilityFailure.md) | 一个原生桥、外部观察器或故障回调被隔离后的结构化诊断。 |
-| [`DesktopApp`](DesktopApp.md) | 桌面应用对象：拥有 SDL 窗口并运行帧循环——每帧从 [`run`](DesktopApp.md#run) 的界面构建函数重建组件树、布局、分发输入、绘制。 |
+| [`DesktopApp`](DesktopApp.md) | 拥有 SDL 窗口，按依赖执行必要的构建、布局、事件和绘制工作。 |
 
 **枚举**
 

@@ -101,11 +101,7 @@ examples/settings/
 2. 用 `derive(name, accepted)` 得到 `canSubmit`，让按钮在条件不满足时禁用；仍保留清楚的字段说明。
 3. 将三份字段放进一个 `ProfileDraft`，再用 `project` 给输入控件字段绑定。比较“多个小状态”和“一个整体状态”的所有权差异。
 
-第一项变化不需要新状态。把下面一行放在 `TextField(name)` 后面，输入时它会跟随同一事实重新计算：
-
-```cangjie role=variation
-Label("姓名长度：${name.value.size}").muted()
-```
+第一项变化不需要新状态。在 `TextField(name)` 后声明 `Label("姓名长度：${name.value.size}").muted()`，输入时它会从同一事实重新计算。
 
 ## 如果没有成功
 

@@ -43,122 +43,18 @@ cjpm run
 
 ### 症状二：状态不更新，或后台结果偶发丢失
 
-先检查所有会影响 `Label` 文本、条件分支、布局、启用态或命中的模型字段。若事件回调写的是普通 `var`，而同一事务没有任何 `State` 写，`FrameScheduler` 不会失效；当前帧会继续绘制事件前已经构建的树，空闲循环也可能不再绘制。计算器曾因此表现为按钮点击后显示滞后一拍。修复是把可见事实本身改为 `State`，并让构建读取 `.value`：
+先检查所有会影响文本、条件分支、布局、启用态或命中的模型字段。若事件回调写的是普通 `var`，而同一事务没有任何
+`State` 写，框架不会安排重建。修复方法是把可见状态改为 `State`，在回调中写 `.value`，并在 builder 中读取同一个
+对象的 `.value`。正确结果是第一次事件所在帧就在绘制前完成稳定重建；可用
+`WidgetTestHost.frame(..., events:)` 断言最终状态和 `stabilizationPasses`。
 
-```cangjie role=fix
-class CounterModel {
-    let display = State<String>("0")
-}
+若没有后台任务，把页面缩成一个 `rememberState`、一个 `Label` 和一个 `Button`。最小页面能连续递增，说明事件循环和
+状态存储正常，问题通常是重复键、模型被重新创建，或读写的不是同一个状态对象。
 
-Button("+1", {=> model.display.value = nextValue(model.display.value)})
-Label(model.display.value)
-```
-
-用两次连续点击只是复现手段，不是通过条件；正确结果是第一次 MouseUp 所在帧在 draw 前发生一次稳定重建，并立即显示新值。可用 `WidgetTestHost.frame(..., events:)` 断言 `stabilizationPasses == 2` 与最终构建读值。
-
-先搜索 `spawn`。下面的最小探针故意展示错误边界：工作线程直接写 UI `State`。它可能偶尔显示结果，却违反 CUI 的线程约束，不能作为修复：
-
-```cangjie role=probe
-let status = State<String>("等待中")
-let _ = spawn {
-    status.value = "后台直接写入" // 症状探针：禁止在真实 UI 中这样做。
-}
-```
-
-若没有后台任务，再把页面缩成一个 `rememberState`、一个 `Label`、一个 `Button`；连续点击能递增，说明事件循环和状态存储正常，问题在原模型重建、重复键或写读不是同一个对象。
-
-有后台任务时使用互斥量保护的信箱。工作线程只发布普通数据；按钮同时把 UI 状态改为“正在加载”，触发下一次构建并挂载帧处理器。帧回调在 UI 线程收取结果后才写状态。
-
-下面是可直接放进空项目 `src/main.cj` 的完整修复程序。工作线程只发布普通字符串，`FrameHandler` 在 UI 帧收取后才写 `State`：
-
-```cangjie role=fix
-package docexample
-
-import cui.*
-import std.sync.Mutex
-
-class UiMailbox {
-    private let mutex = Mutex()
-    private var pending: ?String = None
-    private var busy = false
-
-    func start(): Bool {
-        var shouldStart = false
-        synchronized(mutex) {
-            if (!busy) {
-                busy = true
-                shouldStart = true
-            }
-        }
-        if (!shouldStart) {
-            return false
-        }
-        let _ = spawn {
-            publish("后台结果已就绪")
-        }
-        true
-    }
-
-    private func publish(result: String): Unit {
-        synchronized(mutex) {
-            pending = Some(result)
-            busy = false
-        }
-    }
-
-    func collect(): ?String {
-        synchronized(mutex) {
-            let result = pending
-            pending = None
-            return result
-        }
-    }
-
-    func needsPolling(): Bool {
-        synchronized(mutex) {
-            return busy || pending.isSome()
-        }
-    }
-}
-
-func renderLoading(mailbox: UiMailbox, status: State<String>): Unit {
-    VStack {
-        Label(status.value)
-        Button("开始加载", {=>
-            if (mailbox.start()) {
-                status.value = "正在加载"
-            }
-        })
-    }
-}
-
-func renderMailbox(mailbox: UiMailbox, status: State<String>): Unit {
-    if (mailbox.needsPolling()) {
-        FrameHandler(onFrame: {_ =>
-            match (mailbox.collect()) {
-                case Some(result) => status.value = result
-                case None => ()
-            }
-        }) {
-            renderLoading(mailbox, status)
-        }
-        return
-    }
-    renderLoading(mailbox, status)
-}
-
-main(): Unit {
-    let mailbox = UiMailbox()
-    let status = State<String>("尚未开始")
-    let app = DesktopApp(WindowSpec("后台任务信箱", 420, 240))
-
-    app.run {
-        renderMailbox(mailbox, status)
-    }
-}
-```
-
-这里 `needsPolling()` 同时检查 busy 和 pending，避免工作线程刚发布结果、UI 就提前卸载帧处理器。耗时工作绝不放在锁内；生产代码还应在工作线程捕获异常并把错误文本也发布进信箱。
+若存在 `spawn`，确认工作线程没有直接读写 UI `State`、控件或 `DesktopApp`。工作线程只发布普通数据，UI 线程再通过
+`DesktopApp.post` 或受互斥量保护的信箱收取结果。完整且经过编译验证的信箱示例见
+[在后台工作，并把结果安全送回界面](../how-to/desktop-files-and-background.md)。其中 `needsPolling()` 同时检查工作中和待收取结果，
+避免最后一条消息丢失；耗时工作不能放在锁内。
 
 ### 症状三：列表重排后状态串到别项或跟错行，或滚回后编辑内容消失
 
@@ -199,7 +95,9 @@ main(): Unit {
 
 ## 避免再次发生
 
-保留第一个窗口作为环境冒烟应用；为 id→索引映射、表单校验和过滤写纯逻辑测试；真实桌面回归同时覆盖鼠标和完整键盘路径。后台工作统一采用 mailbox + UI 帧收取，不在 `spawn` 中持有 UI `State`。验证报告应区分“编译通过”和“真实窗口交互已走查”，并让示例 manifest 的源码哈希与当前正文一致。
+保留第一个窗口作为环境冒烟应用；为 id→索引映射、表单校验和过滤写纯逻辑测试；真实桌面回归同时覆盖鼠标和完整键盘路径。
+后台工作统一采用信箱或 `DesktopApp.post` 返回 UI 线程，不在 `spawn` 中持有 UI `State`。验证报告应明确区分“编译通过”
+和“真实窗口交互已检查”。
 
 ## 相关 API
 

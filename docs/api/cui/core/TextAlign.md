@@ -2,7 +2,7 @@
 
 # TextAlign
 
-`cui.core` 包中的 public enum
+位于 `cui.core` 包的公开枚举
 
 文本在所分配框架内的水平对齐方式：行首、居中或行尾。[`Label`](Label.md) 的 `align` 构造参数与 `textAlign` 方法接受它；多行文本逐行套用同一对齐。
 

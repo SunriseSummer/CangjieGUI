@@ -2,7 +2,7 @@
 
 # IdentifiedArray
 
-`cui.core` 包中的 public struct
+位于 `cui.core` 包的公开结构体
 
 同时保存稳定 ID、显示顺序和不可变版本的 keyed 集合。它面向重复子特征 reducer 与 keyed UI：位置可以因排序、
 插入或删除改变，Action 始终按业务 ID 路由。
@@ -57,14 +57,12 @@ O(N)。原集合始终保持不变。
 父级 [`Reducer.forEachBatch`](Reducer.md#foreachbatch)。批次不改变集合结构和显示顺序，因此复用同一个 ID→位置索引，
 只复制一次外层 chunk 表和每个触及 chunk；调用者无需管理可变 builder。
 
-```cangjie
-let rows = IdentifiedArray<RowId, Row>(source, id: {row => row.id})
-let next = rows.updating(targetId, {row => row.renamed("新名称")}).getOrThrow()
-```
+创建集合时提供稳定 ID 提取函数。调用 `updating(targetId, transform)` 后，根据返回的 `Option` 处理“已更新”或
+“目标不存在”，不要在没有确认 ID 存在时直接解包。
 
 ## 另请参阅
 
 - [`IdentifiedAction`](IdentifiedAction.md) — 按 ID 路由到元素的 Action。
-- [`EntityTable`](EntityTable.md) — 不需要显示顺序的正规化持久实体表。
+- [`EntityTable`](EntityTable.md) — 不需要显示顺序、按业务 ID 存储的不可变实体表。
 - [`Reducer`](Reducer.md#foreach) — 子先于父的 keyed reducer 组合。
 - [`MissingFeaturePolicy`](MissingFeaturePolicy.md) — Action 找不到目标时的显式策略。

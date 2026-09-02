@@ -2,7 +2,7 @@
 
 # ScrollBar
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 供滚动容器内部复用的垂直滚动条拖拽控制器，把命中滚动条的按下与移动转发给它，即得一致的滑块拖拽与轨道分页行为。它不是组件，不参与布局与绘制：[`ScrollView`](ScrollView.md)、[`ListView`](../controls/ListView.md)、[`TextArea`](../text/TextArea.md) 与惰性列表都各自持有一个，自绘滚动表面时同样适用。
 

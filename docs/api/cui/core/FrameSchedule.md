@@ -3,7 +3,13 @@
 # FrameSchedule
 
 ```cangjie
-public class FrameSchedule
+public class FrameSchedule {
+    public let immediate: Bool
+    public let deadlineMs: ?UInt64
+    public init(immediate!: Bool, deadlineMs!: ?UInt64)
+    public func isDue(elapsedMs: UInt64): Bool
+    public func hasPending(): Bool
+}
 ```
 
 组件请求的下一帧计划快照。它同时表达“尽快绘制”和“到某个 SDL 单调时钟时刻再绘制”，供自定义宿主像 [`DesktopApp`](../desktop/DesktopApp.md) 一样进入事件等待，而不是空闲轮询。
@@ -16,10 +22,5 @@ public class FrameSchedule
 - `deadlineMs: ?UInt64`：最早的绝对截止时刻；`None` 表示没有定时请求。
 
 ## 方法
-
-```cangjie
-public func isDue(elapsedMs: UInt64): Bool
-public func hasPending(): Bool
-```
 
 `isDue` 判断计划在给定时刻是否到期；`hasPending` 判断是否存在任一种请求。

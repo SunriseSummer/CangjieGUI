@@ -2,7 +2,7 @@
 
 # 动画状态与帧预算
 
-## 先用一句话说明
+## 核心结论
 
 动画把跨帧进度保存在稳定对象中，并且只在尚未到达目标或本来就要循环时请求下一帧。
 
@@ -38,29 +38,11 @@ CUI 提供三种不同的动画方式。`Spring` 根据当前位置、速度和�
 
 ## 应用这个模型
 
-下面对比确定时长与物理追随。两个对象都应由模型持有，而不是在每次 draw 新建：
+确定时长的淡入使用 `Animator`，目标会临时改变的位移使用 `Spring`。两个动画对象都应由模型或 `remember` 持有；每帧只调用 `animate(ctx, target: ...)` 读取当前值。
 
-```cangjie role=contrast
-let fade = Animator(0.0, duration: Motion.normal, easing: Easing.EaseInOutQuad)
-let slide = Spring(0.0)
+计时器只在运行时声明 `FrameHandler`，暂停后改为直接声明静态内容。仅让回调什么都不做并不能停止续帧：只要 `FrameHandler` 仍在组件树中，它就会继续请求下一帧。
 
-let opacity = fade.animate(ctx, target: if (shown) {1.0} else {0.0})
-let offset = slide.animate(ctx, target: if (shown) {0.0} else {24.0})
-```
-
-下面跟踪一个只在运行中挂载的计时器。暂停后不再构建 FrameHandler，因此它不再请求帧；根内容仍正常显示：
-
-```cangjie role=trace
-if (model.running.value) {
-    FrameHandler(onFrame: {info => model.tick(Int64(info.deltaMs))}) {
-        timerView(model)
-    }
-} else {
-    timerView(model)
-}
-```
-
-这和“FrameHandler 回调里什么都不做”不同：只要挂载，帧钩子仍会请求下一帧。停止条件应体现在控件树中。
+可编译的完整动画程序见[驱动会停止的逐帧动画](../how-to/animate-with-frames.md)。
 
 ## 常见误解
 

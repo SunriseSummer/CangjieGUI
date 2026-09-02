@@ -2,7 +2,7 @@
 
 # ZStack
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 把子组件按声明顺序自底向顶叠放、并在同一框架内对齐的层叠容器。后声明的子组件画在上层、事件也先送达，是模态对话框、Toast 通知层浮于主内容之上的标准写法。
 
@@ -132,7 +132,7 @@ public func draw(ctx: UiContext): Unit
 
 ### handle
 
-把事件自顶向下派发给子组件并返回是否被消费。`Frame` 事件广播给全部子组件并返回 `false`；其余事件后声明者（视觉最上层）优先，遇到消费者即停止。点事件会用布局提交的有序 AABB 树跳过不相交的 [`PointerEventScope.LayoutBounds`](PointerEventScope.md) 子树；完全重叠候选仍保持逐层语义，无界兼容叶和活动捕获也不会被剪掉。
+把事件从视觉最上层开始交给子组件，遇到返回 `true` 的组件后停止。显式传入的 `Frame` 事件会广播给全部子组件并返回 `false`；桌面应用的正常帧回调使用独立订阅。对于声明了 [`PointerEventScope.LayoutBounds`](PointerEventScope.md) 的子树，指针事件可以跳过明显不相交的区域；重叠区域和活动手势仍按完整层级路由。
 
 ```cangjie
 public func handle(ctx: UiContext, event: UiEvent): Bool

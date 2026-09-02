@@ -68,12 +68,7 @@ main(): Unit {
 
 ### 3. 接入真实数据
 
-```cangjie role=variation
-func nodeOf(entry: FileEntry): TreeNode {
-    TreeNode(entry.relativePath, entry.name,
-        children: entry.children.map({child => nodeOf(child)}))
-}
-```
+把每个文件条目递归转换为 `TreeNode(entry.relativePath, entry.name, children: ...)`。
 
 扫描目录应在后台完成，UI 帧只接收已经构造好的普通数据。所有入口必须用同一条路径整理规则，例如统一 `/` 与 `\\`；否则 `docs/guide.md` 和 `docs\\guide.md` 会被当成两个节点。
 

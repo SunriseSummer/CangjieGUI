@@ -2,7 +2,7 @@
 
 # CalendarDate
 
-`cui.controls` 包中的 public struct
+位于 `cui.controls` 包的公开结构体
 
 一个日历日——年、月（1–12）、日（1–31），不含时刻与时区。它是 [`DatePicker`](DatePicker.md) 绑定的值类型；构造时会把月份限制在 1–12，并把日期限制在该月的有效天数内，所以下游代码不会见到 2 月 30 日这类无效日期。
 

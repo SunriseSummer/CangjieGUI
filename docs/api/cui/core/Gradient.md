@@ -2,7 +2,7 @@
 
 # Gradient
 
-`cui.core` 包中的 public struct
+位于 `cui.core` 包的公开结构体
 
 圆角背景用的双色线性渐变填充，默认自上而下、`vertical` 为 false 时自左向右。经 [`Widget.gradientBackground`](Widget.md#gradientbackground) 修饰器应用在任意组件背后；它复用纯色填充的同一套缓存几何，不增加细分成本。
 

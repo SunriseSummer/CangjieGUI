@@ -15,9 +15,5 @@ public class EffectCleanup <: Resource {
 
 `close` 只在 action 成功后标记关闭；action 抛异常时仍保持可重试，下一次 `close` 会再次执行。
 
-```cangjie
-lifecycleEffect("watch-project", project.revision) {
-    watcher.start(project.value)
-    EffectCleanup({=> watcher.stop()})
-}
-```
+典型用法是在 `lifecycleEffect` 的 setup 中启动监听器，并返回 `EffectCleanup({=> watcher.stop()})`；版本变化或组件
+卸载时，框架会调用清理函数。

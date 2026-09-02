@@ -2,7 +2,7 @@
 
 # ListView
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 单选字符串列表：可滚动的行列表，点击或键盘移动选择，双向绑定选中下标 `Bindable<Int64>`。选中行画强调色底；聚焦后 ↑/↓/Home/End 移动选择并把新行滚入视区。
 

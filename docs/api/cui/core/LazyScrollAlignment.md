@@ -2,7 +2,7 @@
 
 # LazyScrollAlignment
 
-`cui.core` 包中的 public enum
+位于 `cui.core` 包的公开枚举
 
 按稳定 key 定位时，条目在惰性视口滚动轴上的目标位置。
 

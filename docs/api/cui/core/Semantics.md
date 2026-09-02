@@ -2,7 +2,7 @@
 
 # Semantics
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 平台无关的无障碍属性：标签、角色、当前值、提示、启用/选中/勾选状态。它不包含像素边界或平台对象；布局后由 [`SemanticsNode`](SemanticsNode.md) 与边界、动作组合。
 

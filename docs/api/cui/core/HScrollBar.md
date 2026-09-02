@@ -2,7 +2,7 @@
 
 # HScrollBar
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 [`ScrollBar`](ScrollBar.md) 的水平镜像：为沿 x 轴滚动的表面提供同样的滑块拖拽与轨道分页控制器。它不是组件；[`LazyRow`](LazyRow.md) 内部用它驱动底缘滚动条，自绘的水平滚动表面同样适用。
 

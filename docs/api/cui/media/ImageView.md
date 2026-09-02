@@ -2,7 +2,7 @@
 
 # ImageView
 
-`cui.media` 包中的 public class
+位于 `cui.media` 包的公开类
 
 显示从文件加载的图像。解码后的纹理放在按 UI 线程和渲染器隔离、按路径键控的有界加权 LRU 中（逐帧快命中有二次机会），ImageView 像普通组件一样内联声明——每帧重建只查缓存、不碰磁盘；同一实例重复绘制还会复用已解析结果。覆盖写过图像文件后调用 [`invalidateImage`](functions.md#invalidateimage) 刷新。
 

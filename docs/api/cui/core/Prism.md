@@ -2,10 +2,10 @@
 
 # Prism
 
-`cui.core` 包中的 public struct
+位于 `cui.core` 包的公开结构体
 
-从和类型 `S` 的一个分支到载荷 `A` 的可组合光学结构。`extract` 只在源值属于该分支时返回载荷，`embed` 总能从载荷
-构造分支；它是枚举/领域 Action 相对于记录字段 [`Lens`](Lens.md) 的对偶。
+描述枚举或领域 Action 的某个分支。`extract` 在源值属于目标分支时取出其中的数据，`embed` 用数据构造该分支。
+`then` 可继续组合嵌套分支；记录或模型字段使用 [`Lens`](Lens.md)。
 
 ```cangjie
 public struct Prism<S, A>
@@ -19,8 +19,8 @@ public struct Prism<S, A>
 - Match-Embed：若 `extract(s) == Some(a)`，则 `embed(a) == s`。
 
 框架不要求 `S`/`A` 实现 `Equatable`，因此自定义 Prism 应在模型测试中验证定律。`then` 保持良好 Prism 的定律。
-测试可用 [`checkPrismLaws`](../testing/functions.md#checkprismlaws) 分别提供命中/未命中的 source 和 payload witness；
-结果逐项区分两个往返，有限样本只用于寻找反例。
+测试可用 [`checkPrismLaws`](../testing/functions.md#checkprismlaws) 分别提供命中值、未命中值和分支数据。结果会逐项检查
+两个往返关系；有限样本只能帮助发现反例。
 
 ## 构造
 
@@ -54,14 +54,10 @@ public func then<B>(next: Prism<A, B>): Prism<S, B>
 
 组合嵌套分支：提取按外到内短路，嵌入按内到外构造。
 
-## 示例
+## 使用方式
 
-```cangjie
-let profileAction = Prism<AppAction, ProfileAction>(
-    extract: {action => action.profile},
-    embed: {action => AppAction(profile: Some(action))}
-)
-```
+为 `AppAction` 的资料分支创建 Prism 时，`extract` 在命中后返回 `ProfileAction`，`embed` 把
+`ProfileAction` 重新包装成 `AppAction`。同一个 Prism 可由 Reducer 和 `FeaturePath` 复用。
 
 ## 另请参阅
 

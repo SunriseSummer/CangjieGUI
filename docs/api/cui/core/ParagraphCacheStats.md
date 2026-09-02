@@ -11,6 +11,7 @@ public struct ParagraphCacheStats {
     public let entries: Int64
     public let bytes: Int64
     public let evictions: UInt64
+    public init(hits: UInt64, misses: UInt64, entries: Int64, bytes: Int64, evictions: UInt64)
 }
 ```
 

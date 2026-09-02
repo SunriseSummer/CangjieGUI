@@ -47,26 +47,13 @@ main(): Unit {
 
 ### 4. 可观察数据直接交给列表
 
-```cangjie role=variation
-LazyColumn.of(messageState, 52.0,
-    key: {message => message.id},
-    scroll: Some(scroll), id: "messages") {
-    message => MessageRow(message, drafts[message.id])
-}
-```
+数据已经由 `State<Array<Message>>` 持有时，使用 `LazyColumn.of(messageState, 52.0, key: {message => message.id}, ...)`。插入、删除或排序后给 State 赋回新数组；不要只原地修改数组，因为那不会产生新的状态版本。行内草稿按业务 ID 放在页面模型中，滚出视口再回来时由新行读取。
 
-这里 `messageState` 是 `State<Array<Message>>`，`drafts` 属于页面模型。滚出视口再滚回时，新行会从模型取回草稿。插入、删除或排序时给 State 赋新数组即可；列表一次采样数组与 revision，以顶部稳定 key 做像素锚定，不再要求同步维护 `messagesRevision`。不要只原地改写 State 内的数组，因为那不会产生赋值版本。若数据来自不可观察的外部快照，仍可使用 `Array<T>` 重载并显式传 `revision`。若行高不统一，把同一身份规则迁移到 `LazyList`，而不是在固定高度行里塞入任意高内容。
+数据来自不可观察的外部快照时，可以使用 `Array<T>` 重载并显式传 `revision`。行高不统一时保留相同身份规则，改用 `LazyList`。
 
 ### 5. 可变高度先使用自测量
 
-只提供一个典型行高作为未知区域的初始估计；可见行会自动测量，前序行变高时顶部业务 key 保持原位置：
-
-```cangjie role=variation
-LazyList.measured(messageState, estimatedHeight: 72.0, spacing: 6.0,
-    key: {message => message.id}, id: "thread") {
-    message => MessageRow(message)
-}
-```
+使用 `LazyList.measured(messageState, estimatedHeight: 72.0, key: {message => message.id}, ...)`。只需提供典型行高作为未知区域的初始估计；可见行会自动测量，前序行变高时列表会用顶部业务键保持阅读位置。
 
 行根必须有有限 intrinsic height。可见行中影响高度的普通 State 会由测量依赖自动跟踪。唯一稳定 key 还会让框架在结构变化后把已经学到的高度迁移给同一业务对象；稳定帧不会扫描全部数据。估计不必精确，它只影响从未测量过的区域和新 key 的初始滚动条。
 
@@ -74,42 +61,13 @@ LazyList.measured(messageState, estimatedHeight: 72.0, spacing: 6.0,
 
 ### 6. 已有高度管线时选择 revision 或 extent 模型
 
-高度只随一批数据更新时，把该批次版本传给 `revision`；版本不变期间 `LazyList` 复用 Fenwick 索引，不再每帧调用全部 `heightOf`：
+已经有缓存高度时，使用 `LazyList.of` 并让 `heightOf` 返回该高度。State 数据会自动使用赋值修订号复用位置索引；不可观察的 Array 快照应传 `revision: Some(messagesRevision)`。
 
-```cangjie role=variation
-LazyList.of(messageState, {message => message.cachedHeight},
-    key: {message => message.id}, id: "thread") {
-    message => MessageRow(message)
-}
-```
-
-State 数据形态会自动以赋值 revision 复用 Fenwick 索引；不可观察的 Array 快照仍传 `revision: Some(messagesRevision)`。聊天气泡展开、增量测高等高频单行变化使用 `LazyListExtents`。`update` 为 O(log N) 并自动请求帧；插入/删除/重排才调用 O(N) 的 `reset`：
-
-```cangjie role=variation
-let extents = LazyListExtents(cachedHeights, spacing: 6.0)
-LazyList.ofExtents(messages, extents, key: {message => message.id}, id: "thread") {
-    message => MessageRow(message)
-}
-let _ = extents.update(changedIndex, measuredHeight)
-```
+聊天气泡展开、增量测高等频繁单行变化使用 `LazyListExtents` 和 `LazyList.ofExtents`。单行高度变化调用 `update`；只有插入、删除或重排才调用 `reset`。精确签名和完整示例见 [`LazyList`](../../api/cui/core/LazyList.md) 与 [`LazyListExtents`](../../api/cui/core/LazyListExtents.md)。
 
 ### 7. 按索引或业务 key 定位
 
-把 `LazyViewportController` 放进页面模型。搜索或分页结果已经给出当前数组索引时用 `scrollToIndex`，固定高度为
-O(1)、变高 extent 为 O(log N)，且不会扫描全量 key。恢复业务对象阅读位置、请求与处理之间可能重排时用
-`scrollToKey`；它以稳定身份换取同一结构版本首次请求的 O(N) 反向索引构建。控制器与 `scroll` 二选一；请求
-越界索引或不存在 key 后可用 `lastTargetFound()` 诊断。
-
-```cangjie role=variation
-controller.scrollToKey(selectedId, alignment: LazyScrollAlignment.Nearest)
-LazyColumn.of(messages, 52.0, key: {message => message.id}, controller: controller, id: "messages") {
-    message => MessageRow(message)
-}
-```
-
-```cangjie role=variation
-controller.scrollToIndex(searchResultIndex, alignment: LazyScrollAlignment.Center)
-```
+把 `LazyViewportController` 放进页面模型。已有当前数组索引时调用 `scrollToIndex`；需要在请求期间发生重排后仍定位同一业务对象时调用 `scrollToKey`。控制器和外部 `scroll` 状态二选一。索引越界或键不存在后，可用 `lastTargetFound()` 判断请求是否成功。
 
 ## 确认结果
 

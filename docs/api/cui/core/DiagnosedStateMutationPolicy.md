@@ -2,7 +2,7 @@
 
 # DiagnosedStateMutationPolicy
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 在不改变目标策略判断结果的前提下，显式记录比较次数、抑制收益、失败和耗时。通过
 [`diagnoseStateMutationPolicy`](functions.md#diagnosestatemutationpolicy) 创建；未包装的默认 State、selector、Binding 和派生
@@ -40,16 +40,9 @@ public func resetDiagnostics(): Unit
 
 只清空诊断计数与耗时；被包装策略以及已经使用它的 State/派生节点保持不变。
 
-## 示例
+## 使用方式
 
-```cangjie
-let policy = diagnoseStateMutationPolicy<Int64>(structuralEqualityPolicy<Int64>())
-let page = State<Int64>(1, policy: policy)
-
-page.value = 1
-let snapshot = policy.diagnostics()
-// snapshot.comparisons == 1
-// snapshot.equivalentResults == 1
-```
+先用 `diagnoseStateMutationPolicy` 包装原策略，再把结果传给 `State`、派生状态或 Store 选择器。调用 `diagnostics()`
+读取快照；例如把值 `1` 再写入使用结构相等策略的 `State<Int64>` 后，比较次数和等价结果都会增加一次。
 
 状态策略应在桌面 UI 线程使用；诊断计数也遵循同一线程封闭约束，不是跨线程聚合器。

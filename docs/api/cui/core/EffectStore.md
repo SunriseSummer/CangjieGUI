@@ -2,7 +2,7 @@
 
 # EffectStore
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 持有单一应用模型并运行纯 [`EffectReducer`](EffectReducer.md)。内核只提交模型和交付效果值，不选择线程池、网络库、
 重试、取消或去重策略。
@@ -23,7 +23,32 @@ public init(
 )
 ```
 
-模型观察、`get`、`revision`、`select` 及其等价策略重载与 [`ModelStore`](ModelStore.md) 相同。
+## 读取与观察
+
+```cangjie
+public func get(): Model
+public prop revision: UInt64
+public func observe(callback: (Model, Model) -> Unit): StateObservation<Model>
+```
+
+`get` 返回当前完整模型，`revision` 返回底层状态版本。`observe` 观察后续提交，并返回可取消的订阅。
+
+## 选择局部数据
+
+```cangjie
+public func select<Value>(selector: (Model) -> Value): DerivedState<Value>
+public func select<Value>(
+    selector: (Model) -> Value,
+    policy!: StateMutationPolicy<Value>
+): DerivedState<Value>
+public func select<Value>(lens: Lens<Model, Value>): DerivedState<Value>
+public func select<Value>(
+    lens: Lens<Model, Value>,
+    policy!: StateMutationPolicy<Value>
+): DerivedState<Value>
+```
+
+`select` 创建缓存的只读派生状态。可用闭包或 Lens 选择局部数据；传入策略后，等价结果不会继续传播。
 
 ## connect
 
@@ -38,15 +63,8 @@ public func connect(
 仍严格执行“完整归约 → 模型提交 → 整批效果交付”。它不是自动效果运行时，只是把显式 handler 部分应用到生产 UI
 门面；线程、取消、重试、背压和结果 Action 仍由 handler 管理。
 
-```cangjie
-let uiStore = effectStore.connect(handleEffects: {effects =>
-    effects.forEach({command => worker.submit(command)})
-})
-let profile = uiStore.scope<Profile, ProfileAction>(
-    state: profileLens,
-    action: {action => AppAction.profile(action)}
-)
-```
+应用通常在组合根调用一次 `connect`，在处理器中遍历效果批次并交给后台执行器。返回的 Store 还可通过 `scope` 缩小到
+具体功能，再传给对应子视图。
 
 `connect(h).dispatch(a)` 与 `dispatch(a, handleEffects: h)` 具有相同的提交、效果顺序和失败语义；空批量不调用 `h`。
 应在稳定的应用装配位置创建一次门面，不要在每次 build 中重复连接。测试若要直接断言效果值，仍使用返回
@@ -96,9 +114,22 @@ public func binding<Value>(
     handleEffects!: (EffectBatch<Effect>) -> Unit,
     policy!: StateMutationPolicy<Value>
 ): Binding<Value>
+
+public func binding<Value>(
+    lens: Lens<Model, Value>,
+    action!: (Value) -> Action,
+    handleEffects!: (EffectBatch<Effect>) -> Unit
+): Binding<Value>
+
+public func binding<Value>(
+    lens: Lens<Model, Value>,
+    action!: (Value) -> Action,
+    handleEffects!: (EffectBatch<Effect>) -> Unit,
+    policy!: StateMutationPolicy<Value>
+): Binding<Value>
 ```
 
-Lens 重载接受相同的 `action` 与 `handleEffects`。Binding 写入返回 `Unit`，因此本 API 强制显式提供效果交付，不能像
+闭包与 Lens 重载都接受相同的 `action` 和 `handleEffects`。Binding 写入返回 `Unit`，因此本 API 强制显式提供效果交付，不能像
 普通 [`ModelStore.binding`](ModelStore.md) 那样省略并静默丢弃。生产视图若有多个 Binding，优先在组合根
 [`connect`](#connect) 一次，再使用返回门面的普通 action Binding。`Binding.update` 仍只使用一个根模型快照。
 策略重载只过滤读取侧的等价通知；Action 产生的模型提交与效果批次仍完整交付，即使焦点值保持等价。

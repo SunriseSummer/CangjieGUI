@@ -2,7 +2,7 @@
 
 # Animator
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 按固定时长与 [`Easing`](Easing.md) 曲线把数值从当前位置补间到目标的动画器——CSS transition 与 SwiftUI/Compose `.animation(...)` 背后的模型。[`Spring`](Spring.md) 是物理驱动、时长自然涌现；Animator 则在精确的时长内以选定曲线到达。
 

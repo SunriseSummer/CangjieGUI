@@ -16,37 +16,18 @@
 
 ## 操作步骤
 
-### 1. 给基础程序加入发布身份
+### 1. 确定发布身份
 
-将首窗口中的窗口定义替换为下面补丁，并保持其余模型和界面代码不变：
-
-```cangjie role=patch
-let app = DesktopApp(WindowSpec(
-    "CUI 计数器",
-    640,
-    420,
-    resizable: true
-))
-```
-
-发布标题应稳定、便于用户在任务栏识别。版本号、构建号和许可证等信息放进交付清单，不要临时拼进界面文本。
+在 `WindowSpec` 中设置稳定的窗口标题、尺寸和是否允许缩放。例如首窗口可使用标题 `CUI 计数器`、尺寸
+`640 × 420`，并将 `resizable` 设为 `true`。版本号、构建号和许可证等信息放进交付清单，不要临时拼进界面文本。
 
 ### 2. 建立干净目录
 
-交付目录至少包含可执行文件和匹配架构的 SDL 运行库。Windows 还要复制 `target/native/windows/<arch>/cui_uia.dll`；其源码位于 `platform/windows/accessibility/uia/`，由 `.dev/platform/windows/build_uia.ps1` 独立构建。框架在运行时动态加载 DLL，缺少时应用仍能启动，但原生 UI Automation provider 不可用。应用运行时读取的字体、图像或配置也按程序约定的相对路径复制。不要把整个源码仓库、编译缓存和测试快照一起打包。
-
-```cangjie role=variation
-// 资源路径以可执行文件所在目录为基准时，集中定义一次：
-let APP_ICON = "assets/app-icon.bmp"
-
-func releaseCard(): Unit {
-    VStack {
-        ImageView(APP_ICON, fit: ImageFit.Contain,
-            preferredWidth: Some(48.vp), preferredHeight: 48.vp)
-        Label("版本 1.0.0").muted()
-    }
-}
-```
+交付目录至少包含可执行文件和匹配架构的 SDL 运行库。Windows 还要复制
+`target/native/windows/<arch>/cui_uia.dll`；其源码位于 `platform/windows/accessibility/uia/`，由
+`.dev/platform/windows/build_uia.ps1` 独立构建。框架在运行时动态加载 DLL，缺少时应用仍能启动，但原生
+UI Automation provider 不可用。应用运行时读取的字体、图像或配置也按程序约定的相对路径复制。资源路径应集中定义，
+例如把图标路径保存为 `assets/app-icon.bmp`，并以可执行文件所在目录为基准解析。不要把整个源码仓库、编译缓存和测试快照一起打包。
 
 ### 3. 脱离源码树冒烟
 

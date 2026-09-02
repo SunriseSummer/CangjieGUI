@@ -2,7 +2,7 @@
 
 # Divider
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 分隔内容的 1 逻辑像素发丝线，走向由 `axis` 指定、长度由父栈拉伸铺满。颜色默认取 [`Theme`](Theme.md) 的面板边缘色（`panelEdge`）。
 

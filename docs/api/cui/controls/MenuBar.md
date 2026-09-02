@@ -2,7 +2,7 @@
 
 # MenuBar
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 应用菜单栏：一行水平排列的菜单标题，点击标题即在其正下方弹出下拉菜单，菜单打开时指针掠过其他标题即切换过去。菜单由 [`Menu`](Menu.md) 值描述、条目为 [`MenuItem`](MenuItem.md)（可带快捷键提示、可禁用、可为分隔线）；整条菜单栏是一个键盘焦点项，方向键即可完成全部导航。
 

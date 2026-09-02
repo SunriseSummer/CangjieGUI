@@ -2,7 +2,7 @@
 
 # Label
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 单行或多行文本组件：默认单行、溢出以省略号截断，字体样式经链式构建器就地配置。[`maxLines`](#maxlines) 允许换行至 n 行（仍有剩余文本时最后一行加省略号），[`wrap`](#wrap) 取消行数上限。
 

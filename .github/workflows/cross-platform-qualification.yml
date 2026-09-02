@@ -156,6 +156,7 @@ jobs:
         working-directory: CangjieGUI
         run: >-
           python .dev/cli.py check docs &&
+          python .dev/cli.py check snippets --timeout 600 &&
           python .dev/cli.py test examples --action build --jobs 2 --timeout 300
 
       - name: Upload portability evidence
@@ -220,7 +221,9 @@ jobs:
 
       - name: Verify documentation
         working-directory: CangjieGUI
-        run: python .dev/cli.py check docs
+        run: >-
+          python .dev/cli.py check docs &&
+          python .dev/cli.py check snippets --timeout 600
 
       - name: Build all public examples
         working-directory: CangjieGUI

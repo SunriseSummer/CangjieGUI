@@ -2,7 +2,7 @@
 
 # UiContext
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 渲染帧中传给实际执行组件回调的服务枢纽：渲染器与主题、指针与帧状态，以及焦点、悬停、按下、拖拽、提示与浮层等共享交互协议。整个应用只有一个实例，跨帧存续——普通组件值会随构建更新，retained 边界又可能复用实例，因此需要稳定、统一协调的交互状态保存在这里，而不依赖某个 Widget 的偶然寿命。
 
@@ -100,7 +100,7 @@ main(): Unit {
 | [`setOverlay(overlay: Overlay)`](#setoverlay) | 登记一个交互浮层到已开浮层之上；同 `owner` 重复登记时原位替换。 |
 | [`semanticsSnapshot()`](#semanticssnapshot) | 返回当前平台无关的无障碍节点快照。 |
 | [`semanticsTreeSnapshot()`](#semanticstreesnapshot) | 返回带 revision 和 O(1) id 索引的已提交语义树。 |
-| [`focusedSemanticsNode()`](#focusedsemanticsnode) | 返回当前代际焦点所有者对应的已提交语义节点。 |
+| [`focusedSemanticsNode()`](#focusedsemanticsnode) | 返回当前焦点组件对应的已提交语义节点。 |
 | [`performSemanticsAction(id, action)`](#performsemanticsaction) | 对语义节点执行平台无关动作。 |
 | [`setAccessibilityAdapter(adapter)`](#setaccessibilityadapter) | 安装增量语义树 push adapter。 |
 | [`registerSemantics(node, perform!)`](#registersemantics) | 自定义 Widget 在布局时登记语义与动作。 |
@@ -648,7 +648,8 @@ public mut prop viewportHeight: Float32
 
 ### displayScale
 
-每虚拟像素对应的物理像素数，取自窗口内容缩放。默认 `1.0`，setter 至少保留 `0.001`；[`resolve`](#resolve) 用它换算 `px` 长度。值实际变化时会推进内部 UI 环境 generation，使相同可用尺寸下的 Element/Stack/text memo 与布局提交自动失配；重复写入同一归一化值不制造无效工作。
+每虚拟像素对应的物理像素数，取自窗口内容缩放。默认 `1.0`，写入值至少为 `0.001`；[`resolve`](#resolve) 用它换算
+`px` 长度。值变化时，依赖显示环境的测量、布局和文本缓存会自动失效；重复写入同一值不会产生额外工作。
 
 ```cangjie
 public mut prop displayScale: Float32
@@ -672,8 +673,8 @@ public mut prop clickCount: Int64
 
 ### semanticsSnapshot
 
-返回最近一次稳定布局提交的平台无关无障碍节点。归一化在事务提交时完成；稳定 fragment 的重复查询直接返回已提交
-数组。重复 id 以后声明者覆盖属性和动作。
+返回最近一次稳定布局提交的平台无关无障碍节点。界面结构未变化时，重复查询直接返回已提交数组。id 重复时，后声明的
+节点覆盖属性和动作。
 
 ```cangjie
 public func semanticsSnapshot(): Array<SemanticsNode>
@@ -690,9 +691,8 @@ public func semanticsTreeSnapshot(): SemanticsSnapshot
 
 ### focusedSemanticsNode
 
-通过焦点 key 与代际 Element owner 查询当前已提交语义节点。焦点为空、节点未登记，或相同字符串 key 已被卸载后
-由另一代 Element 复用时返回 `None`；查询不扫描焦点环或语义数组。显式 `focus` 后本地查询立即反映新焦点；
-adapter 仍只在下一次稳定事务提交时收到与树属性原子一致的 `snapshot.focusedId`。
+返回当前焦点组件对应的已提交语义节点。没有焦点、节点未登记，或原组件已卸载而 key 被其他组件复用时返回 `None`。
+显式调用 `focus` 后，本地查询立即反映新焦点；平台适配器会在下一次稳定提交时同时收到焦点和语义树更新。
 
 ```cangjie
 public func focusedSemanticsNode(): ?SemanticsNode

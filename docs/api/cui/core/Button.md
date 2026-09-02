@@ -2,7 +2,7 @@
 
 # Button
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 带按主题显示的背景与边框与居中标题的按压按钮，在按钮内部按下并松开时触发 `onClick`。可聚焦：获得键盘焦点后 Enter 与空格同样触发；[`ButtonRole`](ButtonRole.md) 选择语义配色，`style` 完全覆盖表面。
 

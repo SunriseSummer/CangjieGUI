@@ -2,7 +2,7 @@
 
 # EffectBatch
 
-`cui.core` 包中的 public struct
+位于 `cui.core` 包的公开结构体
 
 不可变、有序的领域效果描述批次。它不执行文件、网络、线程或计时工作；应用基础设施通过 [`forEach`](#foreach)
 解释这些普通值。
@@ -48,5 +48,5 @@ public func map<Mapped>(transform: (Effect) -> Mapped): EffectBatch<Mapped>
 
 ## 另请参阅
 
-- [`Transition`](Transition.md) — 模型端态与效果批次的乘积。
+- [`Transition`](Transition.md) — 一次更新得到的新模型和效果批次。
 - [`EffectStore`](EffectStore.md) — 提交模型后交付批次。

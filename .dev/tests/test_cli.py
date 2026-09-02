@@ -15,7 +15,9 @@ class DevelopmentCliTests(unittest.TestCase):
         with contextlib.redirect_stdout(output):
             code = cli.main(["--help"])
         self.assertEqual(code, 0)
-        for family in ("check docs", "test tools", "release verify", "bench run"):
+        for family in (
+            "check docs", "check snippets", "test tools", "release verify", "bench run"
+        ):
             self.assertIn(family, output.getvalue())
 
     def test_unknown_command_fails_closed(self):

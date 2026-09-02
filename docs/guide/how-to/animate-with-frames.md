@@ -42,17 +42,7 @@ main(): Unit {
 
 ### 3. 只在运动期间续帧
 
-```cangjie role=variation
-if (!model.fade.settled()) {
-    FrameHandler(onFrame: {info => model.fade.tick(info.deltaMs)}) {
-        fadingPanel(model.fade.value)
-    }
-} else {
-    fadingPanel(model.fade.value)
-}
-```
-
-达到目标后不再挂载 `FrameHandler`，桌面循环才能空闲。持续循环的 `Pulse` 是例外：只在界面可见且确实需要运动时挂载，页面隐藏或“减少动态效果”开启时暂停。
+动画尚未稳定时，用 `FrameHandler` 的回调调用 `model.fade.tick(info.deltaMs)`，并在子树中显示当前值；稳定后直接声明静态内容，不再挂载 FrameHandler。这样桌面循环才能回到空闲。持续循环的 `Pulse` 是例外：只在界面可见且确实需要运动时挂载，页面隐藏或“减少动态效果”开启时暂停。
 
 ## 确认结果
 

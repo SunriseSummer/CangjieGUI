@@ -2,9 +2,9 @@
 
 # Widget
 
-`cui.core` 包中的 public interface
+位于 `cui.core` 包的公开接口
 
-所有组件共同实现的声明式值契约：按宿主选中的更新阶段参与测量、布局、绘制与事件处理，并自带尺寸、内边距、表面、阴影、弹性、可见性等整套链式修饰器。全部内置容器与控件都实现此接口；自定义组件实现 `measure`/`layout`/`draw`/`handle` 四个必选方法，即可与内置组件平起平坐地参与布局与焦点遍历。确认指针处理严格局限于布局矩形时，可额外声明 [`PointerEventScope.LayoutBounds`](PointerEventScope.md) 获得空间剪枝。
+所有组件共同实现的协议。自定义组件实现 `measure`、`layout`、`draw` 和 `handle` 四个方法后，就能使用内建布局、修饰器和事件系统。需要焦点、无障碍、动画或容器能力时，再按需实现可选协议或调用 `UiContext` 接口。
 
 ## 声明
 
@@ -14,24 +14,16 @@ public interface Widget
 
 ## 说明
 
-**更新协议。**需要呈现时，普通 builder 只重建受 `State` 影响的声明路径；空闲窗口不构建。实例默认不承载跨帧业务状态——需要存活的数据放进 [`State`](State.md)（控件内部经 [`rememberState`](functions.md#rememberstate) 按标识保留）。框架会选择性持久化复杂单根作用域，按 Measure/Layout/Paint 的真实 State 读取独立失效，并在收益足够时自动缓存有界显示列表；[`RetainedSubtree`](RetainedSubtree.md) 只是显式高级/兼容边界。宿主只对本帧需要执行的阶段调用 [`measure`](#measure)、[`layout`](#layout) 与 [`draw`](#draw)；每条输入事件调用一次 [`handle`](#handle)，返回 `true` 即事件已消费、不再继续派发。合成帧时钟不再遍历 `handle`，用 [`FrameHandler`](FrameHandler.md) 或 [`subscribeFrame`](functions.md#subscribeframe) 显式订阅。
+**更新。** CUI 根据 `State` 的实际读取记录，只重新执行受影响的声明和阶段。空闲窗口不会持续构建。组件实例不应保存跨构建业务状态；这类数据放进 [`State`](State.md)、Binding 或 Store。框架会自动缓存适合保留的声明和绘制工作，普通组件无需手工使用 [`RetainedSubtree`](RetainedSubtree.md)。逐帧逻辑通过 [`FrameHandler`](FrameHandler.md) 或 [`subscribeFrame`](functions.md#subscribeframe) 登记，不通过 `handle` 广播。
 
-**声明收集。**具体组件的构造函数调用 [`emit`](functions.md#emit) 把自己登记进最内层打开的构建块——`VStack { Label("标题") }` 因此无需数组便收集到子组件，顺序即声明顺序。在块外构造组件时 `emit` 是无操作，组件保持普通值语义，可先存进变量、再到块内用 `emit(已存组件)` 显式放置。
+**声明。** 具体组件的构造函数调用一次 [`emit(this)`](functions.md#emit)，把自己加入当前构建块。块外构造时 `emit` 不做任何事；已有组件可以在块内通过 `emit(widget)` 显式放置。
 
-**修饰器链。**`width`/`padding`/`background` 一类默认方法不改动原组件，而是把它包进一个新的 `Widget` 节点并返回包装结果，同时替换构建块中刚登记的原组件。链有顺序语义——每次调用包住此前的整条链：
+**修饰器。** `width`、`padding`、`background` 等方法返回包装后的组件。每一步都会包住前面的结果，因此顺序会改变尺寸和
+绘制范围：先 `padding` 再 `background`，背景包含内边距；顺序相反时，背景只覆盖原内容区域。
 
-```cangjie
-Label("已保存").padding(8.0).background(Color.rgb(223, 240, 216), 6.0) // 背景连同内边距一起着色
-Label("已保存").background(Color.rgb(223, 240, 216), 6.0).padding(8.0) // 背景只垫在文本正后方
-```
+**可选协议。** [`isFlexible`](#isflexible) 和 [`flexWeight`](#flexweight) 控制剩余空间分配；[`acceptsStretch`](#acceptsstretch) 控制交叉轴拉伸；[`participatesInLayout`](#participatesinlayout) 决定是否占位；[`focusableId`](#focusableid) 和 [`focusableIds`](#focusableids) 提供 Tab 顺序。这些方法都有默认实现。
 
-**布局与焦点协议。**[`isFlexible`](#isflexible)/[`flexWeight`](#flexweight) 决定组件在 [`VStack`](VStack.md)/[`HStack`](HStack.md) 剩余空间分配中的角色，[`acceptsStretch`](#acceptsstretch) 回答交叉轴可否拉伸，[`participatesInLayout`](#participatesinlayout) 决定是否占位；[`focusableId`](#focusableid)/[`focusableIds`](#focusableids) 把子树的焦点项交给焦点遍历（Tab / Shift+Tab）。这六个方法都有默认实现，按需覆盖即可。
-
-**UI 环境与原子布局。**框架按“可用尺寸 × UI 环境 generation”缓存持久 Element 的 `measure`，并把布局几何、
-祖先可见域、overlay、semantics fragment 与多子容器的事件路由拓扑作为一个不可变提交缓存。窗口 DPI、
-`displayScale`、`fontScale`、Renderer/Theme、Context 身份或字体注册表发生变化时会自动失配，并按
-Measure→Layout→Paint 顺序重算；自定义 Widget 不需要订阅这些事件或清理框架缓存。`measure`/`layout` 应可重试：
-异常不覆盖旧提交，在阶段内写入刚读取的 `State` 也不会单独发布几何或事件路由。
+**环境变化。** 窗口缩放、字体缩放、主题、渲染器或字体注册变化时，框架会自动使相关测量、布局和绘制缓存失效。自定义组件不需要订阅这些变化或清理框架缓存。`measure` 和 `layout` 可能重试，因此不得在其中执行一次性副作用。
 
 ## 示例
 
@@ -175,7 +167,7 @@ func draw(ctx: UiContext): Unit
 
 ### handle
 
-处理一条输入事件并返回是否已消费。容器按声明的逆序派发（后声明、绘制在上层的先收到），一旦有组件返回 `true` 便停止，事件不再传给它身后的组件。帧事件例外：容器会把 `UiEvent.Frame` 发给全部子组件，不计算是否消费。控件在这里判断指针是否落在自身范围内、更新状态并触发回调。
+处理一条输入事件并返回是否已消费。容器通常按声明逆序派发，后声明、绘制在上层的组件先收到；组件返回 `true` 后，事件不再交给后方节点。逐帧回调由 `FrameHandler` 或 `subscribeFrame` 单独登记，不应依赖 `handle` 广播。
 
 ```cangjie
 func handle(ctx: UiContext, event: UiEvent): Bool
@@ -190,7 +182,7 @@ func handle(ctx: UiContext, event: UiEvent): Bool
 
 ### pointerEventScope
 
-声明子树是否可能观察父容器分配矩形之外的指针事件。默认 `Unbounded` 保留旧自定义 Widget 的完整路由语义；只有全部后代处理器都检查同一边界时才返回 `LayoutBounds`。多子容器把布局矩形按 z 序构造成 AABB 聚合树，点事件只访问相交叶；兼容叶始终保留在遍历中。活动按压/拖拽自动绕过索引。
+声明子树是否可能观察父容器分配矩形之外的指针事件。默认 `Unbounded` 采用保守路由；只有全部后代处理器都检查同一布局矩形时，才返回 `LayoutBounds`。父容器可以据此跳过明显不相交的子树。活动按压或拖拽仍会回到手势所有者。
 
 ```cangjie
 func pointerEventScope(): PointerEventScope
@@ -200,8 +192,7 @@ func pointerEventScope(): PointerEventScope
 
 ### paintOutset
 
-返回组件在 layout 矩形四边之外可能绘制的保守 [`PaintOutset`](PaintOutset.md)。默认非焦点叶为零，焦点叶
-保留统一 focus-ring 边界；容器和修饰器逐分量合成后由滚动 clip、ScenePatch 与 damage 共用。
+返回组件在布局矩形四边之外可能绘制的最大距离。默认非焦点组件为零；可聚焦组件会为标准焦点环预留空间。滚动裁剪和局部重绘使用该范围，避免阴影、光晕或粗描边被截断。
 
 ```cangjie
 func paintOutset(): PaintOutset
@@ -670,7 +661,9 @@ func modifier(value: Modifier): Widget
 
 ### onEvent
 
-给当前组件添加捕获、目标或冒泡监听器，不创建应用级组件生命周期。默认只观察几何或焦点命中本子树的事件；紧随组件声明调用时，builder last-emission facet 会传递带 owner generation 与内部声明身份的焦点片段，因此同名 public key 不跨子树误路由。应用级快捷键显式使用 `EventScope.Global`。
+给当前组件添加捕获、目标或冒泡监听器。默认只观察指针或焦点命中本子树的事件；在组件声明后立即调用时，框架会保留
+该次声明的内部焦点身份，因此不同子树使用相同的公开 key 也不会互相收到事件。应用级快捷键应显式使用
+`EventScope.Global`。
 
 ```cangjie
 func onEvent(handler!: (UiContext, UiEvent) -> EventOutcome): Widget
@@ -705,7 +698,8 @@ func semantics(properties: Semantics): Widget
 func semantics(properties: Semantics, key!: String): Widget
 ```
 
-语义结果以可组合 retained fragment 缓存；布局稳定后事务化归一为带 revision 的已提交树。稳定 fragment 序列按身份短路，后续 [`UiContext.semanticsSnapshot`](UiContext.md#semanticssnapshot) 查询直接返回缓存数组，不再重复扁平化。
+无障碍信息会在布局稳定后作为一个整体提交。结构未变化时，后续
+[`UiContext.semanticsSnapshot`](UiContext.md#semanticssnapshot) 查询直接复用缓存结果。
 
 **参数**
 

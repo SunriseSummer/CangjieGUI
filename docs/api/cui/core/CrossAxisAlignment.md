@@ -2,7 +2,7 @@
 
 # CrossAxisAlignment
 
-`cui.core` 包中的 public enum
+位于 `cui.core` 包的公开枚举
 
 栈在交叉轴上放置子组件的策略：靠端、居中或拉伸填满。[`VStack`](VStack.md) 与 [`HStack`](HStack.md) 的 `crossAxisAlignment` 方法接受它，默认 `Stretch`。
 

@@ -2,7 +2,7 @@
 
 # Rating
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 以一排实心/空心圆点输入 0…`count` 整数评分的控件：实心圆点表示当前评分，其余为空心，默认五点。点击圆点把评分设为对应数值，再点当前评分可清零；`readonly` 为 `true` 时只显示评分，不接受输入。
 

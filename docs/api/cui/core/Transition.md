@@ -2,7 +2,7 @@
 
 # Transition
 
-`cui.core` 包中的 public struct
+位于 `cui.core` 包的公开结构体
 
 一次纯归约的完整结果：下一个模型与稍后解释的有序 [`EffectBatch`](EffectBatch.md)。构造 Transition 不执行效果。
 

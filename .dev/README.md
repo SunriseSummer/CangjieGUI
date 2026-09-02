@@ -10,6 +10,7 @@
 python .dev/cli.py --help
 python .dev/cli.py test tools
 python .dev/cli.py check docs
+python .dev/cli.py check snippets
 python .dev/cli.py test packages
 python .dev/cli.py test examples --action build --jobs 2 --timeout 300
 python .dev/cli.py test desktop
@@ -21,7 +22,8 @@ python .dev/cli.py bench run --samples 1
 | 领域 | 命令 | 作用 |
 | --- | --- | --- |
 | 工具自测 | `test tools` | 验证 Python 工具、工作流契约和性能门禁逻辑 |
-| 文档 | `check docs` | 检查仓库 Markdown 本地链接 |
+| 文档结构 | `check docs` | 检查本地链接及公开 API 页面、索引和伞包导出的完整性 |
+| 文档代码 | `check snippets` | 提取并编译标记为 `verify` 的完整仓颉示例 |
 | 包测试 | `test packages` | 隔离运行各 CUI 包测试并生成统一报告 |
 | 示例 | `test examples` | 构建或测试全部示例，可选真实窗口快照 |
 | 桌面生命周期 | `test desktop` | 验证窗口线程、增量绘制、唤醒、退出和清理 |

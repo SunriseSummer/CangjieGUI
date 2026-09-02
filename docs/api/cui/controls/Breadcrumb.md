@@ -2,7 +2,7 @@
 
 # Breadcrumb
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 面包屑路径：以箭头分隔的一行层级段（如 首页 › 文档 › 项目），末段为当前位置、前段可点击返回上级路径。点击前段以其下标调用 `onSelect`；不传 `onSelect` 时整条是纯展示。
 

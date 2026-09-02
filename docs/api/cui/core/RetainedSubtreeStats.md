@@ -2,7 +2,7 @@
 
 # RetainedSubtreeStats
 
-保留边界的累计命中与自动 build 依赖诊断。
+`RetainedSubtree` 的累计命中、状态依赖和绘制缓存诊断。
 
 ```cangjie
 public struct RetainedSubtreeStats {
@@ -24,16 +24,64 @@ public struct RetainedSubtreeStats {
 }
 ```
 
-`buildHits` 表示声明体复用，`layoutHits` 表示相同几何下跳过布局，`paintHits` 表示
-`cachePaint: true` 后重放透明绘制命令而不再执行子树 draw。`buildDependencyCount` 是当前 body 提交的直接响应式
-依赖边数；稳定 `DerivedState` 无论有多少传递源都占一条边，声明 body 内创建的短命 State-backed 派生则保留
-可跨重建复用的直接 State 源边。`buildInvalidations` 是该边界由干净转为待重建的累计次数，同一帧/事务内的多次写入会合并。
-`frameSubscriberCount` 是边界后代的显式 Frame 回调数；其余三个依赖字段分别给出 measure、layout 与命令缓存
-paint 的 State 依赖数。`paintCommandCount` 与 `paintEstimatedBytes` 给出当前 display list 的命令数及保守内存
-估算；动态绘制安全检查绕过缓存或尚未录制时为 0。它们用于定位依赖过宽、意外高频重建、动画订阅和过大的
-绘制边界，不暴露内部订阅对象。
+## 构造函数
 
-`paintRecordAttempts` 是累计录制探测次数，`paintDynamicBypasses` 是其中检测到动态协议的次数；
-`paintBypassFrames` 是退避期间直接绘制的累计帧数，`paintBypassRemaining` 是距下次探测的剩余绘制帧。动态
-区域若 `paintRecordAttempts` 持续接近 `paintBypassFrames`，说明退避被频繁失效，应检查 revision、几何抖动或
-paint State 自写；正常稳定动态区域的探测比例会随指数退避下降。
+```cangjie
+public init(buildHits: UInt64, layoutHits: UInt64, paintHits: UInt64)
+public init(
+    buildHits: UInt64,
+    layoutHits: UInt64,
+    paintHits: UInt64,
+    buildDependencyCount: Int64,
+    buildInvalidations: UInt64
+)
+public init(
+    buildHits: UInt64,
+    layoutHits: UInt64,
+    paintHits: UInt64,
+    buildDependencyCount: Int64,
+    buildInvalidations: UInt64,
+    measureDependencyCount: Int64,
+    layoutDependencyCount: Int64,
+    paintDependencyCount: Int64
+)
+public init(
+    buildHits: UInt64,
+    layoutHits: UInt64,
+    paintHits: UInt64,
+    buildDependencyCount: Int64,
+    buildInvalidations: UInt64,
+    frameSubscriberCount: Int64,
+    measureDependencyCount: Int64,
+    layoutDependencyCount: Int64,
+    paintDependencyCount: Int64,
+    paintCommandCount!: Int64 = 0,
+    paintEstimatedBytes!: UInt64 = UInt64(0),
+    paintRecordAttempts!: UInt64 = UInt64(0),
+    paintDynamicBypasses!: UInt64 = UInt64(0),
+    paintBypassFrames!: UInt64 = UInt64(0),
+    paintBypassRemaining!: Int64 = 0
+)
+```
+
+## 字段说明
+
+| 字段 | 说明 |
+|---|---|
+| `buildHits` | 复用上次子树、跳过 `body` 的次数。 |
+| `layoutHits` | 布局条件相同，跳过布局的次数。 |
+| `paintHits` | 重放缓存绘制命令、跳过子树 `draw` 的次数。 |
+| `buildDependencyCount` | 当前 `body` 直接依赖的状态数；一个 `DerivedState` 记为一个依赖。 |
+| `buildInvalidations` | 边界从稳定变为需要重建的累计次数；同一事务的多次写入会合并。 |
+| `frameSubscriberCount` | 后代显式注册的逐帧回调数。 |
+| `measureDependencyCount` | 测量阶段读取的状态数。 |
+| `layoutDependencyCount` | 布局阶段读取的状态数。 |
+| `paintDependencyCount` | 记录绘制命令时读取的状态数。 |
+| `paintCommandCount` | 当前缓存中的绘制命令数；未记录或暂时绕过缓存时为 0。 |
+| `paintEstimatedBytes` | 当前绘制命令的估算内存占用。 |
+| `paintRecordAttempts` | 尝试记录绘制命令的累计次数。 |
+| `paintDynamicBypasses` | 因检测到动态绘制能力而放弃记录的次数。 |
+| `paintBypassFrames` | 暂时直接绘制、不尝试记录的累计帧数。 |
+| `paintBypassRemaining` | 距离下次尝试记录还剩多少帧。 |
+
+如果记录尝试一直很频繁，应检查 `revision` 是否每帧变化、布局区域是否抖动，或绘制阶段是否修改了自己的状态。

@@ -1,64 +1,85 @@
 <!-- kind: reference; audience: contributor -->
 
-# 文档与框架验证报告
+# 文档与框架验证规则
 
-本页记录文档中“已验证”的含义和贡献者应执行的门禁，避免把能编译、能截图和交互正确混为一谈。
+本页说明各种“已验证”分别代表什么。构建、无窗口测试、真实窗口和性能测试回答的问题不同，不能互相替代。
 
-## 自动门禁
+## 证据层级
+
+| 证据 | 能证明 | 不能证明 |
+|---|---|---|
+| 构建通过 | 语法、类型、依赖和公开签名可用 | 交互和视觉结果正确 |
+| 无窗口测试通过 | 状态、布局、事件和帧事务符合断言 | GPU、窗口系统和平台行为正确 |
+| 真实窗口测试通过 | 动态库、窗口、输入和截图链路可用 | 所有目标平台都可用 |
+| 性能测试通过 | 同机、同条件下没有超过基线阈值 | 跨机器绝对耗时可直接比较 |
+
+## 基础门禁
 
 在仓库根目录执行：
 
 ```text
 cjpm build
+cjpm test
 node .agents/skills/cangjie-rules/tools/cjcheck/src/main.js . --tier 2 --no-tools --strict --baseline .cjcheck-baseline.json --summary
 node .agents/skills/cangjie-rules/tools/cjcheck/src/main.js . --tier 1 --checks cjlint,cjfmt --json
+python .dev/cli.py test tools
+python .dev/cli.py check docs
+python .dev/cli.py check snippets --timeout 600
+python .dev/cli.py test examples --action build --jobs 4 --timeout 300
+```
+
+- `check docs` 验证本地链接，并将公开类型、成员、函数、重载、包索引和 `cui` 统一导出与源码对照。
+- `check snippets` 编译 API 与指南中所有带 `verify` 的完整程序；指南不接受无法独立编译的仓颉片段。
+- `test examples` 把每个示例当作独立的公开 API 使用者，避免统一构建掩盖包配置或依赖问题。
+- 严格 L2 只允许审阅过的存量基线，不允许新增问题。外部 `cjlint`、`cjfmt` 是补充视图；若规则与项目不匹配，
+  必须在 `.dev/README.md` 记录原因和替代门禁。
+
+需要隔离包进程或采集覆盖率时，再执行：
+
+```text
 python .dev/cli.py test packages
 python .dev/cli.py test packages --coverage --min-line-coverage 45
+```
+
+包测试必须串行运行 CangjieGUI 与 CangjieSDL 的原生窗口用例，避免两个进程争用 SDL 的进程级状态。覆盖率报告位于
+`target/dev/test-package-results/`；当前仓颉工具链可能把部分内联代码归到测试目标，因此覆盖率用于防回退，不代替功能测试。
+
+## 真实窗口与交付
+
+在可交互图形会话中执行：
+
+```text
 python .dev/cli.py test desktop
-python .dev/cli.py check docs
-python .dev/cli.py test tools
-python .dev/cli.py release verify
-python .dev/cli.py bench run
-python .dev/cli.py bench suite --display --samples 5 --check --timeout 240
-python .dev/cli.py bench probe
-python .dev/cli.py test examples --jobs 4 --timeout 300
 python .dev/cli.py test examples --smoke-snapshots --timeout 300
 python .dev/cli.py test examples --smoke-snapshots --retained-diff --timeout 300
 ```
 
-- `cjpm test` 覆盖状态、布局、事件、保留子树、Renderer 值命令缓冲和无窗口帧宿主；真实 GPU/damage 由桌面 fixture 验证。
-- 严格 L2 以审阅过的增量 baseline 拦截新增问题；外部 cjlint/cjfmt 是独立的存量治理视图。项目规则差异必须在
-  `.dev/README.md` 给出失配证据和更精确的替代门禁，不允许仅为减少数量关闭规则。
-- CangjieGUI 与 CangjieSDL 的完整 `cjpm test` 都包含原生窗口/事件等待用例，必须串行执行；两个仓库并行测试会
-  争用进程级 SDL/窗口系统资源，使唤醒测试失去有效时限。无窗口的 Python 工具自测可以并行。
-- 包隔离工具给每个测试进程设置硬超时；覆盖率模式还隔离各包 `.gcda`，避免不同测试二进制把同名 SDL
-  计数文件损坏合并，再以匹配 `.gcno` staging 生成逐包报告并合并生产源码命中行。原始计数、HTML 和 JSON
-  汇总位于 `target/dev/test-package-results/`。仓颉 1.0.5 可能把内联生产代码归因到 `$test` 图，因此可观测行
-  覆盖率门禁用于防回退，不替代下面的功能、真实窗口与 examples E2E 门禁。新 coverage generation 会精确清理
-  `target/release` 与根 `cov_output`，不调用会遍历并删除其它 `target` 证据的 `cjpm clean`；非同代图仍失败闭合。
-- examples 门禁把每个案例作为独立公开 API/E2E 消费者；烟测会短暂打开代表性真实窗口；retained 差分
-  还会比较默认增量执行与强制全量执行的最终像素，防止缓存命中掩盖依赖遗漏。
-- benchmark 报告是同机 A/B 和回归线索；跨机器原始耗时不能直接判定代码回归。
-- 活动性能基线只能经 `--capture-baseline-candidate` 采集、人工/机器审阅后再由独立
-  `--promote-baseline-candidate` 晋升；候选摘要绑定数值与来源，旧 `--save-baseline` 仅是不会覆盖活动门禁的
-  兼容采集别名。晋升后必须用另一批样本执行 `--check`。
-- 跨平台验证分成两层。GitHub 托管 Ubuntu x64/macOS arm64 runner 从固定 URL、大小和 SHA-256 的官方仓颉/SDL
-  发布物开始，安全解包并源码构建 SDL 后执行无头包测试、文档和示例编译，用来证明新环境可重复；它不能证明
-  真实窗口或稳定性能。三平台 qualification 仍必须在带真实交互式图形会话的 runner 上执行；
-  `release stage-runtime` 要求外置、明确的目标平台 SDL runtime，`release verify` 再从临时干净目录直接
-  运行 executable。平台标签、能编译或 `cjpm run` 成功都不能替代动态库/窗口/截图证据。Windows x64 沿用
-  历史 baseline 路径，Linux/macOS 使用独立 `.dev/bench/baselines/<profile>`，禁止跨平台原始耗时比较。
-- phase3 probe 与普通性能基线隔离，用阶段访问数、同进程 A/B 和规模曲线判断更新粒度是否构成架构瓶颈，并
-  看护已实现的层次化状态所有权是否维持近似常数命中成本。
-- Markdown 门禁验证本地链接目标存在；外部 URL 的可达性仍由发布流程或人工检查。
+桌面测试验证窗口线程、事件等待、增量绘制、唤醒、退出和资源释放。`--retained-diff` 还会比较默认增量模式和强制全量
+模式的最终图像，避免缓存命中掩盖依赖遗漏。逐示例结果写入 `target/dev/examples/report.json`。
 
-## 人工边界
+发布验证必须使用明确的目标平台运行库。先用 `release stage-runtime` 建立干净交付目录，再用 `release verify` 从该目录
+直接启动可执行文件。只运行 `cjpm run` 不能证明交付包完整。
 
-原生文件对话框、输入法候选窗位置、窗口管理器行为、不同 GPU 后端和不同平台字体仍需目标系统人工确认。
-像素基线只应在确认视觉变化符合预期后更新，不能用批量更新掩盖未知差异。
+GitHub 托管的 Linux x64 和 macOS arm64 任务验证全新环境中的下载、解包、构建、无窗口测试和示例编译。Windows、
+Linux 和 macOS 的真实窗口、输入法、文件对话框、无障碍桥、GPU 后端和字体仍需对应平台的交互式 runner 或人工检查。
 
-## 最近一次加固基线
+## 性能验证
 
-阶段一、二加固验收要求 GUI、SDL、examples、工具自测、严格增量 `cjcheck` 和文档链接检查全部通过；
-实际数量和性能数据以当前命令输出及忽略目录中的机器报告为准，不在文档中固化易过期数字。
-跨平台完成状态、最近一次完整要求—证据矩阵与未完成项见[下一代 GUI 框架完成度审计](../next-generation-completion-audit.md)。
+```text
+python .dev/cli.py bench run
+python .dev/cli.py bench suite --display --samples 5 --check --timeout 240
+python .dev/cli.py bench probe
+```
+
+性能数据只能在平台、架构、电源状态、构建配置和样本协议一致时比较。Linux 与 macOS 使用各自的
+`.dev/bench/baselines/<profile>`，不能复用 Windows 基线。
+
+新基线先通过 `--capture-baseline-candidate` 生成候选，审阅后再用 `--promote-baseline-candidate` 提升；提升后必须用
+另一批样本运行 `--check`。`bench probe` 使用阶段访问次数、同进程 A/B 和规模曲线判断更新粒度，不与普通耗时基线混用。
+
+## 需要人工确认的边界
+
+原生文件对话框、输入法候选窗位置、窗口管理器行为、不同 GPU 后端和跨平台字体必须在目标系统确认。像素基线只能在确认
+视觉变化符合预期后更新，不能用批量更新隐藏未知差异。外部链接可达性也由发布流程或人工检查。
+
+验证报告不固化容易过期的用例数量和耗时；这些数据以当前命令输出及 `target/dev/` 下的机器报告为准。

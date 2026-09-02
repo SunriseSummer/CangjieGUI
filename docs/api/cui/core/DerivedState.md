@@ -2,7 +2,7 @@
 
 # DerivedState
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 由一个或多个源计算出的只读可观察状态，用 [`derive`](functions.md#derive)、[`deriveStates`](functions.md#derivestates) 或 [`Observable.map`](Observable.md#map) 创建。求值惰性且带缓存：仅当某个源的修订号在两次读取之间变化才重新计算。没有公开构造函数。
 
@@ -20,30 +20,17 @@ public open class DerivedState<T> <: Observable<T>
 
 ## 说明
 
-派生遵循拉取模型，与可重复执行或 retained 命中的声明式 UI 匹配。由内置 `State`、`Binding` 和 `DerivedState` 组成的图先用 State 写入 epoch 证明“自上次读取后没有任何 State 写入”；证明成立时缓存命中为常数时间，epoch 变化才比较完整源 revision 向量。自定义 `Observable` 没有这项内部能力时始终逐源比较，不牺牲兼容正确性。
+`DerivedState` 按需计算。第一次读取会执行计算函数；之后只要源状态没有变化，就直接返回缓存。源变化时先标记结果可能过期，直到下一次读取才重新计算。
 
-框架依赖收集把稳定 `DerivedState` 当作一等惰性节点：作用域只提交一条到该节点的边，节点在边存续期间向声明源订阅“已失效”，上游变化只标脏作用域，不执行 `compute`；下一次真正读取才求值。嵌套派生沿失效边递归连接，自定义 `Observable` 通过其 `observe` 协议加入。若派生是在正在执行的 build/phase 内临时创建，State-backed 节点改用直接源边，使下一次重建可按 State identity 复用既有订阅，而不会围绕短命派生对象每帧拆装整组监听器。这个自适应差异对应用透明，缓存和失效语义相同。
+框架会把稳定的派生状态作为一个依赖节点管理。读取派生值的界面只依赖这个节点，不必分别登记每个上游状态。上游变化只使相关界面失效，不会提前执行计算函数。
 
-需要在 build 中声明、但希望跨重建保留的派生可放进 [`remember`](functions.md#remember)。remember 工厂内创建的
-派生被内核识别为长期节点，因此保持单聚合边与惰性计算，不需要把对象手工提升到页面模型字段；动态源拓扑应让
-显式 remember key 随拓扑版本变化，或重建对应 `Keyed` 子树。
+在构建函数中长期使用复杂派生图时，可以用 [`remember`](functions.md#remember) 保留对象。普通一次性派生无需手工缓存。源集合会在创建派生状态时固定；之后替换调用方数组中的元素不会改变既有依赖，需要换源时应创建新的派生状态。
 
-数组重载在创建时快照源数组，形成固定的依赖积；之后修改调用方数组不会偷偷改写既有派生的依赖拓扑。需要换源时应创建新的 `DerivedState`。推送式的 [`observe`](#observe) 只在返回的观察句柄存续期间连接失效边，关闭时以逆序清理全部上游；中途连接失败会回滚已连接的边。同一个调度事务修改多个源时，观察回调推迟到所有源通知稳定后并去重，只看到事务最终组合值。每个 observation 持有一个稳定、不可变的 deferred continuation，事务队列只引用它，不为每次失效重新创建 action。
+`derive` 支持一至五个不同类型的固定源，也支持同类型 `Observable` 数组。直接持有 `Array<State<T>>` 时使用 `deriveStates`。超过五个不同类型的源时，通常应先把强相关事实整理成有业务含义的模型，而不是继续嵌套无名派生层。
 
-固定重载接受一至五个不同类型的源，并始终生成一个融合节点；四/五源表单或视图模型不需要先构造中间派生。
-动态数量入口使用同类型数组，因为当前仓颉没有可用于公开 API 的可变泛型参数包。超过五个异构事实时优先把强相关事实
-建模为一个领域值；不要为了绕过元数机械制造深层派生链。
+默认派生状态在上游可能变化时向下游传播失效。若计算结果经常保持不变，可以给 `map` 或固定源 `derive` 传比较策略，也可以对已有派生调用 [`distinct`](#distinct)。比较和投影应快速、纯净；昂贵计算应通过更合适的状态边界或缓存解决。
 
-固定一至五源都可在 `derive` 调用中传命名 `policy:`，直接生成带结果等价关系的融合节点。它与先
-`derive(...).distinct(policy)` 的可观察结果相同，但不创建第二份派生 identity、revision tracker 或失效转发边。已有
-派生和动态数组仍可调用 `.distinct(policy)`。
-
-默认节点只传播“上游可能变化”，保持完全惰性。通过 `Observable.map(..., policy:)` 创建或调用 [`distinct`](#distinct)
-得到的节点把结果空间投影到策略定义的等价类：没有订阅者时仍完全惰性；存在 retained/phase 依赖或显式观察者时，
-上游提交会计算一次纯投影，只有结果跨越等价类才推进本节点 revision 并向下游传播。等价候选不会替换当前缓存代表元。
-这适合从较大模型选择便宜字段；昂贵投影应先拆细源或先做可复用的缓存派生，避免把重计算成本搬到每次上游提交。
-
-全 State-backed 数组派生的第一次求值把 revision 与 value 合并为一次源序遍历；直接 State 还能在一次线程归属/依赖检查后返回同一时刻的 `(value, revision)`。`deriveStates` 为 `Array<State<T>>` 保留静态专用路径；`Array<Observable<T>>` 在运行时全为 State 时也会在构造时自动正规化到同一路径。采样前的 State 写入 epoch 与逐源 revision 共同构成计算前像，只有 `compute` 成功才提交；计算或 getter 内发生的写入仍会使下一次读取重算。含自定义 `Observable` 的数组继续保持“先采全部 revision、再读全部 value”的兼容顺序。
+显式观察同样遵守事务规则：一个事务修改多个源时，回调只在全部源稳定后运行一次，并看到最终组合结果。关闭观察句柄会取消全部上游订阅。
 
 ## 示例
 
@@ -116,9 +103,7 @@ public func get(): T
 
 ### observe
 
-观察后续变更，返回可取消的观察句柄。回调收到 `(旧值, 新值)`；对各源的订阅和稳定 deferred continuation
-只维持到观察句柄关闭。一个事务中重复失效按 observation identity 去重；回调重入写源时，同一 continuation
-可在当前派发完成后再次进入工作表。
+观察后续结果变化，返回可取消的观察句柄。回调收到 `(旧值, 新值)`。同一事务中的多次源变化会合并，回调只看到稳定后的结果；关闭句柄会同时取消全部上游订阅。
 
 ```cangjie
 public func observe(callback: (T, T) -> Unit): StateObservation<T>
@@ -136,9 +121,7 @@ public func observe(callback: (T, T) -> Unit): StateObservation<T>
 public func distinct(policy: StateMutationPolicy<T>): DerivedState<T>
 ```
 
-在当前派生图外增加一个观察商节点。`policy` 必须快速、确定、无副作用并满足等价关系；等价的新结果不替换缓存、
-不推进 revision、不调用观察者，也不把 retained scope 标脏。已有单源投影优先直接使用 `map(transform, policy:)`，
-可少一个节点；`distinct` 适合过滤已经组合好的多源派生图。
+为当前派生结果增加比较策略。`policy` 必须快速、确定、无副作用，并满足等价关系。策略认为新旧结果相同时，不替换缓存、不推进修订号，也不通知下游。单源投影优先直接使用 `map(transform, policy:)`；`distinct` 适合已经组合好的多源派生。
 
 ## 另请参阅
 
@@ -146,5 +129,5 @@ public func distinct(policy: StateMutationPolicy<T>): DerivedState<T>
 - [deriveStates](functions.md#derivestates) — `Array<State<T>>` 的静态专用入口。
 - [remember](functions.md#remember) — 在声明式 build 中保留稳定派生身份。
 - [Observable.map](Observable.md#map) — 单源派生的便捷形式。
-- [StateMutationPolicy](StateMutationPolicy.md) — 定义结果的观察等价类。
+- [StateMutationPolicy](StateMutationPolicy.md) — 定义哪些结果在观察意义上相同。
 - [State](State.md) — 可写的源状态。

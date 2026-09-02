@@ -31,27 +31,44 @@ package docexample
 
 import cui.*
 
+func save(saved: State<Int64>): Unit {
+    saved.value = saved.value + 1
+}
+
 main(): Unit {
     let app = DesktopApp(WindowSpec("编辑器", 700, 460))
     app.run {
         let draft = rememberState<String>("draft") {"会议纪要\n\n- 待办事项"}
         let saved = rememberState<Int64>("saved") {0}
-        VStack(spacing: 0.vp) {
-            MenuBar(
-                [
-                    Menu(
-                        "文件",
-                        [
-                            MenuItem("保存", {=> saved.value = saved.value + 1}, shortcut: "Ctrl+S"),
-                            MenuItem.separator(),
-                            MenuItem("退出", {=> ()}, enabled: false)
-                        ]
-                    ),
-                    Menu("帮助", [MenuItem("关于", {=> ()})])
-                ]
-            )
-            TextArea(draft).autofocus().flex()
-            Label("字符数 ${draft.value.size} · 已保存 ${saved.value} 次").muted().padding(10.vp)
+        EventHandler(onEvent: {ctx, event =>
+            match (event) {
+                case UiEvent.KeyDown(Key.Letter(code), _) =>
+                    if (code == UInt8(83) && ctx.eventModifiers().command) {
+                        save(saved)
+                        true
+                    } else {
+                        false
+                    }
+                case _ => false
+            }
+        }) {
+            VStack(spacing: 0.vp) {
+                MenuBar(
+                    [
+                        Menu(
+                            "文件",
+                            [
+                                MenuItem("保存", {=> save(saved)}, shortcut: "Ctrl+S"),
+                                MenuItem.separator(),
+                                MenuItem("退出", {=> ()}, enabled: false)
+                            ]
+                        ),
+                        Menu("帮助", [MenuItem("关于", {=> ()})])
+                    ]
+                )
+                TextArea(draft).autofocus().flex()
+                Label("字符数 ${draft.value.size} · 已保存 ${saved.value} 次").muted().padding(10.vp)
+            }
         }
     }
 }
@@ -59,27 +76,9 @@ main(): Unit {
 
 ### 4. 只补真正全局的按键
 
-`UiEvent.KeyDown` 的第二个载荷是 repeat `Bool`，不是修饰键。桌面宿主会先取空 SDL 队列再派发，稍后查询 `Keyboard.modifiers()` 可能已经看到 KeyUp 后的全局状态。组合键应使用 `EventHandler` 的上下文感知回调，从 `ctx.eventModifiers()` 读取与当前事件一起保存的快照；字母键以 `Key.Letter` 携带大写 ASCII 码：
+`UiEvent.KeyDown` 的第二个载荷是 repeat `Bool`，不是修饰键。桌面宿主会先取空 SDL 队列再派发，稍后查询 `Keyboard.modifiers()` 可能已经看到 KeyUp 后的全局状态。完整程序使用 `ctx.eventModifiers()` 读取随当前事件保存的修饰键快照；`command` 在 Ctrl 或 GUI(Command) 任一按下时为真。
 
-```cangjie role=variation
-EventHandler(onEvent: {ctx, event =>
-    match (event) {
-        case UiEvent.KeyDown(Key.Letter(code), _) =>
-            let modifiers = ctx.eventModifiers()
-            if (code == UInt8(83) && modifiers.command) { // ASCII 'S'
-                model.save()
-                true
-            } else {
-                false
-            }
-        case _ => false
-    }
-}) {
-    TextArea(model.body)
-}
-```
-
-`modifiers.command` 在 Ctrl 或 GUI(Command) 任一按下时为真，适合跨平台快捷键。关键是读取事件时快照、只消费确认命中的组合键，并把其他事件继续交给子树。若 Modal 已打开，根级处理器还必须先检查模态状态，详见[键盘与焦点](keyboard-and-focus.md)。纯逻辑测试使用 `WidgetTestHost.frameRecords` 注入带 modifiers 的 `UiEventRecord`，不要依赖测试机器的当前键盘状态。
+关键是只消费确认命中的组合键，并把其他事件继续交给子树。若 Modal 已打开，根级处理器还必须先检查模态状态，详见[键盘与焦点](keyboard-and-focus.md)。纯逻辑测试使用 `WidgetTestHost.frameRecords` 注入带 modifiers 的 `UiEventRecord`，不要依赖测试机器的当前键盘状态。
 
 ## 确认结果
 
@@ -97,7 +96,7 @@ EventHandler(onEvent: {ctx, event =>
 
 ## 相关 API
 
-[TextArea](../../api/cui/text/TextArea.md)、[MenuBar](../../api/cui/controls/MenuBar.md)、[MenuItem](../../api/cui/controls/MenuItem.md)、[EventHandler](../../api/cui/core/EventHandler.md)、[UiContext](../../api/cui/core/UiContext.md#eventmetadata--eventmodifiers) 与 [WidgetTestHost](../../api/cui/testing/WidgetTestHost.md)。
+[TextArea](../../api/cui/text/TextArea.md)、[MenuBar](../../api/cui/controls/MenuBar.md)、[MenuItem](../../api/cui/controls/MenuItem.md)、[EventHandler](../../api/cui/core/EventHandler.md)、[UiContext](../../api/cui/core/UiContext.md#eventmetadata-eventmodifiers) 与 [WidgetTestHost](../../api/cui/testing/WidgetTestHost.md)。
 
 ## 下一步
 

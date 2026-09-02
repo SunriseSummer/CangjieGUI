@@ -2,7 +2,7 @@
 
 # Length
 
-`cui.core` 包中的 public struct
+位于 `cui.core` 包的公开结构体
 
 带显式单位的一维尺寸，写作 `100.px`、`24.vp` 或 `15.fp`。单位随类型携带，公共尺寸 API 因此不产生"这个数是什么单位"的歧义；数值到逻辑像素的换算推迟到拿着活动缩放的 [`UiContext.resolve`](UiContext.md#resolve)，从不在构造时发生。
 

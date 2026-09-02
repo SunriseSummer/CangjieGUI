@@ -2,7 +2,7 @@
 
 # LazyViewportController
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 惰性视口的外部滚动控制器。持有可观察偏移，并能按当前索引或稳定 key 显示条目而无需调用方知道累计高度。控制器应放在应用模型或 `rememberState` 之外的稳定对象中，不要每帧重建。
 

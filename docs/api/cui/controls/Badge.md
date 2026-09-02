@@ -2,7 +2,7 @@
 
 # Badge
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 紧凑的状态标签：圆角胶囊底上画同色系文本，纯展示、不响应交互。用于状态、分类、计数与标记；配色由 [`BadgeKind`](BadgeKind.md) 决定，胶囊贴合文本宽度、高度固定 22 逻辑像素。
 

@@ -2,7 +2,7 @@
 
 # Radii
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 圆角半径尺度，虚拟像素：小档给标签与输入框、中档给卡片、大档给醒目表面，`pill` 收成全圆头。传给 `background(color, radius)`、`border(...)`、`shadow(...)`、`gradientBackground(...)` 等修饰器，让整个界面的圆角保持一致。渲染器会把半径限制为较短边的一半，因此超大值自然呈现为胶囊形或圆形。全静态字段，不可实例化。
 

@@ -2,7 +2,7 @@
 
 # SplitView
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 用一根可拖动分隔条把空间分给两个窗格的容器，让用户在侧栏与文档、列表与详情之间自行调配空间。`axis` 决定切分方向：`Horizontal` 左右并排（分隔条竖直、左右拖），`Vertical` 上下堆叠（分隔条水平、上下拖）。
 

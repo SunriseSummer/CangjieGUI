@@ -2,7 +2,7 @@
 
 # LengthInsets
 
-`cui.core` 包中的 public struct
+位于 `cui.core` 包的公开结构体
 
 四边各自携带单位的间距，供 padding 类 API 使用，布局时解析为逻辑像素的 `Insets`。[`Widget.padding`](Widget.md#padding) 与 [`VStack`](VStack.md)/[`HStack`](HStack.md) 的 `padding` 构造参数都以它存储边距；解析由 [`UiContext.resolve`](UiContext.md#resolve) 完成，每边限制在非负。
 

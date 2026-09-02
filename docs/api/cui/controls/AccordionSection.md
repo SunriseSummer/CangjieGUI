@@ -2,7 +2,7 @@
 
 # AccordionSection
 
-`cui.controls` 包中的 public struct
+位于 `cui.controls` 包的公开结构体
 
 `Accordion` 折叠面板的一个分区描述：标题文本加正文的界面构建函数。它被 [`Accordion`](Accordion.md) 消费；正文只在分区展开时构建——折叠时不构建正文，其正文内的局部状态在收起后丢弃、重新展开时复位。
 

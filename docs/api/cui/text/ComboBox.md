@@ -2,7 +2,7 @@
 
 # ComboBox
 
-`cui.text` 包中的 public class
+位于 `cui.text` 包的公开类
 
 可输入的下拉组合框：在内嵌单行编辑框上浮出建议列表，输入即过滤；绑定文本就是控件的值，自由输入即使不匹配任何选项也被保留。它内嵌一个 [`TextField`](TextField.md)（因此继承完整编辑能力：光标、选区、撤销、剪贴板），建议列表通过与菜单、下拉共用的交互浮层 [`Overlay`](../core/Overlay.md) 浮出。
 

@@ -2,9 +2,9 @@
 
 # DesktopApp
 
-`cui.desktop` 包中的 public class
+位于 `cui.desktop` 包的公开类
 
-桌面应用对象：拥有 SDL 窗口并运行按需帧循环。输入、应用内 [`State`](../core/State.md) 失效、窗口缩放、DPI/设备重置、立即续帧或定时截止触发渲染；空闲时以最长 250 ms 的有界原生等待阻塞。输入造成的状态变化会在同一帧绘制前重新构建/布局，避免混合新旧状态。
+桌面应用对象：拥有一个 SDL 窗口，并运行按需更新的事件和渲染循环。输入、状态变化、窗口变化、动画或显式帧请求会触发工作；空闲时阻塞等待。输入修改状态后，应用会在本帧绘制前完成必要的重建和布局，避免显示新旧状态混合的界面。
 
 ## 声明
 
@@ -12,15 +12,19 @@
 public class DesktopApp
 ```
 
-## 说明
+## 运行规则
 
-帧循环统一处理焦点、悬停、连续点击和指针事件。事件先交给稳定布局登记的浮层，再进入普通组件树。除 [`post`](#post) 明确用于跨线程投递外，`DesktopApp` 的资源、窗口、对话框、批处理和 `run` API 都封闭在首次使用它们的 UI 线程；错误线程调用抛出 `IllegalStateException`。一次输入或 `post` 动作内的多次写由 [`batch`](#batch) 同类事务合并；布局若持续写状态，最多稳定化三轮并把后续工作留给下一帧，避免无限循环。开启 vsync 时呈现本身节奏控制，不再叠加固定延时。`--profile` 输出阶段均值、P50/P90/P95/P99/最大值、稳定化次数、触发来源、实际局部 damage 帧数和文本探针，并附一条可采集的 `@@FRAME_PROFILE` 键值记录。
+- 应用统一管理焦点、悬停、连续点击、指针捕获和浮层。浮层先于普通组件树接收命中的事件。
+- 除 [`post`](#post) 外，窗口、资源、文件对话框、批处理和 `run` 都只能在应用的 UI 线程调用；错误线程会抛出 `IllegalStateException`。
+- 一次输入或 `post` 动作中的多次状态写入会作为一个事务提交。布局代码如果持续修改状态，应用最多在本帧尝试三轮稳定化，剩余工作留到下一帧，避免无限循环。
+- 开启垂直同步时，呈现过程负责帧节奏；应用不会再叠加固定延时。
+- `--profile` 输出构建、布局和绘制耗时分布、稳定化次数、触发来源、局部重绘次数和文本测量数据。
 
-纯 State 驱动、无交互/浮层/Frame 订阅的安全帧会消费 retained scope 的布局范围，在持久超采样目标上局部清理并
-只重放相交 display list。输入、计时/动画、窗口变化、root 阶段 State、damage 过大或渲染器拒绝时自动全帧；
-`lastFrameUsedPartialDamage` 报告后端实际选择。测试工具可传 `--cui-force-full-retained` 关闭所有 retained 命中，
-以便与默认增量截图做正确性差分；`--cui-disable-retained-damage` 只关闭局部 damage、保留构建和命令缓存。
-两个诊断开关都是排障/对照逃生口，不应作为常规性能配置。
+## 增量绘制
+
+只有状态变化、没有输入、浮层或逐帧订阅的安全帧，可以只清理受影响区域并重放相交的绘制命令。输入、动画、窗口变化、根级依赖、变化区域过大或渲染器不支持时，会自动退回全帧绘制。
+
+[`lastFrameUsedPartialDamage`](#lastframeusedpartialdamage) 返回后端最终是否采用局部重绘。`--cui-force-full-retained` 用于比较默认增量执行和强制全量执行的结果；`--cui-disable-retained-damage` 只关闭局部重绘，保留构建和绘制命令缓存。两者都是测试和排错开关，不是常规性能配置。
 
 ## 示例
 
@@ -72,7 +76,7 @@ main(): Unit {
 | [`openFileDialog(...)`](#openfiledialog) | 发起系统"打开文件"对话框，返回可轮询的请求。 |
 | [`saveFileDialog(...)`](#savefiledialog) | 发起系统"保存文件"对话框。 |
 | [`openFolderDialog(...)`](#openfolderdialog) | 发起系统"选择文件夹"对话框。 |
-| [`run(...)`](#run) | 进入帧循环直到窗口关闭；`body` 每渲染帧重建视图树。 |
+| [`run(...)`](#run) | 进入帧循环直到窗口关闭；`body` 描述根界面，框架按依赖重建受影响路径。 |
 
 ## 构造函数
 
@@ -160,10 +164,7 @@ public func clearRememberedState(): Unit
 public func batch(action: () -> Unit): Unit
 ```
 
-在 UI 线程执行原子动作：多次 `State` 写入只推进一次应用失效代数；同一状态的观察通知合并为
-`(批次前值, 最终值)`，派生观察者在全部源稳定后运行一次。观察者失败不会截断其后的 State/Derived 依赖失效；
-框架保留首错、继续稳定事务，再把异常交还调用方。观察者中的嵌套批次加入当前不动点，仍只在最外层提交。
-跨线程调用会快速失败，后台结果应使用 `post`。
+在 UI 线程执行一个原子动作。多次状态写入只产生一次应用更新；同一状态的观察通知合并为“批次前值 → 最终值”，派生观察者在全部源稳定后运行一次。某个观察者失败不会阻止其余依赖更新，框架完成事务后再抛出最先发生的异常。嵌套 `batch` 仍由最外层统一提交。后台结果应使用 [`post`](#post)，不要跨线程调用本方法。
 
 ### retainedDiagnostics
 
@@ -171,8 +172,7 @@ public func batch(action: () -> Unit): Unit
 public func retainedDiagnostics(): RetainedGraphDiagnostics
 ```
 
-返回最近一次已提交 retained 图的稳定结构、dirty 原因、分相依赖/命中和 effect 计数。应从 `FrameHandler`、
-事件回调或 `post` 动作调用；构建尚未提交时调用抛 `IllegalStateException`，跨 UI 线程调用同样被拒绝。
+返回最近一次已提交增量执行图的结构、失效原因、各阶段依赖与命中，以及生命周期 effect 数量。应从 `FrameHandler`、事件回调或 `post` 动作调用；尚无已提交构建或从错误线程调用时抛出 `IllegalStateException`。
 
 ### lastFrameUsedPartialDamage
 
@@ -180,17 +180,11 @@ public func retainedDiagnostics(): RetainedGraphDiagnostics
 public func lastFrameUsedPartialDamage(): Bool
 ```
 
-返回当前或最近完成绘制的帧是否**实际**采用自动 retained 局部 damage。框架计划了区域但 Renderer 因没有兼容
-持久目标等原因回退全帧时返回 `false`。应从 UI 线程的 widget draw、事件或 `post` 动作读取；跨线程调用被拒绝。
-此值用于剖析和 E2E 断言，不应改变业务 UI。
+返回当前或最近完成的帧是否**实际**采用局部重绘。即使框架计算出变化区域，渲染器也可能退回全帧，此时返回 `false`。只能从 UI 线程的绘制、事件或 `post` 动作读取。该值用于性能分析和端到端断言，不应改变业务界面。
 
 ### setAccessibilityAdapter
 
-在 UI 线程安装 [`AccessibilityAdapter`](../core/AccessibilityAdapter.md)。首次调用立即发送当前语义树 bootstrap；
-以后每次稳定布局提交只发送真实增量。Windows 桌面应用会自动保留内建 UI Automation provider；这里安装的
-adapter 作为并行观察者接收同一事务，不会替换或关闭原生 provider。方法不接管外部 adapter 的资源生命周期。
-每个分支持有独立 revision 游标：安装新观察器只向它重放当前快照，不会让已经同步的原生 provider 收到重复
-bootstrap。观察器拒绝 bootstrap 时只隔离该观察器，同时把原始异常重新抛给调用者。
+在 UI 线程安装 [`AccessibilityAdapter`](../core/AccessibilityAdapter.md)。安装时先向新适配器发送当前完整语义树，之后只发送变化。Windows 内建的 UI Automation 仍然保留；外部适配器作为独立观察者接收相同更新，不会替换或关闭原生桥。方法也不负责关闭外部适配器。初始同步失败时只隔离该适配器，并把原异常抛给调用方。
 
 ```cangjie
 public func setAccessibilityAdapter(adapter: AccessibilityAdapter): Unit
@@ -198,9 +192,7 @@ public func setAccessibilityAdapter(adapter: AccessibilityAdapter): Unit
 
 ### setAccessibilityFailureHandler
 
-在 UI 线程安装无障碍故障通知回调。原生桥、外部观察器和回调本身分别形成独立故障域；某一分支抛异常后只
-隔离该分支，其余分支和帧循环继续工作。回调在语义提交或原生动作排空边界同步执行，必须快速、非阻塞，适合
-记录遥测或更新轻量诊断状态。回调自身抛异常时会自动卸载，其异常仍可由 `takeAccessibilityFailures` 取得。
+在 UI 线程安装无障碍故障通知回调。原生桥、外部适配器和故障回调彼此隔离；某一分支失败时，其余分支和帧循环继续运行。回调与语义提交同步执行，必须快速且不能阻塞，适合记录日志或更新轻量诊断状态。回调自身失败时会被卸载，其异常仍可由 `takeAccessibilityFailures` 取得。
 
 ```cangjie
 public func setAccessibilityFailureHandler(handler: (AccessibilityFailure) -> Unit): Unit

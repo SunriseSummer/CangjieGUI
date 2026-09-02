@@ -2,7 +2,7 @@
 
 # Checkbox
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 带文本标签的勾选框，双向绑定一个 `Bindable<Bool>`。框内按下并抬起（或聚焦后 Enter/Space）翻转绑定值；勾选填充块以弹簧动画从中心放大。
 

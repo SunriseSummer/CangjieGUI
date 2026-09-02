@@ -2,7 +2,7 @@
 
 # SegmentedControl
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 把互斥选项排成一行等宽段、由滑动指示块标记当前选中的单选控件。点击任一段即切换并更新绑定下标；控件是一个焦点项，聚焦后 Left/Right 步进选中。
 

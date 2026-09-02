@@ -2,7 +2,7 @@
 
 # Dropdown
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 下拉选择框：闭合时显示当前项，展开时把选项列表浮到组件树之上，双向绑定选中下标 `Bindable<Int64>`。点击一项即选中并关闭；点击列表外或按 Escape 撤销；列表经交互浮层浮出，点击不会被下方控件截走。
 

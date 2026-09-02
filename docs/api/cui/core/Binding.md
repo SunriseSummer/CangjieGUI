@@ -2,7 +2,7 @@
 
 # Binding
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 指向另一个可绑定值中某个字段的双向绑定，用 [`Bindable.project`](Bindable.md#project) 或 Store 的 `binding` 创建。读取时从原值取出该字段；写入时用 Lens 或 Action 回到原值，因此数据源始终只有一个。策略重载可让读取侧只观察焦点值的等价类，而不削弱写权限边界。没有公开构造函数。
 
@@ -81,9 +81,9 @@ public prop revision: UInt64
 
 ### update
 
-用 `transform` 修改当前字段。对于链式 `project` 产生的嵌套 Binding，框架组合所有投影 setter，并只读取、写入根
-Bindable 一次；通过组合 Lens 创建时则复用 Lens 的逐层一次 endomorphism 路径。同一次修改因此基于一个模型快照，
-不会因 Lens 深度重复读取前缀。变换或任一投影抛异常时根值不写回。
+用 `transform` 修改当前字段。对于链式 `project` 产生的嵌套 Binding，框架会组合所有写回函数，并且只读取、写入根
+`Bindable` 一次。通过组合 Lens 创建时，每层 Lens 也只访问一次。同一次修改始终基于同一个模型快照；变换或任一投影
+抛异常时，根值不会写回。
 
 ```cangjie
 public func update(transform: (T) -> T): Unit

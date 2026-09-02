@@ -2,7 +2,7 @@
 
 # PointerEventScope
 
-`cui.core` 包中的 public enum
+位于 `cui.core` 包的公开枚举
 
 声明 Widget 子树是否可能观察父容器分配矩形之外的指针事件。默认兼容值不会改变既有自定义组件；只有能够证明边界约束的子树才应选择布局范围。
 
@@ -14,9 +14,11 @@ public enum PointerEventScope {
 ```
 
 - `Unbounded`：兼容默认值。父容器必须保留该子树的路由机会，适合全局手势、跨边界协调或尚未声明命中契约的自定义 Widget。
-- `LayoutBounds`：子树的全部指针处理都局限在父容器分配的矩形内。`VStack`、`HStack`、`Grid`、`FlowRow` 和 `ZStack` 可用有序 AABB 树剪掉不相交的 z 序片段。
+- `LayoutBounds`：子树只处理父容器分配矩形内的指针事件。`VStack`、`HStack`、`Grid`、`FlowRow` 和 `ZStack`
+  可以跳过与指针位置不相交的子树。
 
-活动按压或拖拽期间，框架绕过空间剪枝，保证移出原矩形后的 MouseMove/MouseUp 仍到达捕获方。完全重叠的候选仍按逆 z 序逐个执行：如果最深节点才消费，Ω(n) 是事件语义本身，而不是索引缺陷。
+按压或拖动期间，框架不会按布局矩形跳过事件，保证移出原区域后的 `MouseMove` 和 `MouseUp` 仍到达开始交互的组件。
+完全重叠的候选仍按从上到下的显示顺序处理，直到事件被消费。
 
 自定义组件可覆盖 [`Widget.pointerEventScope`](Widget.md#pointereventscope)，也可在实例上使用 [`pointerEventsWithinLayout`](Widget.md#pointereventswithinlayout) 修饰器。错误声明可能跳过矩形之外本应执行的处理器。
 

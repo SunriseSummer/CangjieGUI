@@ -2,7 +2,7 @@
 
 # ToastKind
 
-`cui.controls` 包中的 public enum
+位于 `cui.controls` 包的公开枚举
 
 Toast 通知的类别，决定通知卡片左侧强调条的颜色。作为 [`Toaster.show`](Toaster.md#show) 的 `kind` 参数传入，由 [`ToastLayer`](ToastLayer.md) 渲染时取色：`Info` 用主题强调色，`Error` 用主题危险色，`Success` 与 `Warning` 用固定的绿与琥珀色。
 

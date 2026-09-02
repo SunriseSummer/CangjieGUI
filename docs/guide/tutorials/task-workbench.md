@@ -213,21 +213,7 @@ examples/workbench/
 
 `model.cj` 不导入窗口或绘制 API；`views.cj` 不直接读写文件；`main.cj` 不承载业务规则。模型检查只需创建 `WorkbenchModel`、调用动作并断言选择仍指向可见任务，无需启动 GUI。执行下面的命令，才能证明拆分后的包名、可见性和入口仍然完整：
 
-随附项目中的检查直接读写当前文档绑定，证明“选择改变后编辑的是新对象”这一边界不依赖 GUI：
-
-```cangjie role=variation
-@Test
-func projectBindingReadsAndWritesSelectedDoc(): Unit {
-    let model = WorkbenchModel()
-    @Expect(model.currentTitle(), "产品路线图")
-
-    model.selected.value = 1
-    @Expect(model.currentTitle(), "会议纪要")
-
-    model.body.value = "# 改写\n新内容"
-    @Expect(model.docs.value[1].body.contains("改写"))
-}
-```
+随附项目中的模型测试会直接切换选择并写入当前任务，证明“选择改变后编辑的是新对象”这一边界不依赖 GUI。测试调用项目自身的公开模型动作，不复制另一套示例模型。
 
 ## 确认结果
 

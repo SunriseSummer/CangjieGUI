@@ -2,7 +2,7 @@
 
 # Icon
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 以方形边长绘制的非交互矢量图标，默认 18 vp、取主题文字色。图标名来自 sdl 的 `IconName`；颜色可用 [`foregroundColor`](#foregroundcolor) 覆盖。需要可点击的图标时用 [`IconButton`](IconButton.md)。
 

@@ -2,7 +2,7 @@
 
 # SemanticsNode
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 一个已解析的无障碍节点，包含稳定字符串 id、[`Semantics`](Semantics.md) 属性、布局边界、可见边界和支持的 [`SemanticsAction`](SemanticsAction.md) 列表。
 

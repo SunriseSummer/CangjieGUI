@@ -2,7 +2,7 @@
 
 # LazyRow
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 只构建视口附近列的定列宽水平滚动条带，是 [`LazyColumn`](LazyColumn.md) 的水平对应物。条目按索引惰性（按需）构建，上千项的胶片带以一屏的成本滚动；滚轮直接驱动水平滚动，内容溢出时底缘出现滚动条。
 
@@ -145,11 +145,7 @@ public static func of<T>(
 
 **返回值** `LazyRow` — 配置好的条带。
 
-```cangjie
-LazyRow.of(model.photosState, 160.0, key: {p => p.id}) {
-    photo => photoCard(photo)
-}
-```
+例如，可把照片数组状态传给 `LazyRow.of`，设置 160 逻辑像素列宽，并用照片 ID 作为稳定 key。
 
 ### measure
 

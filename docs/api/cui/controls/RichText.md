@@ -2,7 +2,7 @@
 
 # RichText
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 行内多样式文本组件：把一串 [`RichSpan`](RichSpan.md)（配色、加粗、变字号的文本段与行内图标）排在同一行内，超出可用宽度自动换行到任意多行。是单一样式 [`Label`](../core/Label.md) 的多样式、带图标对应物，统计大数字、更新日志、可点击链接等混排文本都由它承担。
 

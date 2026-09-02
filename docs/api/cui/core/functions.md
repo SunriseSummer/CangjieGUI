@@ -6,16 +6,13 @@
 
 ### stateMutationPolicy
 
-把一个等价比较闭包包装为 [`StateMutationPolicy`](StateMutationPolicy.md)。比较函数应快速、确定、无副作用，
-并满足自反、对称、传递；它描述的是观察等价类，不是输入校验。
+用比较函数创建 [`StateMutationPolicy`](StateMutationPolicy.md)。比较函数应快速、稳定、没有副作用，并满足自反、对称和传递。它只判断两个值对观察者来说是否相同，不负责输入校验。
 
 ```cangjie
 public func stateMutationPolicy<T>(equivalent: (T, T) -> Bool): StateMutationPolicy<T>
 ```
 
-```cangjie
-let byIdentity = stateMutationPolicy<Item>({previous, current => previous.id == current.id})
-```
+例如，可只比较 `Item.id`，让同一业务对象的其他字段不触发该观察路径。被忽略字段的变化也不会传播，因此应谨慎选择比较范围。
 
 ### structuralEqualityPolicy
 
@@ -25,9 +22,7 @@ let byIdentity = stateMutationPolicy<Item>({previous, current => previous.id == 
 public func structuralEqualityPolicy<T>(): StateMutationPolicy<T> where T <: Equatable<T>
 ```
 
-```cangjie
-let page = State<Int64>(1, policy: structuralEqualityPolicy<Int64>())
-```
+例如，把该策略传给 `State<Int64>` 后，重复写入同一页码不会通知观察者。
 
 ### neverEqualPolicy
 
@@ -48,21 +43,13 @@ public func diagnoseStateMutationPolicy<T>(
 ): DiagnosedStateMutationPolicy<T>
 ```
 
-```cangjie
-let policy = diagnoseStateMutationPolicy<Int64>(structuralEqualityPolicy<Int64>())
-let page = State<Int64>(1, policy: policy)
-page.value = 1
-let snapshot = policy.diagnostics()
-```
+把返回策略传给 `State`、派生状态或 Store 选择器，再用 `diagnostics()` 读取比较次数、结果和耗时。
 
 ### derive
 
-返回从一到多个源计算出的只读派生状态。十一重载包含：一至五个可异构的固定源、这些固定源各自带命名
-`policy:` 的融合结果商，以及同类型
-`Observable` 的数组形态（源数量动态或超过固定元数时用——例如把一组逐项计数器聚合成总数）。固定四/五源仍只
-创建一个融合派生节点，不需要嵌套中间 `DerivedState`。`compute` 按源序收到当前值。数组重载会在创建时快照源数组；
-派生实例的依赖拓扑固定，之后修改调用方数组不改变它，需要换源时请创建新的派生实例。运行时全为 `State` 的擦除数组
-会在构造时自动转入专用采样路径，已有调用无需迁移。数组结果需要商映射时在构造结果上调用 `.distinct(policy)`。
+从一个或多个可观察值创建只读派生状态。固定重载接受一至五个不同类型的源；源数量动态或类型相同时可以传数组。`compute` 按参数顺序收到各源当前值。
+
+数组中的源会在创建时固定。之后替换调用方数组元素不会改变既有派生状态，需要换源时应重新创建。固定源重载可传 `policy:`，只在计算结果真正变化时通知下游；数组结果可继续调用 `.distinct(policy)`。
 
 ```cangjie
 public func derive<A, T>(source: Observable<A>, compute: (A) -> T): DerivedState<T>
@@ -164,21 +151,12 @@ public func derive<A, B, C, D, E, T>(
 
 **返回值** [`DerivedState`](DerivedState.md)`<T>` — 惰性、带缓存的只读派生值；只有源修订号变动才重算。
 
-```cangjie
-let subtotal = derive<Int64, Int64, Int64>(price, quantity, {p, q => p * q})
-```
-
-```cangjie
-let canSubmit = derive(name, accepted, online, pending,
-    {text, ok, connected, requests => !text.isEmpty() && ok && connected && requests == 0},
-    policy: structuralEqualityPolicy<Bool>())
-```
+例如，价格和数量可以派生出小计；名称、协议勾选、联网状态和待处理数量可以共同派生出“允许提交”。结果是布尔值时，
+可传 `structuralEqualityPolicy<Bool>()` 跳过重复结果。
 
 ### deriveStates
 
-返回从同类型 `State` 数组计算出的只读派生状态。仓颉泛型数组不协变，直接持有
-`Array<State<A>>` 时使用此入口，无需先构造 `Array<Observable<A>>`。它在创建时快照源数组，并以静态
-`State` 路径采样 value/revision、建立失效边；语义与数组形态的 [`derive`](#derive) 相同。
+从同类型 `State` 数组创建只读派生状态。仓颉泛型数组不协变，因此直接持有 `Array<State<A>>` 时使用本函数，无需先转换为 `Array<Observable<A>>`。源数组会在创建时固定，其他行为与数组重载的 [`derive`](#derive) 相同。
 
 ```cangjie
 public func deriveStates<A, T>(sources: Array<State<A>>, compute: (Array<A>) -> T): DerivedState<T>
@@ -191,16 +169,7 @@ public func deriveStates<A, T>(sources: Array<State<A>>, compute: (Array<A>) -> 
 
 **返回值** [`DerivedState`](DerivedState.md)`<T>` — 惰性、带缓存的只读派生值。
 
-```cangjie
-let counters = [State<Int64>(1), State<Int64>(2), State<Int64>(3)]
-let total = deriveStates<Int64, Int64>(counters, {values =>
-    var result: Int64 = 0
-    for (value in values) {
-        result += value
-    }
-    result
-})
-```
+例如，可把 `Array<State<Int64>>` 传给 `deriveStates`，并在 `compute` 中遍历当前值求和。
 
 ### ForEach
 
@@ -216,9 +185,7 @@ public func ForEach<T>(items: Iterable<T>, key!: (T) -> String, body!: (T) -> Un
 - `key!`: `(T) -> String` — 逐项唯一且稳定的键。
 - `body!`: `(T) -> Unit` — 逐项界面构建函数。
 
-```cangjie
-ForEach(tasks, key: {task => task.id}) {task => taskRow(task)}
-```
+例如，任务列表可用 `task.id` 作为 key，并在 `body` 中声明对应任务行。
 
 ### ForEachIndexed
 
@@ -263,13 +230,11 @@ public func LazyGrid<T>(
 
 **返回值** [`LazyColumn`](LazyColumn.md) — 承载网格行的虚拟化列表。
 
-```cangjie
-LazyGrid(photos, 4, 160.0, spacing: 12.0, columnSpacing: 12.0) { photo => photoCell(photo) }
-```
+例如，照片墙可以设置 4 列、160 逻辑像素行高和 12 逻辑像素行列间距，再由 `item` 构建单元格。
 
 ### currentStateGeneration
 
-兼容诊断用的进程级原子状态写代数。任何 [`State`](State.md) 赋值都会推进它，但桌面循环不再依赖该全局值：每个应用由独立 [`FrameScheduler`](FrameScheduler.md) 判断失效，避免多窗口互相触发重建。运行中的状态绑定所属 UI 线程；后台结果应通过 [`DesktopApp.post`](../desktop/DesktopApp.md#post) 投递。
+返回兼容诊断使用的进程级状态写入计数。任何 [`State`](State.md) 赋值都会推进它，但桌面循环不依赖该全局值；每个应用由自己的 [`FrameScheduler`](FrameScheduler.md) 判断是否需要更新，多个窗口不会互相触发重建。
 
 ```cangjie
 public func currentStateGeneration(): UInt64
@@ -279,8 +244,7 @@ public func currentStateGeneration(): UInt64
 
 ### remember
 
-在活动声明式构建中保留任意稳定值。固定结构可用 keyless 重载；条件、循环和重排结构使用显式键，并结合
-[`Keyed`](Keyed.md) / `ForEach`。工厂只在首次成功挂载时执行，之后返回同一值；失败构建不会提交新值。
+在当前声明位置保留一个值。固定结构可省略键；条件、循环和重排结构应使用显式键，并结合 [`Keyed`](Keyed.md) 或 `ForEach`。工厂只在首次成功挂载时执行，之后返回同一个值；失败的构建不会提交新值。
 
 ```cangjie
 public func remember<T>(factory: () -> T): T
@@ -290,23 +254,16 @@ public func remember<T>(factory: () -> T): T
 public func remember<T>(key: String, factory: () -> T): T
 ```
 
-它适合控制器、格式化器、动画对象以及稳定 [`DerivedState`](DerivedState.md) 图。`remember` 只管理值的挂载身份，
-不会自动调用任意对象的 `close()`；需要确定清理的 `Resource` 使用 [`mountEffect`](#mounteffect) 或
-[`lifecycleEffect`](#lifecycleeffect)。remembered 派生在构造时被标记为长期节点，在 build/phase 依赖图中只提交
-一条惰性失效边。
+它适合控制器、格式化器、动画对象和稳定的 [`DerivedState`](DerivedState.md) 图。`remember` 不会自动调用对象的 `close()`；需要确定清理的 `Resource` 应使用 [`mountEffect`](#mounteffect) 或 [`lifecycleEffect`](#lifecycleeffect)。
 
-```cangjie
-let total = remember<DerivedState<Int64>> {
-    deriveStates<Int64, Int64>(counters, {values => values.size})
-}
-```
+例如，可用 `remember<DerivedState<Int64>>` 保留一次创建的派生状态，避免每次构建重复建立依赖图。
 
 **异常** `IllegalStateException` — 在活动构建之外调用；同一显式键重复；同一键/位置槽的值类型变化；keyless
 槽数量在仍挂载的同一作用域中变化。
 
 ### rememberState
 
-返回由活动 [`DesktopApp`](../desktop/DesktopApp.md) 构建保留的局部可写状态，是通用 [`remember`](#remember) 对 `State<T>` 的便捷封装。固定、无条件的声明可省略字符串键，按当前声明作用域中的位置槽保留；后续构建若增减同一位置作用域的槽数，框架拒绝整次构建并保留上次成功状态，避免同类型状态静默错位。条件、循环、插入、删除或重排内容使用显式键，并放进 [`Keyed`](Keyed.md) / `ForEach`，让标识独立于位置。
+返回由当前 [`DesktopApp`](../desktop/DesktopApp.md) 保留的局部 `State<T>`。固定、无条件的声明可省略键，按声明位置保存；同一作用域后续增减无键状态数量时，框架会拒绝该次构建，避免状态错位。条件、循环、插入、删除和重排内容应使用显式键，并放进 [`Keyed`](Keyed.md) 或 `ForEach`。
 
 ```cangjie
 public func rememberState<T>(initial: () -> T): State<T>
@@ -337,22 +294,14 @@ public func rememberState<T>(key: String, policy: StateMutationPolicy<T>, initia
 - `IllegalArgumentException` — `key` 为空。
 - `IllegalStateException` — 在活动构建之外调用；同作用域键重复；同键/位置槽值类型改变；keyless 位置槽数量在仍挂载的同一作用域中发生变化。
 
-```cangjie
-let query = rememberState<String>(structuralEqualityPolicy<String>()) {""}
-let selected = rememberState<Int64>(
-    "selected",
-    stateMutationPolicy<Int64>({previous, current => previous == current})
-) {-1}
-```
+无键重载适合固定位置，例如保留查询文本；动态结构应传稳定 key，例如 `selected`，并可同时指定状态比较策略。
 
 `policy` 与 `initial` 一样是首次创建配置；后续重建返回原 `State`，不会替换其策略。昂贵的自定义策略对象可先用
 [`remember`](#remember) 保留。未传策略的两个既有重载继续把每次赋值视为变化。
 
 ### mountEffect
 
-在当前声明身份挂载一次有清理能力的副作用。`setup` 不在 builder 执行中立即调用，而是在整个根构建体成功后
-准备；构建随后失败会关闭已准备资源且不替换旧 effect。边界卸载、应用清理或同键 effect 被替换时关闭返回的
-`Resource`。固定、无条件的声明可用 keyless 重载；条件、循环和重排结构使用显式键与 `Keyed`/`ForEach`。
+在当前声明身份挂载一次可清理资源。`setup` 在整次构建成功后执行；如果后续提交失败，新资源会被关闭，旧资源保持不变。声明卸载、应用关闭或同键 effect 被替换时，框架关闭返回的 `Resource`。固定结构可省略键；动态结构应使用显式键和 `Keyed` 或 `ForEach`。
 
 ```cangjie
 public func mountEffect(setup: () -> Resource): Unit
@@ -362,18 +311,11 @@ public func mountEffect(setup: () -> Resource): Unit
 public func mountEffect(key: String, setup: () -> Resource): Unit
 ```
 
-keyless effect 与 `remember`/`rememberState` 共用受守卫的位置形状；槽数或声明种类改变时，setup 执行前即拒绝
-并回滚整次构建。`key` 在当前 `Keyed` / `RetainedSubtree` scope 内必须非空且唯一。setup 属于提交阶段，不能在
-其中调用 `remember`、`rememberState`、effect 或继续声明 UI。只需 cleanup 闭包时返回
-[`EffectCleanup`](EffectCleanup.md)。
-该 API 是静态挂载声明：自动组合可在稳定帧复用已提交声明而不重新执行祖先 builder；State 驱动的条件删除仍会
-标脏并正常卸载 Resource。
+无键 effect 与 `remember`、`rememberState` 共用声明位置。数量或种类变化时，框架会在执行 `setup` 前拒绝该次构建。显式键必须在当前作用域中非空且唯一。`setup` 属于提交阶段，不能在其中继续声明 UI 或调用 remember/effect API。只有一个清理函数时，可以返回 [`EffectCleanup`](EffectCleanup.md)。
 
 ### lifecycleEffect
 
-`mountEffect` 的 revision 版本。revision 不变时保留当前 Resource；变化时先成功建立新 Resource，再关闭旧
-Resource，因此 setup 失败不会破坏此前已提交的 effect。cleanup 抛异常时框架继续清理兄弟资源、保留失败资源
-供下次重试，并在提交后把首个异常抛给宿主。
+`mountEffect` 的版本化形式。`revision` 不变时保留当前资源；变化时先成功创建新资源，再关闭旧资源，因此创建失败不会破坏已提交资源。清理失败时，框架仍会继续清理其他资源，并在提交后抛出最先发生的异常；失败资源会保留，供下一次清理重试。
 
 ```cangjie
 public func lifecycleEffect(revision: UInt64, setup: () -> Resource): Unit
@@ -383,29 +325,15 @@ public func lifecycleEffect(revision: UInt64, setup: () -> Resource): Unit
 public func lifecycleEffect(key: String, revision: UInt64, setup: () -> Resource): Unit
 ```
 
-```cangjie
-lifecycleEffect("selection-observer", selection.revision) {
-    selection.observe({_, value => analytics.recordSelection(value)})
-}
-```
-
-固定声明可省略字符串键：
-
-```cangjie
-lifecycleEffect(selection.revision) {
-    selection.observe({_, value => analytics.recordSelection(value)})
-}
-```
+例如，可用 `selection.revision` 作为版本，在 setup 中调用 `selection.observe`，并把返回的订阅直接作为待清理资源。
+固定声明可省略字符串 key；动态结构应使用稳定 key。
 
 普通对象、主题或服务配置不会自动成为 effect revision；调用方应把会改变 setup 捕获语义的输入合成到 revision。
 显式 revision 也会保留自动祖先的访问要求，因此普通外部值变化不会被静态组合命中冻结。
 
 ### subscribeFrame
 
-为自定义 Widget 在当前构建登记一个合成帧回调。应在组件构造函数中调用；普通重建会重新登记，retained
-边界命中会 O(1) 采用已保存的不可变有序片段。回调仍逐帧按声明顺序执行；静态组件不要订阅，框架不再把合成
-`Frame` 广播给整棵树。仅需包装现有内容时
-优先使用 [`FrameHandler`](FrameHandler.md)，它还会自动请求后续帧。
+为自定义 Widget 登记逐帧回调，通常在组件构造函数中调用。回调按声明顺序执行，并由自身决定是否请求下一帧。静态组件不要订阅；只需要包装已有内容时优先使用 [`FrameHandler`](FrameHandler.md)，它会自动请求续帧。
 
 ```cangjie
 public func subscribeFrame(callback: (UiContext, FrameInfo) -> Unit): Unit
@@ -550,11 +478,11 @@ Effect 按 child Action 顺序连接；Reject 在缺失、异常或 ID 改变时
 
 父级组合使用 [`Reducer.forEachBatch`](Reducer.md#foreachbatch) 或
 [`EffectReducer.forEachBatch`](EffectReducer.md#foreachbatch)。它和 [`entityBatchReducer`](#entitybatchreducer) 的差别是：
-前者保留稳定显示顺序，后者面向无顺序的正规化关系表。
+前者保留稳定显示顺序，后者用于不需要显示顺序、按 ID 存储的实体表。
 
 ### entityReducer
 
-把 child reducer 提升到按 ID 路由的正规化 [`EntityTable`](EntityTable.md)。纯与效果版本按参数类型重载：
+把 child reducer 提升到按 ID 路由的 [`EntityTable`](EntityTable.md)。纯版本和带效果版本按参数类型重载：
 
 ```cangjie
 public func entityReducer<ID, Model, Action>(
@@ -575,7 +503,7 @@ public func entityReducer<ID, Model, Action, Effect>(
 
 ### entityBatchReducer
 
-把一个显式有序 `IdentifiedAction` 数组解释为一次正规化实体表归约。纯与效果版本按 child reducer 类型重载：
+按数组顺序把一组 `IdentifiedAction` 应用到实体表。纯版本和带效果版本按 child reducer 类型重载：
 
 ```cangjie
 public func entityBatchReducer<ID, Model, Action>(
@@ -604,4 +532,4 @@ public func entityBatchReducer<ID, Model, Action, Effect>(
 - [`State`](State.md) / [`DerivedState`](DerivedState.md) — 派生函数的源与产物。
 - [`Keyed`](Keyed.md) — `ForEach` 底层的标识容器。
 - [`IdentifiedArray`](IdentifiedArray.md) — reducer 侧的稳定身份持久集合。
-- [`EntityTable`](EntityTable.md) — reducer 侧的正规化实体表。
+- [`EntityTable`](EntityTable.md) — reducer 侧按业务 ID 存储的实体表。

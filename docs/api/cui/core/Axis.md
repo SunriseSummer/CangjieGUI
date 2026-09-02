@@ -2,7 +2,7 @@
 
 # Axis
 
-`cui.core` 包中的 public enum
+位于 `cui.core` 包的公开枚举
 
 布局方向轴：水平或垂直。[`Divider`](Divider.md) 用它选择走向，[`Widget.acceptsStretch`](Widget.md#acceptsstretch) 用它询问某个轴上能否拉伸，`cui.controls` 的拆分视图用它选择分割方向。
 

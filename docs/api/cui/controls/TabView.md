@@ -2,7 +2,7 @@
 
 # TabView
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 顶部页签条加整页内容区的页签容器，同一时刻只有选中页参与布局、绘制与事件。界面构建函数里每个顶层组件即一页，按声明顺序与 `labels` 对应；页签条与 [`SegmentedControl`](SegmentedControl.md) 同视觉——滑动指示块标记当前页，点击切换，聚焦后 Left/Right 步进。
 

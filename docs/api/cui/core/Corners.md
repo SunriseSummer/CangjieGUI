@@ -2,7 +2,7 @@
 
 # Corners
 
-`cui.core` 包中的 public struct
+位于 `cui.core` 包的公开结构体
 
 背景四角的独立圆角半径，即 CSS 四值 `border-radius` 模型，按左上、右上、右下、左下排列。配合 [`Widget.background`](Widget.md#background) 的 `corners!:` 形式构建聊天气泡（三角圆、尾角方）、顶部圆角的标签页或贴边面板；绘制时每个半径被限制在短边的一半。常见形状用静态工厂 [`all`](#all)（四角同值）与 [`top`](#top) / [`bottom`](#bottom) / [`left`](#left) / [`right`](#right)（只圆一侧），任意组合用完整构造器。
 

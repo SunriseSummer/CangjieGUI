@@ -2,7 +2,7 @@
 
 # RichSpan
 
-`cui.controls` 包中的 public struct
+位于 `cui.controls` 包的公开结构体
 
 [`RichText`](RichText.md) 中的一段带样式行内片段：一段文本或一枚行内图标，可逐段配色、加粗、斜体、加装饰线、换字体、调字号、垫高亮底或挂点击动作。用工厂起步（[`text`](#text)、[`muted`](#muted)、[`icon`](#icon)），再链式调用样式方法逐项配置。
 

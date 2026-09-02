@@ -2,7 +2,7 @@
 
 # Menu
 
-`cui.controls` 包中的 public struct
+位于 `cui.controls` 包的公开结构体
 
 `MenuBar` 菜单栏的一个顶级菜单描述：标题加其下拉包含的菜单项。纯数据，本身不绘制也不处理事件；[`MenuBar`](MenuBar.md) 读取它生成标题条与下拉菜单。
 

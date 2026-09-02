@@ -28,37 +28,10 @@
 
 用 `SplitView` 或 `HStack` 把表格与详情分开。表格区域伸缩，详情设置合理最小宽度。未选择时显示引导，不要访问不存在的记录。
 
-先用这个可独立编译的变化理解表格内部边界：选择第二行再按“负载”表头排序，右侧详情仍读取原始索引 1。它只覆盖控件内部排序，不是本页最终方案，因为应用过滤或删除输入数组时原始索引也会改变。
-
-```cangjie role=variation
-package docexample
-
-import cui.*
-
-main(): Unit {
-    let app = DesktopApp(WindowSpec("机群主从表格", 760, 420))
-    app.run {
-        let columns = [
-            TableColumn("主机", 150.0),
-            TableColumn("负载", 90.0, numeric: true)
-        ]
-        let rows = [["web-01", "63"], ["web-02", "8"], ["db-01", "100"]]
-        let selected = rememberState<Int64>("fleet.selected") {0}
-        HStack(spacing: 12.vp) {
-            Table(columns, rows, selected).flex()
-            Panel {
-                VStack {
-                    Label("当前详情").bold()
-                    Label("主机：${rows[selected.value][0]}")
-                    Label("负载：${rows[selected.value][1]} %")
-                }.spacing(8.vp)
-            }.contentPadding(16.vp).width(220.vp)
-        }.padding(16.vp)
-    }
-}
-```
-
-下面是本页可直接运行的最终方案。它把选择的事实提升为业务 id，使用 `Binding.project` 在 `Table` 读写索引时完成双向转换；“只看高负载”会把 `web-02` 从索引 1 移到索引 0，“删除 db-01”再次替换数组，但详情仍追踪 `web-02`：
+只使用 `Table.selected` 时，选择第二行再按“负载”表头排序，详情仍读取原始索引 1；但应用过滤或删除输入数组后，
+这个索引可能指向另一条记录。下面的完整方案把选择提升为业务 id，再使用 `Binding.project` 在 `Table` 读写索引时完成
+双向转换。“只看高负载”会把 `web-02` 从索引 1 移到索引 0，“删除 db-01”再次替换数组，但详情仍追踪
+`web-02`：
 
 ```cangjie verify role=complete profile=gui-visual
 package docexample

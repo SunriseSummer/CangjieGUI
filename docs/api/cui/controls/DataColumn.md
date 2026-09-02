@@ -2,7 +2,7 @@
 
 # DataColumn
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 `Table.of` 的类型化列定义：表头、列宽、数值标记与从行数据 `T` 抽取单元格文本的 `value` 抽取器。源数据保持强类型，每列的表头与取值逻辑写在一起，无需手搭 `Array<Array<String>>` 字符串矩阵（见 [`Table`](Table.md)）。
 

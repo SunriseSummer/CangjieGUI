@@ -18,19 +18,7 @@
 
 ### 1. 划清线程边界
 
-工作线程只处理普通数据，绝不直接写 UI `State`。完成后调用 `app.post` 投递一个短 UI 动作：它经线程安全队列唤醒正在等待事件的循环，并在 UI 线程事务中执行。一次动作内的多次状态写只产生一次视觉失效。成功和失败必须走同一个返回通道；应用退出前应取消或 join 自己创建的工作任务。
-
-```cangjie role=variation
-let _ = spawn {
-    let result = try {
-        loadSnapshot()
-    } catch (error: Exception) {
-        "加载失败：${error.message}"
-    }
-    let woke = app.post({=> status.value = result})
-    // woke=false 表示 SDL 唤醒事件未入队；动作仍留在队列，将在下一次窗口事件时执行。
-}
-```
+工作线程只处理普通数据，绝不直接写 UI `State`。完成后调用 `app.post` 投递一个短 UI 动作：它经线程安全队列唤醒正在等待事件的循环，并在 UI 线程事务中执行。一次动作内的多次状态写只产生一次视觉失效。`post` 返回 `false` 表示 SDL 唤醒事件没有入队，但动作仍在队列中，会由下一次窗口事件或运行时的限时等待取出。成功和失败必须走同一个返回通道；应用退出前应取消或等待自己创建的工作任务结束。
 
 ### 2. 需要背压时使用信箱，并只在等待期间续帧
 
@@ -120,19 +108,9 @@ main(): Unit {
 
 ### 4. 把文件对话框接到相同轮询点
 
-```cangjie role=variation
-model.openDialog.value = Some(app.openFileDialog(options: options))
-
-// FrameHandler 的 UI 回调中：
-match (request.poll()) {
-    case FileDialogResult.FileDialogPending => ()
-    case FileDialogResult.FileDialogCanceled => model.finish("已取消")
-    case FileDialogResult.FileDialogFailed(message) => model.fail(message)
-    case FileDialogResult.FileDialogSelected(paths, _) => model.load(paths[0])
-}
-```
-
-对话框请求是异步句柄，不要在按钮回调里阻塞等待。文件解析仍可放进工作线程，最终经信箱返回；取消不是异常，应该给出普通状态。
+按钮回调调用 `app.openFileDialog(options: options)`，并把返回的请求句柄保存在模型中。`FrameHandler` 调用
+`poll()` 后分别处理等待、取消、失败和已选择四种 `FileDialogResult`；选择成功时再读取返回的路径。对话框请求是异步句柄，
+不要在按钮回调里阻塞等待。文件解析仍可放进工作线程，最终经信箱返回；取消不是异常，应该显示普通状态。
 
 ## 确认结果
 

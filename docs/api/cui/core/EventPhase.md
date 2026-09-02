@@ -2,7 +2,7 @@
 
 # EventPhase
 
-`cui.core` 包中的 public enum
+位于 `cui.core` 包的公开枚举
 
 ```cangjie
 public enum EventPhase {

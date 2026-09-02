@@ -2,7 +2,7 @@
 
 # ReorderableList
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 行高固定、可拖拽重排的垂直列表：每行左侧带握点手柄，按住手柄拖动即抬起该行随指针移动、其余行让位露出落点，松手调用 `onMove(from, to)` 提交——列表只报告移动，数据始终由调用方持有并自行重排。
 

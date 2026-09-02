@@ -2,7 +2,7 @@
 
 # ProgressRing
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 环形进度指示：淡色轨道整环上，自 12 点方向顺时针扫出与 `value`（0…1 比例，越界截断）相当的前景弧，中心可叠加取整百分比。纯显示控件，是线性 [`ProgressBar`](ProgressBar.md) 的环形互补。
 

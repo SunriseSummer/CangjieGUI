@@ -2,7 +2,7 @@
 
 # RadioButton
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 整数值互斥选择组中的一个选项：同组各项共享一个 `Bindable<Int64>`，激活任一项即把共享值设为该项的 `value`。选中态画为外圈强调色加内点，内点以弹簧动画放大入场。
 

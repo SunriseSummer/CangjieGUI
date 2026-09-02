@@ -174,16 +174,7 @@ main(): Unit {
 
 ## 接着试一试
 
-若产品希望“过滤隐藏选中项后不自动选择别项”，把完整程序中的 `toggleOpenOnly` 整个替换为下面版本。结果将显示“当前选择：未选择”，而不是误选另一行：
-
-```cangjie role=variation
-func toggleOpenOnly(): Unit {
-    openOnly.value = !openOnly.value
-    if (!selectionIsVisible()) {
-        selectedId.value = ""
-    }
-}
-```
+若产品希望“过滤隐藏选中项后不自动选择别项”，让 `toggleOpenOnly` 在当前选择不可见时把 `selectedId.value` 设为空串，不再选择第一条可见任务。结果应显示“当前选择：未选择”，而不是误选另一行。
 
 ## 常见错误
 

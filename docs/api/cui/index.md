@@ -6,9 +6,21 @@
 import cui.*
 ```
 
-统一导入入口：本包自身不定义类型或函数，而是重新导出 sdl 模块和全部 CUI 子包。sdl 提供几何、颜色、渲染、图像、窗口、输入与桌面系统能力；CUI 子包提供组件、布局、控件、文本、媒体和桌面应用。应用只需 `import cui.*` 即可使用这些 API。
+应用的统一导入入口。它重新导出 CUI 各子包和常用 SDL 类型，因此大多数应用只需 `import cui.*`。精确签名和行为说明位于符号原本所属的子包页面。
 
-## 再导出
+## 常用入口
+
+| 任务 | API |
+|---|---|
+| 启动窗口 | [`DesktopApp`](desktop/DesktopApp.md) |
+| 声明组件和布局 | [`Widget`](core/Widget.md)、[`VStack`](core/VStack.md)、[`HStack`](core/HStack.md) |
+| 保存和绑定状态 | [`State`](core/State.md)、[`Binding`](core/Binding.md)、[`rememberState`](core/functions.md#rememberstate) |
+| 使用成品控件 | [`cui.controls`](controls/index.md) |
+| 编辑文本 | [`cui.text`](text/index.md) |
+| 显示图片或自绘 | [`cui.media`](media/index.md) |
+| 测试组件 | [`cui.testing`](testing/index.md) |
+
+## 完整再导出列表
 
 以下符号定义于本模块各子包，在此再导出；详情见各定义包的文档页。
 
@@ -17,7 +29,7 @@ import cui.*
 | 符号 | 说明 |
 |---|---|
 | [`AccessibilityAdapter`](core/AccessibilityAdapter.md) | 原生无障碍桥或外部语义工具实现的增量 push 接口。 |
-| [`AccessibilityUpdate`](core/AccessibilityUpdate.md) | 一次 revisioned 原子语义树 patch。 |
+| [`AccessibilityUpdate`](core/AccessibilityUpdate.md) | 带版本号的一批无障碍语义树变更。 |
 | [`Alignment`](core/Alignment.md) | 九宫格式的二维对齐，供 `ZStack` 这类把子组件放进同一框架的容器定位不拉伸的子组件。 |
 | [`Animator`](core/Animator.md) | 按固定时长与 `Easing` 曲线把数值从当前位置补间到目标的动画器——CSS transition 与 SwiftUI/Compose `.animation(...)` 背后的模型。 |
 | [`Axis`](core/Axis.md) | 布局方向轴：水平或垂直。 |
@@ -32,19 +44,24 @@ import cui.*
 | [`CursorShape`](core/CursorShape.md) | 控件在指针悬停期间申请的语义指针形状，由宿主映射为各平台的原生光标。 |
 | [`derive`](core/functions.md#derive) | 返回从一到多个源计算出的只读派生状态。 |
 | [`deriveStates`](core/functions.md#derivestates) | 从 `State` 数组构造静态专用的只读派生状态。 |
+| [`diagnoseStateMutationPolicy`](core/functions.md#diagnosestatemutationpolicy) | 包装状态等价策略并记录比较结果与耗时。 |
 | [`DerivedState`](core/DerivedState.md) | 由一个或多个源计算出的缓存只读状态，可选按结果等价类过滤下游失效。 |
 | [`Divider`](core/Divider.md) | 分隔内容的 1 逻辑像素发丝线，走向由 `axis` 指定、长度由父栈拉伸铺满。 |
 | [`drawFocusRing`](core/functions.md#drawfocusring) | 绘制键盘焦点环：贴着控件的强调色圆角描边，画在边界外 2 像素处，读作独立于控件自身边缘的光晕。 |
 | [`Easing`](core/Easing.md) | 把 `[0, 1]` 内的动画进度映射为缓动后进度的时序曲线。 |
-| [`EffectCleanup`](core/EffectCleanup.md) | 把 cleanup 闭包适配为可重试、幂等的 effect Resource。 |
+| [`EffectCleanup`](core/EffectCleanup.md) | 把清理函数包装成可关闭资源。 |
 | [`EffectBatch`](core/EffectBatch.md) | 可 O(1) 拼接、按序解释的不可变领域效果批次。 |
 | [`EffectReducer`](core/EffectReducer.md) | 纯计算下一模型与有序领域效果描述的 reducer。 |
-| [`EffectStore`](core/EffectStore.md) | 提交模型后显式交付惰性效果批次的单向 Store。 |
-| [`EntityTable`](core/EntityTable.md) | 正规化模型使用的 ID 键控分层持久实体表。 |
+| [`EffectStore`](core/EffectStore.md) | 提交模型后把待执行效果交给应用处理。 |
+| [`EntityTable`](core/EntityTable.md) | 按稳定 ID 保存实体的持久映射。 |
 | [`EntityTableStats`](core/EntityTableStats.md) | 实体表容量、占用与哈希碰撞诊断。 |
 | [`EntityUpdate`](core/EntityUpdate.md) | 一个实体 ID 与纯自变换组成的有序批量补丁。 |
 | [`emit`](core/functions.md#emit) | 把新构造的组件注册进最内层打开的构建块。 |
 | [`EventHandler`](core/EventHandler.md) | 在子树收到事件之前先把每个事件交给回调的透明包装组件，回调返回 `true` 即消费该事件。 |
+| [`EventListener`](core/EventListener.md) | 在捕获、目标或冒泡阶段处理命中子树的事件。 |
+| [`EventOutcome`](core/EventOutcome.md) | 分别表达事件是否已处理、是否停止继续传播。 |
+| [`EventPhase`](core/EventPhase.md) | 事件沿命中路径传播时所处的捕获、目标或冒泡阶段。 |
+| [`EventScope`](core/EventScope.md) | 监听器处理命中子树的事件，或显式处理全局事件。 |
 | [`FeaturePath`](core/FeaturePath.md) | 把状态 Lens 与 Action Prism 绑定成可组合特征边界。 |
 | [`Flexible`](core/Flexible.md) | 把内容纳入所在栈空间分配的包装组件：按权重分得剩余空间，而非按内容收缩。 |
 | [`FlowRow`](core/FlowRow.md) | 把子组件从左到右排布、放不下时自动换到内容高度新行的流式容器。 |
@@ -65,7 +82,7 @@ import cui.*
 | [`LazyColumn`](core/LazyColumn.md) | 只构建视口附近行的定行高垂直滚动列表，构建、布局与绘制均为 O(可见) 而非 O(行数)。 |
 | [`LazyGrid`](core/functions.md#lazygrid) | 垂直滚动的虚拟化网格：`data` 排成 `columns` 等宽列并按行开窗，海量均匀单元格（照片墙、卡片网格）只花一屏的成本。 |
 | [`LazyList`](core/LazyList.md) | 可由高度模型或可见行自测量驱动的变高惰性垂直列表。 |
-| [`LazyListExtents`](core/LazyListExtents.md) | Fenwick 可变行高模型，支持 O(log N) 单行更新。 |
+| [`LazyListExtents`](core/LazyListExtents.md) | 支持快速单行更新和位置查询的可变行高索引。 |
 | [`LazyRow`](core/LazyRow.md) | 只构建视口附近列的定列宽水平滚动条带，是 `LazyColumn` 的水平对应物。 |
 | [`LazyScrollAlignment`](core/LazyScrollAlignment.md) | 惰性视口按 key 定位的对齐方式。 |
 | [`LazyViewportController`](core/LazyViewportController.md) | 按当前索引或稳定 key 控制惰性视口滚动。 |
@@ -73,21 +90,24 @@ import cui.*
 | [`LengthInsets`](core/LengthInsets.md) | 四边各自携带单位的间距，供 padding 类 API 使用，布局时解析为逻辑像素的 `Insets`。 |
 | [`LengthUnit`](core/LengthUnit.md) | 长度值的单位：物理像素 `Px`、虚拟像素 `Vp` 或随用户字体缩放的字体像素 `Fp`。 |
 | [`LengthUnits`](core/LengthUnits.md) | 为数值字面量提供 `.px`/`.vp`/`.fp` 长度后缀的接口。 |
+| [`Lens`](core/Lens.md) | 从整体值读写局部字段的可组合双向投影。 |
 | [`MainAxisAlignment`](core/MainAxisAlignment.md) | 栈沿主轴分配剩余空间的策略：靠端、居中或三种等分间隔。 |
 | [`Motion`](core/Motion.md) | 动效令牌：三档标准动画时长（毫秒）与四条角色化缓动曲线，与 Animator、Spring 搭配使用。 |
 | [`ModelStore`](core/ModelStore.md) | 以强类型 Action 和纯 Reducer 驱动单一应用模型。 |
+| [`Modifier`](core/Modifier.md) | 可组合、可复用的组件修饰器。 |
 | [`MissingFeaturePolicy`](core/MissingFeaturePolicy.md) | 子 Action 没有对应可选/keyed 状态时拒绝或显式忽略。 |
 | [`mountEffect`](core/functions.md#mounteffect) | 在当前声明身份成功提交后挂载一次 Resource。 |
 | [`Observable`](core/Observable.md) | 可读、可观察值的抽象：读取当前值、暴露修订号、订阅变更，并可 map 出派生状态。 |
 | [`Overlay`](core/Overlay.md) | 浮在整棵组件树之上的交互浮层：下拉弹出面板、菜单或对话框。 |
 | [`Panel`](core/Panel.md) | 带主题表面与内容内边距的卡片式容器，是划分界面区块的基础构件。 |
+| [`Portal`](core/Portal.md) | 把组件放到应用浮层中，不占声明位置的布局空间。 |
 | [`ParagraphCacheStats`](core/ParagraphCacheStats.md) | 跨即时树重建的段落布局 LRU 命中、容量与淘汰诊断。 |
 | [`PointerEventScope`](core/PointerEventScope.md) | 声明 Widget 子树的指针处理是否可安全限制在布局矩形内。 |
 | [`Prism`](core/Prism.md) | 可组合地提取和嵌入一个 Action/和类型分支。 |
 | [`Pulse`](core/Pulse.md) | 永动的循环时间线——骨架屏微光、呼吸状态点、加载脉冲。 |
 | [`Radii`](core/Radii.md) | 圆角半径尺度，虚拟像素：小档给标签与输入框、中档给卡片、大档给醒目表面，pill 收成全圆头。 |
-| [`Reducer`](core/Reducer.md) | 把 Action 纯解释为模型变化，并支持顺序组合与 Lens pullback。 |
-| [`lifecycleEffect`](core/functions.md#lifecycleeffect) | 按显式 revision 事务替换和清理 Resource effect。 |
+| [`Reducer`](core/Reducer.md) | 根据 Action 纯计算下一模型，并可组合到更大的模型。 |
+| [`lifecycleEffect`](core/functions.md#lifecycleeffect) | 在版本变化时安全替换可关闭资源。 |
 | [`rememberState`](core/functions.md#rememberstate) | 返回由活动 `DesktopApp` 构建保留的局部状态。 |
 | [`remember`](core/functions.md#remember) | 在活动构建中保留任意稳定值或对象。 |
 | [`stateMutationPolicy`](core/functions.md#statemutationpolicy) | 从观察等价闭包构造 State 变更策略。 |
@@ -95,26 +115,32 @@ import cui.*
 | [`neverEqualPolicy`](core/functions.md#neverequalpolicy) | 返回接受每次 State 赋值的兼容策略。 |
 | [`identifiedReducer`](core/functions.md#identifiedreducer) | 把 reducer 提升到按稳定 ID 路由的持久集合。 |
 | [`identifiedBatchReducer`](core/functions.md#identifiedbatchreducer) | 把有序 child Action 批次归约为至多一个持久集合版本。 |
-| [`entityReducer`](core/functions.md#entityreducer) | 把 reducer 提升到按 ID 路由的正规化实体表。 |
+| [`entityReducer`](core/functions.md#entityreducer) | 把 reducer 提升到按 ID 路由的实体表。 |
 | [`entityBatchReducer`](core/functions.md#entitybatchreducer) | 把有序实体 Action 批次归约为至多一个持久表版本。 |
 | [`optionalReducer`](core/functions.md#optionalreducer) | 把 reducer 提升到带显式缺失策略的 Option 状态。 |
 | [`subscribeFrame`](core/functions.md#subscribeframe) | 为自定义 Widget 显式登记逐帧回调。 |
 | [`Reveal`](core/Reveal.md) | 在零与内容自然高度之间缓动过渡的展开/收起容器，切换 `shown` 即让内容滑入滑出。 |
-| [`RetainedGraphDiagnostics`](core/RetainedGraphDiagnostics.md) | 已提交 retained 执行图、effect 和失败 cleanup 的确定性诊断快照。 |
-| [`RetainedScopeDiagnostics`](core/RetainedScopeDiagnostics.md) | 一个 retained scope 的身份、直接所有权、dirty 原因和分相统计。 |
-| [`RetainedSubtree`](core/RetainedSubtree.md) | 自动跟踪 build/measure/layout/缓存 paint 的 State 读取，复用稳定子树和可选透明绘制命令。 |
+| [`RetainedGraphDiagnostics`](core/RetainedGraphDiagnostics.md) | 最近一次增量执行图、生命周期资源和清理失败的诊断快照。 |
+| [`RetainedScopeDiagnostics`](core/RetainedScopeDiagnostics.md) | 一个增量作用域的身份、失效原因和分阶段统计。 |
+| [`RetainedSubtree`](core/RetainedSubtree.md) | 显式保留子树的高级接口；普通界面通常无需使用。 |
 | [`RetainedSubtreeStats`](core/RetainedSubtreeStats.md) | 保留边界累计的分相依赖/命中、自动失效、命令数和估算字节。 |
 | [`ScrollBar`](core/ScrollBar.md) | 供滚动容器内部复用的垂直滚动条拖拽控制器，把命中滚动条的按下与移动转发给它，即得一致的滑块拖拽与轨道分页行为。 |
 | [`ScrollView`](core/ScrollView.md) | 裁剪显示、支持滚轮与拖动滚动条的垂直滚动视口，滚动位置按稳定标识跨帧保留。 |
 | [`ScopedStore`](core/ScopedStore.md) | 隐藏根模型与根 Action、仍共享单一根事实的特征局部 Store。 |
 | [`PaintOutset`](core/PaintOutset.md) | 布局矩形之外可组合的保守绘制溢出。 |
+| [`Semantics`](core/Semantics.md) | 平台无关的无障碍标签、角色、值与状态。 |
+| [`SemanticsAction`](core/SemanticsAction.md) | 无障碍适配器可请求的激活、聚焦、增减或设值动作。 |
 | [`SemanticsChange`](core/SemanticsChange.md) | 语义树新增、移除、更新和顺序移动的增量。 |
+| [`SemanticsNode`](core/SemanticsNode.md) | 带稳定标识、边界、属性和动作的无障碍节点。 |
+| [`SemanticsRole`](core/SemanticsRole.md) | 控件映射到原生无障碍 API 前使用的平台无关角色。 |
 | [`SemanticsSnapshot`](core/SemanticsSnapshot.md) | 不可变、按 id 索引的已提交语义树。 |
 | [`Shadow`](core/Shadow.md) | 可配置的组件阴影，包含水平/垂直偏移、模糊、扩散和颜色，作用类似 CSS `box-shadow`。 |
 | [`Spacer`](core/Spacer.md) | 测量为零并吸收所在栈剩余空间的空白弹性组件，把兄弟组件推向两端。 |
 | [`Spacing`](core/Spacing.md) | 4 像素栅格上的间距尺度：七档命名间隔，以虚拟像素的 Length 值表达。 |
 | [`Spring`](core/Spring.md) | 跨帧把数值弹性逼近目标的弹簧-阻尼器。 |
 | [`State`](core/State.md) | 可写的单一数据源可观察状态：对 value 赋值会推进修订号，并在调用线程上同步通知全部观察者。 |
+| [`StateMutationPolicyDiagnostics`](core/StateMutationPolicyDiagnostics.md) | 状态等价策略的比较次数、结果、失败与耗时快照。 |
+| [`DiagnosedStateMutationPolicy`](core/DiagnosedStateMutationPolicy.md) | 为状态等价策略记录诊断数据的显式包装器。 |
 | [`StateMutationPolicy`](core/StateMutationPolicy.md) | 定义 State 变化或派生结果的观察等价关系。 |
 | [`StateObservation`](core/StateObservation.md) | 由 Observable.observe 返回的可取消的观察句柄：持有它就持续收到回调，close() 后不再收到。 |
 | [`StateStore`](core/StateStore.md) | 跨声明式重建保留显式键控局部状态的容器：一次完整构建未访问的条目会被移除，与视图卸载语义一致。 |
@@ -199,7 +225,7 @@ import cui.*
 
 | 符号 | 说明 |
 |---|---|
-| [`DesktopApp`](desktop/DesktopApp.md) | 桌面应用对象：拥有 SDL 窗口并运行按需帧循环；分相 State 依赖与 retained scope 可跳过未变构建、布局和绘制命令。 |
+| [`DesktopApp`](desktop/DesktopApp.md) | 拥有 SDL 窗口并按需执行相关构建、布局和绘制工作的桌面应用对象。 |
 | [`AccessibilityFailure`](desktop/AccessibilityFailure.md) | 一个独立桌面无障碍分支被隔离后的结构化诊断。 |
 | [`AccessibilityFailureSource`](desktop/AccessibilityFailureSource.md) | 无障碍失败来源。 |
 | [`AccessibilityFailureOperation`](desktop/AccessibilityFailureOperation.md) | 无障碍失败发生的边界操作。 |
@@ -239,7 +265,7 @@ import cui.*
 | `Pen` | 一次描边的描述：线条/轮廓的宽度与颜色。 |
 | `Point` | 逻辑像素坐标系中的一个位置——布局、事件与绘制共用的坐标空间。 |
 | `Rect` | 逻辑像素下的轴对齐矩形——原点 `x`/`y` 加宽高 `w`/`h`，用于布局框、命中测试与裁剪。 |
-| `RenderCommandBuffer` | Renderer 录制的不可变透明绘制命令，可校验资源/epoch 后按原 z 序重放。 |
+| `RenderCommandBuffer` | Renderer 录制的不可变绘制命令，可在资源仍有效时按原层级重放。 |
 | `RenderCommandBufferStats` | 命令缓冲的命令、clip、资源、估算内存与重放次数诊断。 |
 | `RenderCommandSlot` | 可原子替换不可变子命令缓冲的稳定层次引用，供 retained scene 内核避免祖先复制。 |
 | `RenderPass` | 异常安全、幂等关闭的场景资源，确保恢复 render target、scale 与 clip。 |

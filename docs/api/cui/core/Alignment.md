@@ -2,7 +2,7 @@
 
 # Alignment
 
-`cui.core` 包中的 public enum
+位于 `cui.core` 包的公开枚举
 
 九宫格式的二维对齐，供 [`ZStack`](ZStack.md) 这类把子组件放进同一框架的容器定位不拉伸的子组件。九个取值覆盖四角、四边中点与正中。
 

@@ -2,7 +2,7 @@
 
 # Accordion
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 可折叠分区的竖向堆叠：每个分区一条可点击的标题与一个展开时才构建的正文。适合设置分组、FAQ 与属性检查器；分区由 [`AccordionSection`](AccordionSection.md) 描述，`single` 开启后展开一个分区会收起其余分区（严格手风琴）。
 

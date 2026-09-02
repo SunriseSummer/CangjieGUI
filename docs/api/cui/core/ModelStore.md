@@ -2,7 +2,7 @@
 
 # ModelStore
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 强类型单向应用模型：界面观察或选择 `Model`，把用户意图转换为 `Action`，只有纯 [`Reducer`](Reducer.md) 能构造
 下一模型。它内部只有一个 [`State`](State.md)，不会为 selector 或字段 Binding 复制事实。
@@ -43,18 +43,10 @@ public init(
 默认保持 `State` 的“每次 dispatch 都是事件”语义；模型有稳定等价关系时传
 [`structuralEqualityPolicy`](functions.md#structuralequalitypolicy) 或领域策略。
 
-## 示例
+## 使用方式
 
-```cangjie
-let counter = ModelStore<Int64, Int64>(0, update: {model, delta => model + delta})
-let doubled = counter.select<Int64>(
-    {model => model * 2},
-    policy: structuralEqualityPolicy<Int64>()
-)
-counter.dispatch(1)
-counter.dispatchAll([2, 3])
-// counter.get() == 6；doubled.get() == 12
-```
+计数器可以把模型和 Action 都定义为 `Int64`，更新函数返回 `model + delta`。从该 Store 选择两倍值后，依次派发
+`1` 和批量动作 `[2, 3]`，最终模型为 6，派生值为 12。
 
 ## 属性与观察
 
@@ -123,17 +115,33 @@ public func scope<LocalModel, LocalAction>(
 ): ScopedStore<LocalModel, LocalAction>
 
 public func scope<LocalModel, LocalAction>(
+    state!: Lens<Model, LocalModel>,
+    action!: (LocalAction) -> Action
+): ScopedStore<LocalModel, LocalAction>
+
+public func scope<LocalModel, LocalAction>(
+    state!: Lens<Model, LocalModel>,
+    action!: (LocalAction) -> Action,
+    policy!: StateMutationPolicy<LocalModel>
+): ScopedStore<LocalModel, LocalAction>
+
+public func scope<LocalModel, LocalAction>(
     path: FeaturePath<Model, Action, LocalModel, LocalAction>
+): ScopedStore<LocalModel, LocalAction>
+
+public func scope<LocalModel, LocalAction>(
+    path: FeaturePath<Model, Action, LocalModel, LocalAction>,
+    policy!: StateMutationPolicy<LocalModel>
 ): ScopedStore<LocalModel, LocalAction>
 ```
 
-`state` 还可传 [`Lens`](Lens.md)`<Model, LocalModel>`，并有相同的策略重载。scope 把根 Store 变成只认识局部模型和
-局部 Action 的 [`ScopedStore`](ScopedStore.md)：子视图不再携带根类型，局部 Action 经 `action` 提升后仍由同一个
+`scope` 把根 Store 变成只认识局部模型和局部 Action 的 [`ScopedStore`](ScopedStore.md)：子视图不再携带根类型，
+局部 Action 经 `action` 提升后仍由同一个
 根 reducer 解释。它不复制状态，也不开放局部 setter。
 
 默认 scope 完全惰性；根模型任一 revision 都会传播“可能变化”。字段、小值对象等有便宜等价关系时传显式策略，
 无关根 Action 就不会推进局部 revision 或重建读取该 scope 的界面分支。嵌套 scope 会组合状态投影和 Action 提升；
-无策略状态投影融合为一个 Derived 节点，显式策略则保留为不可跨越的商边界。`dispatchAll` 直接融合到一次根事务，
+无策略状态投影会合并为一个派生节点，显式策略则在每层独立过滤变化。`dispatchAll` 直接合并到一次根事务，
 不创建逐层中间 Action 数组。
 
 [`FeaturePath`](FeaturePath.md) 重载从同一个值取得状态 Lens 与 Action Prism 的嵌入方向；它还提供带 `policy` 的重载。

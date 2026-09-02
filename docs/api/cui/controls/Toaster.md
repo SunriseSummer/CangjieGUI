@@ -2,7 +2,7 @@
 
 # Toaster
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 瞬态 Toast 通知的调度器：保存当前仍在显示的通知及各自的剩余时间，从任意处调用 `show` 即可加入一条消息。它只负责“有哪些通知、各自还剩多久”，不负责界面；渲染与计时由组件树中的 [`ToastLayer`](ToastLayer.md) 完成。
 

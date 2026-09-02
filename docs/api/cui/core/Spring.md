@@ -2,7 +2,7 @@
 
 # Spring
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 跨帧把数值弹性逼近目标的弹簧-阻尼器。CUI 每帧重绘，组件在 `draw` 里用帧间隔驱动它并读取 [`value`](#value)——无需独立动画计时器就得到平滑的状态过渡。
 

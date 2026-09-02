@@ -2,7 +2,7 @@
 
 # TextField
 
-`cui.text` 包中的 public class
+位于 `cui.text` 包的公开类
 
 单行文本编辑控件：把输入写回绑定的 `Bindable<String>`，按桌面惯例提供点选拖选、双击选词、Ctrl 快捷键、分组撤销与光标水平跟随。光标与选区锚点是 UTF-8 文本的字节偏移，连同水平滚动一起按控件标识跨帧保留；绑定可以是 [`State`](../core/State.md)，也可以是任何 [`Bindable`](../core/Bindable.md) 实现，例如指向模型字段的双向绑定。
 

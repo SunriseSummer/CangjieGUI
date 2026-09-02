@@ -2,7 +2,7 @@
 
 # ImageFit
 
-`cui.media` 包中的 public enum
+位于 `cui.media` 包的公开枚举
 
 图像像素装进分配框的方式，供 [`ImageView`](ImageView.md) 使用：拉伸填满、等比包含或等比覆盖。
 

@@ -2,7 +2,7 @@
 
 # FlowRow
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 把子组件从左到右排布、放不下时自动换到内容高度新行的流式容器。子组件保持各自的测量尺寸、从不被拉伸，是标签墙、单选组、状态胶囊行的自然写法。
 
@@ -147,7 +147,7 @@ public func draw(ctx: UiContext): Unit
 
 ### handle
 
-把事件派发给子组件并返回是否被消费。`Frame` 事件广播给全部子组件并返回 `false`；其余事件保持自后声明者向前、遇到消费者即停止的顺序。点事件会用布局提交的有序 AABB 树跳过不相交的 [`PointerEventScope.LayoutBounds`](PointerEventScope.md) 子树；无界兼容叶和活动捕获仍完整遍历。
+把事件按声明逆序交给子组件，遇到返回 `true` 的组件后停止。显式传入的 `Frame` 事件会广播给全部子组件并返回 `false`；桌面应用的正常帧回调使用独立订阅。对于声明了 [`PointerEventScope.LayoutBounds`](PointerEventScope.md) 的子树，指针事件可以跳过明显不相交的区域；活动手势仍采用保守路由。
 
 ```cangjie
 public func handle(ctx: UiContext, event: UiEvent): Bool

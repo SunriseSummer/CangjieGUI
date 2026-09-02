@@ -2,7 +2,7 @@
 
 # StateMutationPolicyDiagnostics
 
-`cui.core` 包中的 public struct
+位于 `cui.core` 包的公开结构体
 
 显式诊断策略在某一时刻的不可变计数快照。它用于判断等价比较是否真正截断了足够多的状态写入或派生失效，以及
 比较自身的总耗时和最坏耗时是否值得。普通 [`StateMutationPolicy`](StateMutationPolicy.md) 不维护这些字段。

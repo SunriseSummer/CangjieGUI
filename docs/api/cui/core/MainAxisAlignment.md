@@ -2,7 +2,7 @@
 
 # MainAxisAlignment
 
-`cui.core` 包中的 public enum
+位于 `cui.core` 包的公开枚举
 
 栈沿主轴分配剩余空间的策略：靠端、居中或三种等分间隔。[`VStack`](VStack.md) 与 [`HStack`](HStack.md) 的 `mainAxisAlignment` 方法接受它，默认 `Start`。
 

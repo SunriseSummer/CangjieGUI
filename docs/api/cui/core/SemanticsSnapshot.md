@@ -22,11 +22,9 @@ public class SemanticsSnapshot {
 }
 ```
 
-`nodes` 保持声明/布局顺序；重复 id 的最后声明覆盖节点内容和动作目标，同时保留该 id 首次出现的位置。
-`node(id)` 为平均 O(1)。`nodeAt` 在提交期建立的有序 AABB union 树中按逆声明/z 序返回视觉最上层节点，使用
-[`SemanticsNode.visibleBounds`](SemanticsNode.md) 并忽略零面积节点，典型复杂度为 `O(log n + k)`。快照和索引均
-不可变；稳定 retained fragment 的重复快照直接返回已提交数组，不重新扁平化整棵树。
+`nodes` 保持声明和布局顺序。id 重复时，最后一次声明覆盖节点内容和动作目标，但节点仍位于该 id 首次出现的位置。
+`node(id)` 按 id 快速查询；`nodeAt` 使用 [`SemanticsNode.visibleBounds`](SemanticsNode.md)，忽略零面积节点，并返回
+命中位置上显示层级最高的节点。快照及其索引不可变；界面结构未变化时会直接复用上次结果。
 
-`focusedId` 与节点属性在同一事务中提交，不会暴露新焦点配旧树。导航方法使用提交期从代际 Element 所有权投影
-出的父子/兄弟索引，平均 O(1)；没有语义的中间 Element 会被收缩到最近语义祖先。`parentIndexAt` 是平台桥的
-零字符串查找入口：根、越界或无父节点均返回 `-1`，其索引对应 `nodes` 的稳定声明顺序。
+`focusedId` 和节点属性在同一事务中提交，不会出现新焦点与旧节点树混用。父子和兄弟导航会跳过没有语义信息的中间组件。
+`parentIndexAt` 供平台无障碍桥按数组索引查询父节点；根节点、越界索引或无父节点都返回 `-1`。

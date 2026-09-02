@@ -30,30 +30,11 @@
 
 全局 Delete 快捷键只负责发起与行按钮相同的删除请求，不复制确认或修改数组的逻辑。这样鼠标与键盘经过同一检查，也会打开同一个确认对话框。
 
-在[模态与 Toast](modal-and-toast.md)的完整程序中，找到 `app.run` 里最外层的 `ZStack { ... }`，用下面的处理器包住它，并把原根内容整体放回注释位置。补丁只使用基页已有的模型；没有项目时会返回 `false`，让事件继续传播。
-
-```cangjie role=patch
-EventHandler(onEvent: {event =>
-    match (event) {
-        case UiEvent.KeyDown(Key.Delete, _) =>
-            // 外层处理器先收到事件；Modal 打开时必须放行且不改 pendingId。
-            if (model.confirming.value) { false } else { model.requestFirstDelete() }
-        case _ => false
-    }
-}) {
-    // 此处放回 Modal 完整程序原有的整个 ZStack。
-}
-```
+在[模态与 Toast](modal-and-toast.md)的完整程序中，最外层 `EventHandler` 已经把 Delete 映射到 `model.requestFirstDelete()`。没有项目或 Modal 已打开时，动作返回 `false`，让事件继续正常传播，并且不修改待确认对象。
 
 同时把基页 `requestFirstDelete()` 的首个条件保持为 `confirming.value || projects.value.size == 0`。这一动作入口守卫是第二道边界：以后即使菜单或别的根级处理器复用它，也不能在 Modal 已打开时改写待确认对象。
 
-还可以在 Modal 完整程序的 `Label(model.status.value)` 后加入一个工具栏按钮。它与 Delete 键调用同一个 `requestFirstDelete()`，可用于比较鼠标与快捷键是否得到同一确认对话框；按钮是否可见不改变模型守卫：
-
-```cangjie role=variation
-Button("删除第一项", {=>
-    let _ = model.requestFirstDelete()
-}, role: ButtonRole.Danger)
-```
+还可以在状态标签后增加“删除第一项”工具栏按钮，让它同样调用 `requestFirstDelete()`，用于比较鼠标和快捷键是否得到同一个确认对话框。按钮是否存在不改变模型中的守卫条件。
 
 ### 4. 把选择与焦点分开
 

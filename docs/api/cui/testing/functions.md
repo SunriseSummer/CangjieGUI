@@ -15,17 +15,9 @@ public func checkLensLaws<S, A>(
 ): LensLawCheck where S <: Equatable<S>, A <: Equatable<A>
 ```
 
-检查一个具体 witness 的 Get-Put、两个 Put-Get 与一个 Put-Put。调用者应在多个代表值或属性生成值上重复调用。
+检查一组具体输入的 Get-Put、两个 Put-Get 和 Put-Put 规则。应选择相等、不同和边界值，并在需要时结合属性测试重复执行。
 
-```cangjie
-let laws = checkLensLaws<Profile, String>(
-    profileName,
-    source: Profile("林", true),
-    first: "陈",
-    second: "苏"
-)
-@Expect(laws.isLawful())
-```
+例如，可传入一个资料姓名 Lens、原资料和两个候选姓名，再断言返回结果的 `isLawful()` 为 `true`。
 
 ### checkPrismLaws
 

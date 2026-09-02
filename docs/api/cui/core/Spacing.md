@@ -2,7 +2,7 @@
 
 # Spacing
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 4 像素栅格上的间距尺度：七档命名间隔，以虚拟像素的 [`Length`](Length.md) 值表达。按命名档位而非临时数字取间距能保持界面节奏一致——Material、Fluent 与 iOS HIG 共用的设计令牌做法。每档都参与单位系统，如 `.padding(Spacing.md)` 或 `VStack {}.spacing(Spacing.sm)`。全静态字段，不可实例化。
 

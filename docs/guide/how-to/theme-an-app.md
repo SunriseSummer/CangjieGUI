@@ -20,9 +20,13 @@
 
 选择浅色或深色基础主题，在 `DesktopApp` 创建时传入。`Theme` 是不可变值，当前没有运行时 `setTheme` 或 copy/with API；所谓“覆盖”是构造一个完整新值并在应用启动时传入，不是运行中逐项改写。
 
-当内建主题不能表达产品语义时，把完整构造集中在一个工厂函数中。把[设置表单](../tutorials/settings-form.md)的 `DesktopApp(...)` 改为 `DesktopApp(..., theme: appTheme())`，业务页面只消费主题和角色，不复制颜色：
+当内建主题不能表达产品语义时，把完整构造集中在一个工厂函数中。业务页面只消费主题和角色，不复制颜色：
 
-```cangjie role=patch
+```cangjie verify role=complete profile=gui-visual
+package docexample
+
+import cui.*
+
 func appTheme(): Theme {
     Theme(
         bg: Color.rgb(245, 247, 250),
@@ -38,15 +42,23 @@ func appTheme(): Theme {
     )
 }
 
-// 在设置表单 main() 中，用这一行替换原来的 DesktopApp 构造：
-let app = DesktopApp(WindowSpec("账户设置", 460, 320), theme: appTheme())
+main(): Unit {
+    let app = DesktopApp(WindowSpec("主题样张", 460, 320), theme: appTheme())
+    app.run {
+        VStack(spacing: 12.vp) {
+            Label("账户设置").bold()
+            TextField(rememberState<String> {"林"})
+            HStack(spacing: 8.vp) {
+                Button("取消", {=> ()})
+                Button("保存", {=> ()}, role: ButtonRole.Primary)
+                Button("删除", {=> ()}, role: ButtonRole.Danger)
+            }
+        }.padding(20.vp)
+    }
+}
 ```
 
-要比较内建深色主题，不改表单控件树，只把设置表单完整程序创建应用的那一行替换为：
-
-```cangjie role=variation
-let app = DesktopApp(WindowSpec("账户设置（深色）", 460, 320), theme: Theme.dark())
-```
+要比较内建深色主题，不改控件树，只把 `theme: appTheme()` 替换为 `theme: Theme.dark()`，重新启动应用。
 
 ### 2. 用角色表达动作
 

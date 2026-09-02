@@ -2,7 +2,7 @@
 
 # PrismLawCheck
 
-`cui.testing` 包中的 public struct
+位于 `cui.testing` 包的公开结构体
 
 一个和类型源值与一个局部 payload 上的 Prism 往返律检查结果。
 

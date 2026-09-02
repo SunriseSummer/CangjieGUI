@@ -2,7 +2,7 @@
 
 # TimeOfDay
 
-`cui.controls` 包中的 public struct
+位于 `cui.controls` 包的公开结构体
 
 表示一天内的时刻，只有小时（0–23）和分钟（0–59），不含日期与时区；[`TimePicker`](TimePicker.md) 用它保存选中时间。构造时会把任意小时和分钟换算成合法的 24 小时制：总分钟数超过一天就从午夜重新开始，负数则向前回绕。因此 `TimePicker` 不会保留 24:00、10:75 这类无效时间。
 

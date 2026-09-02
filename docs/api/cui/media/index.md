@@ -6,7 +6,7 @@
 import cui.media.*
 ```
 
-图像与自绘包：文件图像视图 [`ImageView`](ImageView.md)（解码纹理进入按 UI 线程/渲染器隔离的有界路径缓存，可内联声明）、自由绘制表面 [`CanvasWidget`](CanvasWidget.md)（把原始渲染器交给回调），以及缓存刷新与诊断函数。
+图像与自绘包。[`ImageView`](ImageView.md) 显示文件图片并使用有界纹理缓存；[`CanvasWidget`](CanvasWidget.md) 把渲染器和布局矩形交给绘制回调；包级函数负责刷新和检查图像缓存。
 
 ## 类型
 
@@ -14,7 +14,7 @@ import cui.media.*
 
 | 类型 | 说明 |
 |---|---|
-| [`CanvasWidget`](CanvasWidget.md) | 自由绘制表面：弹性填满分得的空间、画主题输入底色、裁剪到框，然后把原始 `Renderer` 与框矩形交给 `onDraw`——坐标是绝对的，绘制方从矩形偏移、不从零点起。 |
+| [`CanvasWidget`](CanvasWidget.md) | 在组件矩形内使用原始 Renderer 自由绘制，并可处理指针事件。 |
 | [`ImageView`](ImageView.md) | 显示从文件加载的图像。 |
 
 **结构体**

@@ -2,7 +2,7 @@
 
 # StepIndicator
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 多步流程（结账、引导、向导）的横向步骤进度条：编号节点由连接线串起，`current` 之前的步骤实心打勾、当前步高亮、其后置灰。每步的标签位于对应节点下方。
 

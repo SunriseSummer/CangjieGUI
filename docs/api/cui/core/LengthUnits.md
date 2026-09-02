@@ -2,7 +2,7 @@
 
 # LengthUnits
 
-`cui.core` 包中的 public interface
+位于 `cui.core` 包的公开接口
 
 为数值字面量提供 `.px`/`.vp`/`.fp` 长度后缀的接口。`Int64` 与 `Float64` 的[扩展](extensions.md)实现了它，使 `100.px`、`24.vp`、`1.5.vp`、`15.fp` 直接产出 [`Length`](Length.md)；导入本接口（`cui` 根包已再导出）即启用后缀。
 

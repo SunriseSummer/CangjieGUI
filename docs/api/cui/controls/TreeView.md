@@ -2,7 +2,7 @@
 
 # TreeView
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 带展开/折叠的层级列表——文件浏览器、大纲、导航树。节点由 [`TreeNode`](TreeNode.md) 根数组描述；视图把当前展开的节点摊平成行，只绘制视口附近的行（大树也只花一屏的代价），用户点行选中、点箭头或用键盘揭示层级。
 

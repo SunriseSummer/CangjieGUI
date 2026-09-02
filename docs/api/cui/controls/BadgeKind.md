@@ -2,7 +2,7 @@
 
 # BadgeKind
 
-`cui.controls` 包中的 public enum
+位于 `cui.controls` 包的公开枚举
 
 `Badge` 徽标的语义配色：中性、主题强调色，或信息/成功/警告/危险四种状态色。[`Badge`](Badge.md) 按它取基色；`Neutral`、`Accent`、`Danger` 跟随主题，`Info`、`Success`、`Warning` 用固定语义色，经软化底色处理后明暗主题皆可读。
 

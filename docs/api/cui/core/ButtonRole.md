@@ -2,7 +2,7 @@
 
 # ButtonRole
 
-`cui.core` 包中的 public enum
+位于 `cui.core` 包的公开枚举
 
 按钮的语义角色：常规、主要或危险，决定主题为按钮生成的表面配色。[`Button`](Button.md) 与 [`IconButton`](IconButton.md) 的 `role` 参数接受它，[`Theme.buttonSurface`](Theme.md#buttonsurface) 把它翻译成实际的填充、边框与阴影。
 

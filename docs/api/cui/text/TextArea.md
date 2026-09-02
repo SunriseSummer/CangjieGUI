@@ -2,7 +2,7 @@
 
 # TextArea
 
-`cui.text` 包中的 public class
+位于 `cui.text` 包的公开类
 
 多行文本编辑控件：把编辑写回绑定的 `Bindable<String>`，带垂直滚动与右缘滚动条，行间导航按字节列对齐。沿用单行编辑的全部桌面惯例（多击选择、Ctrl 快捷键表、分组撤销），文档的行拆分按文本修订号缓存，滚动不会每帧重拆整篇文本；绑定可以是 [`State`](../core/State.md)，也可以是任何 [`Bindable`](../core/Bindable.md) 实现。
 

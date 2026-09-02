@@ -2,7 +2,7 @@
 
 # Picker
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 在一组有限字符串项之间前后切换的紧凑选择器：两端各一枚 ‹ › 按钮、中间显示当前项，切换在两端回绕。适合视图粒度、周期等少量循环选项；要一次看到全部候选项时用弹出式的 [`Dropdown`](Dropdown.md)。
 

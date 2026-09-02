@@ -2,7 +2,7 @@
 
 # LengthUnit
 
-`cui.core` 包中的 public enum
+位于 `cui.core` 包的公开枚举
 
 长度值的单位：物理像素 `Px`、虚拟像素 `Vp` 或随用户字体缩放的字体像素 `Fp`。[`Length`](Length.md) 携带它，[`UiContext.resolve`](UiContext.md#resolve) 在布局时据此把数值换算为逻辑像素。
 

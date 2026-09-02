@@ -2,7 +2,7 @@
 
 # LensLawCheck
 
-`cui.testing` 包中的 public struct
+位于 `cui.testing` 包的公开结构体
 
 一个具体源值和两个焦点值上的 Lens 三定律检查结果。有限样本不能证明所有输入上的定律，但能把模型测试中的
 Get-Put、Put-Get 与 Put-Put 义务变成统一、可定位的可执行反例。

@@ -2,7 +2,7 @@
 
 # TimePicker
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 带弹出选择面板的时间字段：闭合时显示绑定的 [`TimeOfDay`](TimeOfDay.md)，点击（或聚焦后按 Enter/Space/Down）经交互浮层弹出面板，面板把 24 小时网格与逐分钟编辑器配成一对。绑定值始终是合法的 24 小时制时刻。
 

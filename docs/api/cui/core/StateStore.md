@@ -2,7 +2,7 @@
 
 # StateStore
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 跨声明式重建保留显式键控局部状态的容器：一次完整构建未访问的条目会被移除，与视图卸载语义一致。应用代码通常不直接持有它，而是在 [`DesktopApp`](../desktop/DesktopApp.md) 构建中经 [`rememberState`](functions.md#rememberstate) 使用。
 

@@ -2,7 +2,7 @@
 
 # Chip
 
-`cui.controls` 包中的 public class
+位于 `cui.controls` 包的公开类
 
 可选中的过滤标签：绑定 `Bindable<Bool>` 的圆角胶囊，点击（或聚焦后 Space/Enter）即切换选中。选中时填充主题强调色，未选中时是描边的空心字段；一排 Chip 即一组开关式过滤器。
 

@@ -2,7 +2,7 @@
 
 # LazyList
 
-`cui.core` 包中的 public class
+位于 `cui.core` 包的公开类
 
 可由高度模型或可见行自测量驱动的惰性垂直列表，是 [`LazyColumn`](LazyColumn.md) 的变高对应物。聊天气泡、评论、带折行文本的卡片这类“行高随内容”的列表，构建、布局与绘制同样只花一屏的成本。
 
@@ -18,7 +18,10 @@ LazyList <: [`Widget`](Widget.md)
 
 ## 说明
 
-行偏移保存在 Fenwick extent 索引中，前缀定位与单点高度更新为 O(log N)。`measured` 形式只要求一个初始估计高度：行进入预取窗口后，框架测量 intrinsic height，并把整批可见结果合并为一次稳定化更新；宽度、字体或显示环境变化会自动清除旧测量。业务不再维护逐行高度数组。给出唯一稳定 key 后，插入、删除或重排还会把已经学到的高度按 key 迁移到新索引；稳定帧不扫描全量 key，只有结构版本改变时做一次 O(N) 重索引。
+框架使用前缀和索引保存行高，因此定位行和更新单行高度都是 O(log N)。`measured` 形式只需要初始估计高度：行进入
+预取范围后，框架测量其实际高度，并把本批可见行结果合并为一次更新。宽度、字体或显示环境变化会自动清除旧测量，
+业务无需维护逐行高度数组。提供唯一且稳定的 key 后，插入、删除或重排还会把已测高度迁移到新索引；只有数据结构变化时
+才执行一次 O(N) 重索引。
 
 兼容的 `heightOf` 形式在未给 `revision` 时每次构建扫描全部高度，确保任意闭包变化仍正确；它也保留随滚动重建的兼容语义，因为框架无法观察闭包捕获的高度是否变化。若高度和 key 顺序在版本不变期间稳定，传 `revision` 后只在版本变化时重建索引，并像固定高度列表一样把区间内滚动降为布局变换。`State<Array<T>>`、[`LazyListExtents`](LazyListExtents.md) 与 `measured` 形式均具有可观察版本，自动使用相位分离；`LazyListExtents.update` 不扫描其余行。
 
@@ -175,12 +178,7 @@ public static func measured<T>(
 ): LazyList
 ```
 
-```cangjie
-LazyList.measured(messageState, estimatedHeight: 72.0,
-    key: {message => message.id}, id: "thread") {
-    message => MessageBubble(message)
-}
-```
+例如，消息列表可使用 72 逻辑像素估计高度、消息 ID 作为稳定 key，并为列表设置稳定 id；实际行高仍由内容测量。
 
 估计值只影响尚未测量区域的初始滚动条和预取范围，不会强制行高。首次发现内容是否需要滚动条时最多经历“初始宽度、滚动条宽度、稳定证明”三次同帧稳定化 pass；之后稳定可见行命中缓存。精确固定高度场景继续使用开销最低的 [`LazyColumn`](LazyColumn.md)。
 
@@ -230,11 +228,7 @@ public static func of<T>(
 
 **返回值** `LazyList` — 配置好的列表。
 
-```cangjie
-LazyList.of(model.messages, {m => m.height}, key: {m => m.id}) {
-    msg => bubble(msg)
-}
-```
+例如，消息模型已保存高度时，可把高度读取函数和消息 ID key 一起传给 `LazyList.of`。
 
 ### ofExtents
 
