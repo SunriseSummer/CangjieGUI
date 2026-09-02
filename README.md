@@ -14,18 +14,12 @@
 ## 开发环境
 
 - Cangjie SDK 1.0.5
-- API 与条件编译目标为 Windows/macOS/Linux；当前完整自动/真实窗口验收证据来自 Windows，另外两个平台的
-  未完成验证项见[完成度审计](docs/next-generation-completion-audit.md)
-- 三平台构建、真实窗口、干净交付与性能证据由
-  [cross-platform qualification](.github/workflows/cross-platform-qualification.yml) 统一编排；平台 runner 和动态库
-  前置契约见[开发工具说明](.dev/README.md)
-- Linux x64/macOS arm64 另有全新 GitHub 托管机 portability lane：从带大小/SHA-256 的固定官方 SDK 与 SDL 源码
-  开始，验证安全 bootstrap、源码链接、无头包测试和全部示例编译；真实桌面与性能结论仍只来自 qualification
+- Windows/Mac/Linux
 - 参阅 [`CangjieSDL`](https://github.com/SunriseSummer/CangjieSDL) 项目文档，根据目标平台规格配置 SDL 和 SDL_ttf 动态库
 
 > [!IMPORTANT]
 >
-> 发布和部署基于 CUI 的桌面软件时，请确保 SDL 和 SDL_ttf 动态库位于仓颉可执行文件目录，或在目标平台的动态库搜索路径中，即可以作为私有资产打包或在目标平台作为公共运行时安装。Windows 构建还应携带与框架同版的 `cui_uia.dll`，以启用内建 UI Automation provider。
+> 发布和部署基于 CUI 的桌面软件时，请确保 SDL 和 SDL_ttf 动态库位于仓颉可执行文件目录，或在目标平台的动态库搜索路径中，即可以作为私有资产打包或在目标平台作为公共运行时安装。
 
 ## 快速开始
 
