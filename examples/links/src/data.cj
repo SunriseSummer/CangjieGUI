@@ -5,7 +5,7 @@
  */
 package cui_links
 
-import cui.{Color, IconName}
+import cui.{Color, IconSource}
 
 // 通知行的一个片段：文本 + 是否为链接。
 struct Segment {
@@ -20,11 +20,11 @@ struct Segment {
 
 // 一条通知：图标、图标色、若干片段。
 struct Notice {
-    let icon: IconName
+    let icon: IconSource
     let iconColor: Color
     let segments: Array<Segment>
 
-    init(icon: IconName, iconColor: Color, segments: Array<Segment>) {
+    init(icon: IconSource, iconColor: Color, segments: Array<Segment>) {
         this.icon = icon
         this.iconColor = iconColor
         this.segments = segments
@@ -34,34 +34,33 @@ struct Notice {
 let ICON_ADDED = Color.rgb(52, 199, 120)
 let ICON_FIXED = Color.rgb(230, 168, 70)
 let ICON_UPDATED = Color.rgb(96, 165, 250)
-
 let NOTICES: Array<Notice> = [
     Notice(
-        IconName.NewDocument,
+        IconSource("assets/icons/document.svg"),
         ICON_ADDED,
         [Segment("Ada", isLink: true), Segment(" 新建了 "), Segment("report.md", isLink: true), Segment(" 并 @了 "),
             Segment("你", isLink: true)]
     ),
     Notice(
-        IconName.Brush,
+        IconSource("assets/icons/brush.svg"),
         ICON_FIXED,
         [Segment("小满", isLink: true), Segment(" 修复了 "), Segment("#登录崩溃", isLink: true), Segment(" 请 "),
             Segment("周珩", isLink: true), Segment(" 复审")]
     ),
     Notice(
-        IconName.Refresh,
+        IconSource("assets/icons/refresh.svg"),
         ICON_UPDATED,
         [Segment("周珩", isLink: true), Segment(" 更新了 "), Segment("设计规范", isLink: true), Segment(" 到 "),
             Segment("v3", isLink: true)]
     ),
     Notice(
-        IconName.Save,
+        IconSource("assets/icons/save.svg"),
         ICON_UPDATED,
         [Segment("Ada", isLink: true), Segment(" 在 "), Segment("#发布计划", isLink: true), Segment(" 里提到了 "),
             Segment("里程碑 M2", isLink: true)]
     ),
     Notice(
-        IconName.Copy,
+        IconSource("assets/icons/copy.svg"),
         ICON_ADDED,
         [Segment("小满", isLink: true), Segment(" 复制了 "), Segment("模板/周报.md", isLink: true), Segment(" 到 "),
             Segment("团队空间", isLink: true)]

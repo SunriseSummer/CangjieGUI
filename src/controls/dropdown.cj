@@ -34,6 +34,7 @@ public class Dropdown <: Widget {
     private let popupScroll: State<Float32>
     private let popupBar: ScrollBar
     private var frame = Rect.zero()
+    private var rowHeight: Float32 = CUI_SMALL_H
 
     public init(items: Array<String>, selected: Bindable<Int64>, key!: ?String = None) {
         let ident = resolveControlKey(key, "Dropdown")
@@ -48,11 +49,13 @@ public class Dropdown <: Widget {
         emit(this)
     }
 
-    public func measure(_: UiContext, available: Size): Size {
-        Size(min(available.w, DROPDOWN_DEFAULT_W), CUI_CONTROL_H)
+    public func measure(ctx: UiContext, available: Size): Size {
+        rowHeight = ctx.textRowHeight()
+        Size(min(available.w, DROPDOWN_DEFAULT_W), ctx.textRowHeight(minHeight: CUI_CONTROL_H, padding: 16.0))
     }
 
     public func layout(ctx: UiContext, rect: Rect): Unit {
+        rowHeight = ctx.textRowHeight()
         frame = rect
         registerRectOverlayWhen(ctx, open.value, {=> popupRect(ctx)}, {c, e, popup => handleOverlay(c, e, popup)},
             {c, popup => drawPopup(c, popup)}, overlayOwner)
@@ -62,8 +65,9 @@ public class Dropdown <: Widget {
         drawSurface(ctx, frame, ctx.theme.fieldSurface(active: ctx.showFocusRing(id) || open.value))
         let labelArea = Rect(frame.x + 10.0, frame.y, max(0.0, frame.w - 40.0), frame.h)
         ctx.renderer.pushClip(labelArea)
-        let textY = frame.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
-        ctx.renderer.text(currentLabel(), labelArea.x, textY, ctx.theme.text, pointSize: FontSizes.CONTROL)
+        let textY = frame.centerY() - ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.CONTROL)) / 2.0
+        ctx.text(currentLabel(), labelArea.x, textY, ctx.theme.text,
+            pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
         ctx.renderer.popClip()
         drawFieldChevron(ctx, frame)
 
@@ -111,12 +115,12 @@ public class Dropdown <: Widget {
     private func openPopup(ctx: UiContext): Unit {
         open.value = true
         let listH = listHeight(popupRect(ctx))
-        let target = Float32(selected.value) * CUI_SMALL_H - (listH - CUI_SMALL_H) / 2.0
+        let target = Float32(selected.value) * rowHeight - (listH - rowHeight) / 2.0
         popupScroll.value = clampScrollOffset(target, contentHeight(), listH)
     }
 
     private func contentHeight(): Float32 {
-        Float32(items.size) * CUI_SMALL_H
+        Float32(items.size) * rowHeight
     }
 
     private func listHeight(popup: Rect): Float32 {
@@ -199,13 +203,13 @@ public class Dropdown <: Widget {
     // shared with ListView and Table keyboard navigation.
     private func revealRow(index: Int64, popup: Rect): Unit {
         let listH = listHeight(popup)
-        let rowTop = Float32(index) * CUI_SMALL_H
+        let rowTop = Float32(index) * rowHeight
         var next = popupScroll.value
         if (rowTop < next) {
             next = rowTop
         }
-        if (rowTop + CUI_SMALL_H > next + listH) {
-            next = rowTop + CUI_SMALL_H - listH
+        if (rowTop + rowHeight > next + listH) {
+            next = rowTop + rowHeight - listH
         }
         let clamped = clampScrollOffset(next, contentHeight(), listH)
         if (clamped != popupScroll.value) {
@@ -219,7 +223,7 @@ public class Dropdown <: Widget {
         if (y < popup.y + DROPDOWN_POPUP_PAD || y >= popup.bottom() - DROPDOWN_POPUP_PAD) {
             return -1
         }
-        Int64((y - popup.y - DROPDOWN_POPUP_PAD + popupScroll.value) / CUI_SMALL_H)
+        Int64((y - popup.y - DROPDOWN_POPUP_PAD + popupScroll.value) / rowHeight)
     }
 
     /*
@@ -237,7 +241,7 @@ public class Dropdown <: Widget {
         if (fullHeight <= above) {
             return Rect(frame.x, frame.y - DROPDOWN_GAP - fullHeight, frame.w, fullHeight)
         }
-        let height = max(CUI_SMALL_H + DROPDOWN_POPUP_PAD * 2.0, max(below, above))
+        let height = max(rowHeight + DROPDOWN_POPUP_PAD * 2.0, max(below, above))
         if (below >= above) {
             Rect(frame.x, frame.bottom() + DROPDOWN_GAP, frame.w, height)
         } else {
@@ -262,10 +266,10 @@ public class Dropdown <: Widget {
         }
         let rowW = max(0.0, popup.w - 8.0 - gutter)
         ctx.renderer.pushClip(list)
-        var i = Int64(offset / CUI_SMALL_H)
-        var y = list.y - (offset - Float32(i) * CUI_SMALL_H)
+        var i = Int64(offset / rowHeight)
+        var y = list.y - (offset - Float32(i) * rowHeight)
         while (i < items.size && y < list.bottom()) {
-            let row = Rect(popup.x + 4.0, y, rowW, CUI_SMALL_H)
+            let row = Rect(popup.x + 4.0, y, rowW, rowHeight)
             if (i == selected.value) {
                 ctx.renderer.fillRoundedRect(row, ctx.theme.smallRadius, ctx.theme.accent)
                 drawRowLabel(ctx, items[i], row, ctx.theme.accentText)
@@ -275,7 +279,7 @@ public class Dropdown <: Widget {
             } else {
                 drawRowLabel(ctx, items[i], row, ctx.theme.text)
             }
-            y += CUI_SMALL_H
+            y += rowHeight
             i += 1
         }
         ctx.renderer.popClip()
@@ -283,8 +287,8 @@ public class Dropdown <: Widget {
     }
 
     private func drawRowLabel(ctx: UiContext, text: String, row: Rect, color: Color): Unit {
-        let textY = row.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
-        ctx.renderer.text(text, row.x + 8.0, textY, color, pointSize: FontSizes.CONTROL)
+        let textY = row.centerY() - ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.CONTROL)) / 2.0
+        ctx.text(text, row.x + 8.0, textY, color, pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
     }
 
     private func popupSurface(ctx: UiContext): SurfaceStyle {

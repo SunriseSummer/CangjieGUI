@@ -50,7 +50,7 @@ Reveal(shown: open, key: "faq-${index}") {
 }
 ```
 
-`Reveal` 内部以 `localState` 持有 `Animator`，即时模式每帧重建不丢动画进度；创建即处于目标态时
+`Reveal` 内部以 `localState` 持有 `Animator`，所属声明重新构建也不丢动画进度；创建即处于目标态时
 不产生动画（静态快照稳定）。
 
 ## 运行
@@ -65,3 +65,9 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot disclosure.bmp"
 ```
+
+## 练习与验收
+
+用鼠标和键盘展开同一项，检查高度动画与焦点反馈。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

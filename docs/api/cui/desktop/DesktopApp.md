@@ -14,8 +14,11 @@ public class DesktopApp
 
 ## 运行规则
 
+应用必须在程序原生主线程创建并在同一线程运行。GUI 状态有仓颉线程所有权检查，SDL 窗口／渲染资源同时检查原生 OS 线程，窗口存活期间自动持有运行时线程绑定；UI 线程不要使用会暂停输入和绘制的 `Future.get()` 等等待，后台结果通过 `post` 或非阻塞轮询接回。错误线程调用 `run` 会在改变运行状态前拒绝。
+
+- 窗口从创建起保持隐藏，字体初始化和首次构建／布局／绘制均在隐藏期间完成；首个完整帧成功提交后自动显示，再请求一次重绘以处理显示与 DPI 变化。构造后尚未调用 `run` 时窗口不可见，首帧失败或已请求关闭时不会显示空窗口。
 - 应用统一管理焦点、悬停、连续点击、指针捕获和浮层。浮层先于普通组件树接收命中的事件。
-- 除 [`post`](#post) 外，窗口、资源、文件对话框、批处理和 `run` 都只能在应用的 UI 线程调用；错误线程会抛出 `IllegalStateException`。
+- 除 [`post`](#post) 和 [`postStats`](#poststats) 外，窗口、资源、文件对话框、批处理和 `run` 都只能在应用的 UI 线程调用；错误线程会抛出 `IllegalStateException`。
 - 一次输入或 `post` 动作中的多次状态写入会作为一个事务提交。布局代码如果持续修改状态，应用最多在本帧尝试三轮稳定化，剩余工作留到下一帧，避免无限循环。
 - 开启垂直同步时，呈现过程负责帧节奏；应用不会再叠加固定延时。
 - `--profile` 输出构建、布局和绘制耗时分布、稳定化次数、触发来源、局部重绘次数和文本测量数据。
@@ -91,7 +94,8 @@ public init(
     frameDelay!: UInt32 = UInt32(16),
     fontScale!: Float32 = 1.0,
     metadata!: ?AppMetadata = None,
-    hints!: Array<SdlHintSetting> = []
+    hints!: Array<SdlHintSetting> = [],
+    maxPendingPosts!: Int64 = 4096
 )
 ```
 
@@ -103,6 +107,7 @@ public init(
 - `fontScale!`: `Float32` — 应用到 `fp` 长度的用户字体缩放；下限 0.1。默认 `1.0`。
 - `metadata!`: `?AppMetadata` — 应用名/版本等元数据（sdl.system）。默认 `None`。
 - `hints!`: `Array<SdlHintSetting>` — 建窗前应用的 SDL hint。默认空。
+- `maxPendingPosts!`: `Int64` — 等待执行的后台动作容量，默认 4096；必须大于零，否则在建窗前抛出 `IllegalArgumentException`。
 
 **异常**
 
@@ -112,7 +117,7 @@ public init(
 
 ### manage
 
-注册退出时自动关闭的资源（逆序关闭）。某个资源关闭失败不会阻止其余资源和窗口继续清理；全部清理完成后重新抛出首个清理异常。应用停止后调用会抛出 `IllegalStateException`。
+注册退出时自动关闭的资源（逆序关闭）。某个资源关闭失败不会阻止其余资源和窗口继续清理；全部清理完成后统一报告异常；单个异常保持原类型，多个异常聚合为 `UiAggregateException`。应用停止后调用会抛出 `IllegalStateException`。
 
 ```cangjie
 public func manage(resource: Resource): Unit
@@ -164,7 +169,7 @@ public func clearRememberedState(): Unit
 public func batch(action: () -> Unit): Unit
 ```
 
-在 UI 线程执行一个原子动作。多次状态写入只产生一次应用更新；同一状态的观察通知合并为“批次前值 → 最终值”，派生观察者在全部源稳定后运行一次。某个观察者失败不会阻止其余依赖更新，框架完成事务后再抛出最先发生的异常。嵌套 `batch` 仍由最外层统一提交。后台结果应使用 [`post`](#post)，不要跨线程调用本方法。
+在 UI 线程执行一个原子动作。多次状态写入只产生一次应用更新；同一状态的观察通知合并为“批次前值 → 最终值”，派生观察者在全部源稳定后运行一次。某个观察者失败不会阻止其余依赖更新，框架完成事务后统一报告异常；单个异常保持原类型，多个异常聚合为 `UiAggregateException`。嵌套 `batch` 仍由最外层统一提交。后台结果应使用 [`post`](#post)，不要跨线程调用本方法。
 
 ### retainedDiagnostics
 
@@ -213,7 +218,33 @@ public func takeAccessibilityFailures(): Array<AccessibilityFailure>
 public func post(action: () -> Unit): Bool
 ```
 
-把动作加入线程安全队列并推送 SDL 唤醒事件。动作稍后在 UI 线程事务中执行。运行中若 SDL 拒绝极少见的唤醒事件，返回 `false`，但动作仍由最长 250 ms 的有界事件等待兜底取出；应用停止后返回 `false` 且不再接收动作，已接受但尚未执行的动作会在关闭时丢弃。应用负责在退出前取消或 join 自己的工作任务。
+动作按入队顺序在 UI 线程事务中执行。`true` 表示已接收；`false` 保证未入队，原因是容量已满或应用已经停止。唤醒失败不会撤销接收，最长 250 ms 的事件等待仍会取出动作，失败计入 `postStats().wakeFailures`。每次最多执行 256 个动作，剩余动作安排续帧，连锁投递不会无限占住同一轮调度。
+
+动作必须短且不阻塞；接收不代表必定执行，退出会丢弃尚未执行的动作。应用应先停止生产任务，UI 线程通过非阻塞轮询或投递获取完成结果，不能在帧循环中阻塞等待工作线程。
+
+### postStats
+
+```cangjie
+public func postStats(): DesktopPostStats
+```
+
+从任意线程取得队列快照，字段见 [DesktopPostStats](DesktopPostStats.md)。停止后仍可查询。
+
+### setCloseRequestHandler
+
+```cangjie
+public func setCloseRequestHandler(handler: ?(CloseRequest) -> Unit): Unit
+```
+
+在创建应用的 UI 线程安装异步关闭确认。系统关窗、Quit 事件与 `app.requestClose()` 统一调用它；默认或设为 `None` 时立即接受。回调不能阻塞，应保留请求并展示 Modal；同一请求未决期间的重复关闭会被合并。处理器抛错时撤销该未决请求并传播异常。
+
+### requestClose
+
+```cangjie
+public func requestClose(): Unit
+```
+
+在 UI 线程请求正常关闭，允许处理器取消或延后；[CloseRequest](CloseRequest.md) 的 `accept()` 才进入清理。底层 `UiContext.requestClose()` 保留直接退出语义，会绕过确认，业务退出按钮应使用 `app.requestClose()`。详见[桌面生命周期](../../../guide/how-to/desktop-lifecycle.md)。
 
 ### openFileDialog
 
@@ -280,6 +311,10 @@ public func run(body: () -> Unit): Unit
 **参数**
 
 - `body`: `() -> Unit` — 界面构建函数，声明整个界面。
+
+## 运行与清理同时失败
+
+`run()` 在主流程异常后仍尝试停止投递、逆序关闭受管资源、关闭无障碍桥、清理状态与 effect，以及关闭原生窗口。只有一个异常时重抛原对象；多个异常时抛出 [`UiAggregateException`](../core/UiAggregateException.md)，其中 `primary` 保留主流程最早的错误，`failures` 包含后续清理错误及原始堆栈。失败回调不能保证资源已经成功关闭，应用应检查这些错误并实施自己的恢复策略。
 
 ## 另请参阅
 

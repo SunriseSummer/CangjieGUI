@@ -140,6 +140,10 @@ public func binding<Value>(
 任务；后台结果必须通过 [`DesktopApp.post`](../desktop/DesktopApp.md#post) 回到 UI 线程，再派发成功/失败 Action。
 CUI 刻意不提供自动同步 `send`、隐式任务树或全局中间件，避免把重入顺序、取消和线程语义藏进 Store。
 
+## 复合失败
+
+模型提交后，观察者失败仍不妨碍 effect 交付一次；若交付也失败，使用 [`UiAggregateException`](UiAggregateException.md) 同时保留提交后通知异常与交付异常，按发生顺序排列。单一异常仍原样重抛，已提交的模型不会回滚，框架不会自动重复执行 effect。
+
 ## 另请参阅
 
 - [`EffectBatch`](EffectBatch.md) 与 [`Transition`](Transition.md) — 效果代数和值语义。

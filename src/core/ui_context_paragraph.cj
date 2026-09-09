@@ -22,6 +22,7 @@ extend UiContext {
         font: ?String,
         compute: () -> ParagraphLayout
     ): ParagraphLayout {
-        paragraphCache.getOrCompute(text, width, pointSize, maxLines, style, font, compute)
+        paragraphCache.getOrCompute(ParagraphCacheKey(text, width, pointSize, style, font, maxLines, uiEnvironmentKey()),
+            compute)
     }
 }

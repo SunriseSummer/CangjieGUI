@@ -9,7 +9,7 @@ extend UiContext {
             displayScaleValue
         }
         set(value) {
-            let normalized = max(0.001, value)
+            let normalized = normalizedUiScale(value, 0.001)
             if (displayScaleValue != normalized) {
                 displayScaleValue = normalized
                 advanceUiEnvironment()
@@ -23,7 +23,7 @@ extend UiContext {
             fontScaleValue
         }
         set(value) {
-            let normalized = max(0.1, value)
+            let normalized = normalizedUiScale(value, 0.1)
             if (fontScaleValue != normalized) {
                 fontScaleValue = normalized
                 advanceUiEnvironment()
@@ -48,7 +48,15 @@ extend UiContext {
                 advanceUiEnvironment()
             }
         }
-        UiEnvironmentKey(uiEnvironmentGeneration)
+        let scale = renderer.textMeasurementScale()
+        let family = match (renderer.effectiveFontFamily()) {
+            case Some(name) => name
+            case None => ""
+        }
+        UiEnvironmentKey(uiEnvironmentGeneration, rasterScaleX: scale.w.toBits(), rasterScaleY: scale.h.toBits(),
+            fontRevision: Fonts.revision(), fontFamily: family, textSize: textSize().toBits(),
+            textStyle: effectiveFontStyle().ttfFlags(), fontWeight: effectiveFontStyle().weight.value,
+            fontVariations: effectiveFontStyle().variations.key())
     }
 
     /** Converts a unit-carrying length into logical (virtual) pixels. */
@@ -68,5 +76,13 @@ extend UiContext {
             max(0.0, resolve(insets.bottom)),
             max(0.0, resolve(insets.left))
         )
+    }
+}
+
+private func normalizedUiScale(value: Float32, minimum: Float32): Float32 {
+    if (value.isNaN() || value.isInf()) {
+        1.0
+    } else {
+        max(minimum, value)
     }
 }

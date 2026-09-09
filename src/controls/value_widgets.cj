@@ -1,5 +1,6 @@
 package cui.controls
 
+import std.math.floor
 import sdl.{FontSizes, Key, MouseButton, Pen, Rect, Size, UiEvent, clampF32}
 import cui.core.{Bindable, CUI_CONTROL_H, CUI_SMALL_H, CursorShape, Observable, Spring, UiContext, Widget,
     claimHoverIfInside, controlIdentity, drawSurface, emit, localState, registerFocusable, resolveControlKey}
@@ -18,18 +19,20 @@ public class ProgressBar <: Widget {
     private var frame = Rect.zero()
 
     public init(value: Observable<Float32>, lower!: Float32 = 0.0, upper!: Float32 = 1.0) {
+        validateValueRange(lower, upper)
         this.value = value
-        this.lowerBound = lower
-        this.upperBound = upper
+        this.lowerBound = min(lower, upper)
+        this.upperBound = max(lower, upper)
         // The fill eases toward the value, so a jump slides rather than snaps. Retained across
         // rebuilds and started at the current amount, so a static first frame is snapshot-stable.
-        let startAmount = normalizedAmount(value.get(), lower, upper)
+        let startAmount = normalizedAmount(value.get(), lowerBound, upperBound)
         this.fillSpring = localState<Spring>("${controlIdentity("ProgressBar")}:fill") {Spring(startAmount)}.value
         emit(this)
     }
 
     /** Sets the inclusive value range represented by the bar. */
     public func range(lower: Float32, upper: Float32): ProgressBar {
+        validateValueRange(lower, upper)
         lowerBound = min(lower, upper)
         upperBound = max(lower, upper)
         this
@@ -52,7 +55,8 @@ public class ProgressBar <: Widget {
         let fill = Rect(frame.x, frame.y, frame.w * shown, frame.h)
         drawSurface(ctx, frame, ctx.theme.fieldSurface())
         ctx.renderer.fillRoundedRect(fill, ctx.theme.smallRadius, ctx.theme.accent)
-        ctx.renderer.textCenter("${Int64(shown * 100.0)}%", frame, ctx.theme.text, pointSize: FontSizes.CAPTION)
+        ctx.textCenter("${Int64(shown * 100.0)}%", frame, ctx.theme.text,
+            pointSize: ctx.textSize(fallback: FontSizes.CAPTION))
     }
 
     public func handle(_: UiContext, _: UiEvent): Bool {
@@ -77,10 +81,11 @@ public class Slider <: Widget {
     public init(value: Bindable<Float32>, key!: ?String = None, lower!: Float32 = 0.0, upper!: Float32 = 1.0,
         step!: Float32 = 0.0) {
         this.id = resolveControlKey(key, "Slider")
+        validateValueRange(lower, upper)
         this.value = value
-        this.lowerBound = lower
-        this.upperBound = upper
-        this.stepSize = max(0.0, step)
+        this.lowerBound = min(lower, upper)
+        this.upperBound = max(lower, upper)
+        this.stepSize = checkedValueStep(step)
         // Snap the initial value only for a discrete slider, so a continuous slider keeps its exact
         // starting value (byte-identical to before this parameter existed).
         if (stepSize > 0.0) {
@@ -92,6 +97,7 @@ public class Slider <: Widget {
 
     /** Sets the inclusive value range controlled by the slider. */
     public func range(lower: Float32, upper: Float32): Slider {
+        validateValueRange(lower, upper)
         lowerBound = min(lower, upper)
         upperBound = max(lower, upper)
         // Write only when normalizing changes the value: this runs on every frame's rebuild,
@@ -106,13 +112,13 @@ public class Slider <: Widget {
      * range the same way.
      */
     public func step(step: Float32): Slider {
-        stepSize = max(0.0, step)
+        stepSize = checkedValueStep(step)
         applyNormalize()
         this
     }
 
-    public func measure(_: UiContext, available: Size): Size {
-        Size(min(available.w, VALUE_CONTROL_W), CUI_CONTROL_H)
+    public func measure(ctx: UiContext, available: Size): Size {
+        Size(min(available.w, VALUE_CONTROL_W), ctx.textRowHeight(minHeight: CUI_CONTROL_H, padding: 12.0))
     }
 
     public func layout(_: UiContext, rect: Rect): Unit {
@@ -188,14 +194,14 @@ public class Slider <: Widget {
     // Clamps to the range, then (for a discrete slider) snaps to the nearest step multiple. With
     // stepSize <= 0 this is a plain range clamp, so the continuous path is unchanged.
     private func normalize(raw: Float32): Float32 {
-        let clamped = clampF32(raw, lowerBound, upperBound)
+        let clamped = safeValue(raw, lowerBound, upperBound)
         if (stepSize <= 0.0) {
             return clamped
         }
-        // clamped >= lowerBound, so the quotient is non-negative and Int64(.. + 0.5) rounds to
-        // nearest. A step that overshoots the range is pulled back to the bound by the final clamp.
-        let steps = Float32(Int64((clamped - lowerBound) / stepSize + 0.5))
-        clampF32(lowerBound + steps * stepSize, lowerBound, upperBound)
+        // Float64 arithmetic keeps tiny steps and large finite values out of integer overflow.
+        let steps = floor((Float64(clamped) - Float64(lowerBound)) / Float64(stepSize) + 0.5)
+        let snapped = Float64(lowerBound) + steps * Float64(stepSize)
+        Float32(max(Float64(lowerBound), min(Float64(upperBound), snapped)))
     }
 
     private func applyNormalize(): Unit {
@@ -207,9 +213,31 @@ public class Slider <: Widget {
 }
 
 private func normalizedAmount(value: Float32, lower: Float32, upper: Float32): Float32 {
-    clampF32((value - lower) / rangeSize(lower, upper), 0.0, 1.0)
+    clampF32((safeValue(value, lower, upper) - lower) / rangeSize(lower, upper), 0.0, 1.0)
 }
 
 private func rangeSize(lower: Float32, upper: Float32): Float32 {
     max(0.000001, upper - lower)
+}
+
+// Invalid configuration is rejected before it reaches drawing or numeric conversions.
+private func validateValueRange(lower: Float32, upper: Float32): Unit {
+    if (lower.isNaN() || upper.isNaN() || lower.isInf() || upper.isInf() || (upper - lower).isInf()) {
+        throw IllegalArgumentException("Value control range and its span must be finite")
+    }
+}
+
+private func checkedValueStep(step: Float32): Float32 {
+    if (step.isNaN() || step.isInf()) {
+        throw IllegalArgumentException("Slider step must be finite")
+    }
+    max(0.0, step)
+}
+
+private func safeValue(value: Float32, lower: Float32, upper: Float32): Float32 {
+    if (value.isNaN()) {
+        lower
+    } else {
+        clampF32(value, lower, upper)
+    }
 }

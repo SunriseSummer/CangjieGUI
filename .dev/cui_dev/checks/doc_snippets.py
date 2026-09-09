@@ -14,8 +14,10 @@ from cui_dev.common.process import run_command
 
 API_ROOT = REPOSITORY_ROOT / "docs" / "api"
 GUIDE_ROOT = REPOSITORY_ROOT / "docs" / "guide"
-DOC_ROOTS = (API_ROOT, GUIDE_ROOT)
-STRICT_ROOTS = (REPOSITORY_ROOT / "docs" / "guide",)
+README = REPOSITORY_ROOT / "README.md"
+EXAMPLES_ROOT = REPOSITORY_ROOT / "examples"
+DOC_ROOTS = (README, API_ROOT, GUIDE_ROOT, EXAMPLES_ROOT)
+STRICT_ROOTS = (README, GUIDE_ROOT)
 WORKSPACE = DEV_TARGET_ROOT / "doc-snippets"
 OPENING_FENCE = re.compile(r"^```cangjie(?:\s+(.*))?\s*$")
 PACKAGE_LINE = re.compile(r"(?m)^package\s+docexample\s*$")
@@ -56,7 +58,11 @@ def verified_snippets(
     for root in roots:
         require_verification = root.resolve() in strict
         api_declarations_only = root.resolve() in declarations
-        for path in sorted(root.rglob("*.md")):
+        files = [root] if root.is_file() else sorted(
+            path for path in root.rglob("*.md")
+            if not {"target", ".git", ".dep-cache"}.intersection(path.relative_to(root).parts)
+        )
+        for path in files:
             lines = path.read_text(encoding="utf-8").splitlines()
             index = 0
             while index < len(lines):

@@ -32,6 +32,7 @@ protected enum WidgetModifier {
     | Enabled(Bool)
     | Accessibility(String, Semantics)
     | PointerLayoutBounds
+    | Typography(TextStyle)
 }
 
 class ModifiedWidget <: Widget {
@@ -46,6 +47,7 @@ class ModifiedWidget <: Widget {
 
     public func measure(ctx: UiContext, available: Size): Size {
         match (operation) {
+            case WidgetModifier.Typography(style) => ctx.withTextStyle(style, {=> child.measure(ctx, available)})
             case WidgetModifier.Width(length) =>
                 let value = exact(ctx, length)
                 let childSize = child.measure(ctx, Size(min(value, available.w), available.h))
@@ -88,6 +90,7 @@ class ModifiedWidget <: Widget {
     public func layout(ctx: UiContext, rect: Rect): Unit {
         frame = rect
         match (operation) {
+            case WidgetModifier.Typography(style) => ctx.withTextStyle(style, {=> child.layout(ctx, rect)})
             case WidgetModifier.Width(length) => child.layout(ctx,
                 Rect(rect.x, rect.y, min(exact(ctx, length), rect.w), rect.h))
             case WidgetModifier.Height(length) => child.layout(ctx,
@@ -116,6 +119,7 @@ class ModifiedWidget <: Widget {
 
     public func draw(ctx: UiContext): Unit { // cjcheck-ignore: long-function # one match with one short arm per modifier kind; the length is the enum's width, not nested logic
         match (operation) {
+            case WidgetModifier.Typography(style) => ctx.withTextStyle(style, {=> child.draw(ctx)})
             case WidgetModifier.Surface(style) =>
                 drawSurface(ctx, frame, style)
                 child.draw(ctx)
@@ -190,6 +194,7 @@ class ModifiedWidget <: Widget {
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
         match (operation) {
+            case WidgetModifier.Typography(style) => ctx.withTextStyle(style, {=> child.handle(ctx, event)})
             case WidgetModifier.Visible(isVisible) => isVisible && child.handle(ctx, event)
             case WidgetModifier.Enabled(isEnabled) =>
                 // Disabled suppresses input, not time: the per-frame tick still flows, so a

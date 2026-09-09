@@ -95,7 +95,7 @@ public func remember<T>(key: String, policy: StateMutationPolicy<T>, initial: ()
 ### clear
 
 移除全部保留的状态值并按子树/声明逆序关闭 lifecycle effect。下一次 `remember` 将重新以 `initial` 创建；
-cleanup 抛异常时仍继续清理其余资源，最后重抛首个异常，失败 Resource 保留供下次 `clear` 重试。
+cleanup 抛异常时仍继续清理其余资源，最后重抛单个原始异常，或用 [`UiAggregateException`](UiAggregateException.md) 汇总多个异常；失败 Resource 保留供下次 `clear` 重试。
 
 ```cangjie
 public func clear(): Unit

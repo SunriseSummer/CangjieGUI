@@ -91,7 +91,7 @@ public func axis(value: Axis): Divider
 
 ### foregroundColor
 
-覆盖主题的分隔线颜色。命名与 [`Label`](Label.md) / [`Icon`](Icon.md) 的 `foregroundColor` 保持一致。返回 `this` 便于链式调用。
+覆盖主题的分隔线颜色。命名与 [`Label`](Label.md) / [`Icon`](../media/Icon.md) 的 `foregroundColor` 保持一致。返回 `this` 便于链式调用。
 
 ```cangjie
 public func foregroundColor(value: Color): Divider

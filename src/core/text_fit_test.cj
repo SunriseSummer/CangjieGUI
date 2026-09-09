@@ -96,11 +96,11 @@ func paragraphLayoutCacheSurvivesImmediateWidgetRebuilds(): Unit {
 @Test
 func paragraphLayoutCacheEvictsByByteBudget(): Unit {
     let cache = ParagraphLayoutCache(byteBudget: 300)
-    let first = cache.getOrCompute("first text payload", 100.0, 15.0, 2, FontStyle.regular, None,
+    let first = cache.getOrCompute(ParagraphCacheKey("first text payload", 100.0, 15.0, FontStyle.regular, None, 2, UiEnvironmentKey(UInt64(0))),
         {=> ParagraphLayout(["first text payload"], 50.0)})
-    let _ = cache.getOrCompute("second text payload", 100.0, 15.0, 2, FontStyle.regular, None,
+    let _ = cache.getOrCompute(ParagraphCacheKey("second text payload", 100.0, 15.0, FontStyle.regular, None, 2, UiEnvironmentKey(UInt64(0))),
         {=> ParagraphLayout(["second text payload"], 50.0)})
-    let _ = cache.getOrCompute("third text payload", 100.0, 15.0, 2, FontStyle.regular, None,
+    let _ = cache.getOrCompute(ParagraphCacheKey("third text payload", 100.0, 15.0, FontStyle.regular, None, 2, UiEnvironmentKey(UInt64(0))),
         {=> ParagraphLayout(["third text payload"], 50.0)})
     @Expect(first.lines[0], "first text payload")
     let stats = cache.stats()

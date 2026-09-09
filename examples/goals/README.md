@@ -51,3 +51,9 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot goals.bmp"
 ```
+
+## 练习与验收
+
+让一项超过目标值，确认满环边界和总完成度符合模型规则。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

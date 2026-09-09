@@ -115,8 +115,8 @@ protected func drawTooltip(ctx: UiContext, windowWidth: Float32, windowHeight: F
     }
     let text = ctx.tooltipText
     let anchor = ctx.tooltipAnchor
-    let width = ctx.renderer.textWidth(text, pointSize: FontSizes.CAPTION) + TOOLTIP_PAD_X * 2.0
-    let height = ctx.renderer.textHeight(pointSize: FontSizes.CAPTION) + TOOLTIP_PAD_Y * 2.0
+    let width = ctx.textWidth(text, pointSize: ctx.textSize(fallback: FontSizes.CAPTION)) + TOOLTIP_PAD_X * 2.0
+    let height = ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.CAPTION)) + TOOLTIP_PAD_Y * 2.0
 
     var y = anchor.bottom() + TOOLTIP_GAP
     if (y + height > windowHeight) {
@@ -127,5 +127,5 @@ protected func drawTooltip(ctx: UiContext, windowWidth: Float32, windowHeight: F
     let bubble = Rect(x, y, width, height)
 
     ctx.renderer.fillRoundedRect(bubble, ctx.theme.smallRadius, ctx.theme.text.withAlpha(240))
-    ctx.renderer.textCenter(text, bubble, ctx.theme.bg, pointSize: FontSizes.CAPTION)
+    ctx.textCenter(text, bubble, ctx.theme.bg, pointSize: ctx.textSize(fallback: FontSizes.CAPTION))
 }

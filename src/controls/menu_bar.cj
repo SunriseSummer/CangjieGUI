@@ -178,7 +178,7 @@ public class MenuBar <: Widget {
     // menus, anywhere else dismisses.
     private func pressOverlay(ctx: UiContext, popup: Rect, titles: Array<Rect>, x: Float32, y: Float32): Unit {
         if (popup.contains(x, y)) {
-            runItem(ctx, menuItemIndexAt(popup, y))
+            runItem(ctx, menuItemIndexAt(popup, y, rowHeight: ctx.textRowHeight()))
             return
         }
         let index = titleIndexAt(titles, x, y)
@@ -197,7 +197,7 @@ public class MenuBar <: Widget {
             // Claim the default cursor over the popup so a control beneath it cannot set its
             // shape through the menu (the move still falls through for the bar's own hover).
             ctx.claimHover(overlayOwner, CursorShape.Default)
-            let index = menuItemIndexAt(popup, y)
+            let index = menuItemIndexAt(popup, y, rowHeight: ctx.textRowHeight())
             if (index >= 0) {
                 let items = currentItems()
                 if (index < items.size && items[index].isSelectable()) {
@@ -260,7 +260,8 @@ public class MenuBar <: Widget {
         let rects = ArrayList<Rect>()
         var x = frame.x + MENU_BAR_INSET
         for (menu in menus) {
-            let w = ctx.renderer.textWidth(menu.title, pointSize: FontSizes.CONTROL) + MENU_BAR_TITLE_PAD * 2.0
+            let w = ctx.textWidth(menu.title, pointSize: ctx.textSize(fallback: FontSizes.CONTROL)) +
+                MENU_BAR_TITLE_PAD * 2.0
             rects.add(Rect(x, frame.y, w, frame.h))
             x += w
         }
@@ -287,7 +288,7 @@ public class MenuBar <: Widget {
         let title = titles[index]
         let items = menus[index].items
         let w = menuPreferredWidth(ctx, items)
-        let h = menuContentHeight(items)
+        let h = menuContentHeight(items, rowHeight: ctx.textRowHeight())
         let x = clampF32(title.x, MENU_BAR_MARGIN, max(MENU_BAR_MARGIN, ctx.viewportWidth - w - MENU_BAR_MARGIN))
         let below = title.bottom() + MENU_BAR_GAP
         let y = if (below + h <= ctx.viewportHeight - MENU_BAR_MARGIN) {
@@ -315,9 +316,10 @@ public class MenuBar <: Widget {
         } else {
             ctx.theme.text
         }
-        let tw = ctx.renderer.textWidth(menus[index].title, pointSize: FontSizes.CONTROL)
-        let ty = cell.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
-        ctx.renderer.text(menus[index].title, cell.centerX() - tw / 2.0, ty, color, pointSize: FontSizes.CONTROL)
+        let tw = ctx.textWidth(menus[index].title, pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
+        let ty = cell.centerY() - ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.CONTROL)) / 2.0
+        ctx.text(menus[index].title, cell.centerX() - tw / 2.0, ty, color,
+            pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
     }
 }
 

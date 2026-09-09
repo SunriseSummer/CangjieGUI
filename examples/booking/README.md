@@ -77,3 +77,9 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot booking.bmp"
 ```
+
+## 练习与验收
+
+增加最长入住天数校验，确认摘要、按钮和确认回执使用同一规则。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

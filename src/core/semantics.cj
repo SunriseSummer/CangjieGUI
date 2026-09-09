@@ -101,6 +101,7 @@ public class SemanticsNode {
 
 /* A composable contribution to the retained semantic tree. */
 interface SemanticContribution {
+    func containsId(id: String): Bool
     func collect(
         nodes: ArrayList<SemanticsNode>,
         indexById: HashMap<String, Int64>,
@@ -114,6 +115,10 @@ interface SemanticContribution {
 
 /* Cached leaf registration; the provider keeps dynamic values out of layout dependencies. */
 class SemanticRegistration <: SemanticContribution {
+    /** Tests leaf membership without resolving properties or executing an action. */
+    public func containsId(id: String): Bool {
+        this.id == id
+    }
     let id: String
     let owner: ElementId
     let bounds: Rect
@@ -250,6 +255,15 @@ class SemanticRegistration <: SemanticContribution {
  * fragment reference, while flattening to a platform snapshot is paid only by an actual query.
  */
 class SemanticFragment <: SemanticContribution {
+    /** Tests membership across cached child registrations without flattening the semantic tree. */
+    public func containsId(id: String): Bool {
+        for (child in children) {
+            if (child.containsId(id)) {
+                return true
+            }
+        }
+        false
+    }
     private let children: Array<SemanticContribution>
 
     init(children: Array<SemanticContribution>) {
@@ -289,6 +303,10 @@ class SemanticFragment <: SemanticContribution {
 }
 
 class DisabledSemanticContribution <: SemanticContribution {
+    /** Preserves membership while the wrapper continues to reject disabled actions. */
+    public func containsId(id: String): Bool {
+        child.containsId(id)
+    }
     private let child: SemanticContribution
 
     init(child: SemanticContribution) {

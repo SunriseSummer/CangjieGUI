@@ -1,112 +1,115 @@
-/*
- * 记事本视图层：工具栏、“新建”确认条、正文编辑区与状态栏。
- *
- *  - “新建”确认条渲染在工具栏下方，代替会阻塞事件循环的系统弹窗；
- *    只在等待用户决定时出现，交互与打开/保存的异步模式保持一致
- *  - 状态栏的文件路径包在 Flexible 里：独占剩余宽度并自动省略号截断，
- *    行数/字节统计因此永远不会被长路径挤出窗口
- *  - 尺寸一律使用 vp/fp 单位；按钮与复选框依赖框架自动分配的构建期唯一标识
- */
 package cui_notepad
 
-import cui.{Axis, Button, ButtonRole, Checkbox, DesktopApp, Divider, EventHandler, Flexible, FontSizes, HStack,
-    IconButton, IconName, Label, LengthUnits, Panel, Spacer, TextAlign, TextArea, Tooltip, VStack}
+import cui.{Button, ButtonRole, Checkbox, CrossAxisAlignment, DesktopApp, Divider, EventHandler}
+import cui.{Flexible, FlowRow, FontWeight, HStack, Icon, IconSource, Label, LengthInsets, LengthUnits}
+import cui.{Panel, Spacer, TextArea, TextInputStyle, TextStyle, Tooltip, VStack}
 
 func notepadView(model: NotepadModel, app: DesktopApp, documentPath: String): Unit {
+    subscribeNotepadDialogs(model)
     EventHandler(onEvent: {ctx, event => handleNotepadEvent(ctx, event, model, app, documentPath)}) {
         VStack {
-            toolbar(model, app, documentPath)
-            if (model.confirmingNew.value) {
-                confirmNewBar(model)
-            }
-            // editable 是构造参数（而非修饰符）：TextArea 在构造时即决定是否注册 Tab 焦点，
-            // 因此只读编辑器不会进入焦点遍历序列。
-            TextArea(
-                model.body,
-                scroll: Some(model.bodyScroll),
-                cursor: Some(model.bodyCursor),
-                anchor: Some(model.bodyAnchor),
-                editable: !model.readOnly.value
-            )
+            HStack {
+                Icon(IconSource("assets/icons/document.svg")).iconSize(NOTEPAD_ICON).foregroundColor(NOTEPAD_ACCENT)
+                VStack {
+                    Label("记事本").fontSize(NOTEPAD_TITLE).fontWeight(FontWeight.semiBold)
+                    Label("简洁记录，从容保存").muted().fontSize(NOTEPAD_COMMAND)
+                }.spacing(3.vp).hug()
+                Spacer()
+                Button("保存文件", {=> saveCurrentFile(model, documentPath)})
+                    .key("notepad-save")
+                    .role(ButtonRole.Primary)
+                    .fontSize(NOTEPAD_PRIMARY)
+            }.spacing(NOTEPAD_GAP).crossAxisAlignment(CrossAxisAlignment.Center).hug()
+            Panel {
+                VStack {
+                    documentHeading(model)
+                    Divider()
+                    toolbar(model, app, documentPath)
+                    if (model.confirmingNew.value) {
+                        confirmNewBar(model)
+                    }
+                    let editor = TextArea(model.body, key: "notepad-document", scroll: model.bodyScroll,
+                        cursor: model.bodyCursor, anchor: model.bodyAnchor, editable: !model.readOnly.value)
+                        .style(
+                            TextInputStyle(padding: LengthInsets(10.vp), lineHeight: NOTEPAD_LINE_HEIGHT,
+                                surface: notepadPaper()))
+                        .placeholder("写下第一行文字…")
+                    Divider()
+                    HStack {
+                        Button("复制全文", {=> copyAll(model.body, model.status)})
+                            .key("notepad-copy-all")
+                            .enabled(!model.body.value.isEmpty())
+                        Button("粘贴", {=> reportPaste(model, editor.paste())})
+                            .key("notepad-paste")
+                            .enabled(!model.readOnly.value)
+                        Spacer()
+                        Label("UTF-8").muted().fontSize(NOTEPAD_CAPTION)
+                    }.spacing(4.vp).hug().textStyle(TextStyle(fontSize: NOTEPAD_COMMAND))
+                }.spacing(8.vp)
+            }.contentPadding(NOTEPAD_CARD_INSET).style(toolbarSurface()).flex()
             statusBar(model)
-        }.spacing(10.vp).padding(14.vp)
+        }.spacing(NOTEPAD_SECTION_GAP).padding(NOTEPAD_PAGE_INSET)
     }
+}
+
+private func documentHeading(model: NotepadModel): Unit {
+    HStack {
+        Flexible {
+            Tooltip(text: model.currentPath.value) {
+                Label(documentName(model)).fontSize(NOTEPAD_DOCUMENT_TITLE).fontWeight(FontWeight.semiBold)
+            }
+        }
+        Label(if (model.dirty.value) {
+            "未保存修改"
+        } else if (model.currentPath.value.isEmpty()) {
+            "空白文档"
+        } else {
+            "已保存"
+        }).fontSize(NOTEPAD_CAPTION).foregroundColor(NOTEPAD_ACCENT)
+    }.spacing(NOTEPAD_GAP).crossAxisAlignment(CrossAxisAlignment.Center).hug()
 }
 
 func toolbar(model: NotepadModel, app: DesktopApp, documentPath: String): Unit {
-    Panel {
-        HStack {
-            Tooltip(text: "新建文档 · Ctrl+N") {
-                IconButton(IconName.NewDocument) {
-                    => newFile(model)
-                }.label("新建")
-            }
-            Tooltip(text: "打开文件 · Ctrl+O") {
-                IconButton(IconName.OpenFolder) {
-                    => openFile(model, app)
-                }.label("打开")
-            }
-            Divider().axis(Axis.Vertical)
-            Tooltip(text: "保存 · Ctrl+S") {
-                IconButton(IconName.Save) {
-                    => saveCurrentFile(model, documentPath)
-                }.label("保存").role(ButtonRole.Primary)
-            }
-            Tooltip(text: "另存为 · Ctrl+Shift+S") {
-                IconButton(IconName.SaveAs) {
-                    => saveFileAs(model, app, documentPath)
-                }.label("另存为")
-            }
-            Divider().axis(Axis.Vertical)
-            Tooltip(text: "复制全文") {
-                IconButton(IconName.Copy) {
-                    => copyAll(model.body, model.status)
-                }.label("复制")
-            }
-            Tooltip(text: "在光标处粘贴") {
-                IconButton(IconName.Paste) {
-                    => pasteClipboard(model.body, model.bodyCursor, model.bodyAnchor, model.status)
-                }.label("粘贴").enabled(!model.readOnly.value)
-            }
-            Spacer()
-            Checkbox("只读", model.readOnly)
-        }
-    }.contentPadding(10.vp).style(toolbarSurface()).hug()
+    FlowRow {
+        Button("新建", {=> newFile(model)}).key("notepad-new")
+        Button("打开", {=> openFile(model, app)}).key("notepad-open")
+        Button("另存为", {=> saveFileAs(model, app, documentPath)}).key("notepad-save-as")
+        Checkbox("只读", model.readOnly)
+    }.spacing(8.vp).textStyle(TextStyle(fontSize: NOTEPAD_COMMAND))
 }
 
-/*
- * “新建”确认条。不用系统 MessageBox 的原因：它同步阻塞事件循环，
- * 会让 FrameHandler 里打开/保存对话框的帧内轮询停摆；应用内确认条
- * 则完全由状态驱动，界面持续响应，用户也能先浏览正文再做决定。
- */
 func confirmNewBar(model: NotepadModel): Unit {
     Panel {
-        HStack {
-            Label("当前内容尚未保存，确认丢弃并新建？")
-            Spacer()
-            Button("丢弃并新建", {=> confirmDiscardAndNew(model)}).role(ButtonRole.Danger)
-            Button("取消", {=> cancelNewFile(model)})
-        }.spacing(10.vp)
-    }.contentPadding(12.vp, 8.vp).style(confirmBarSurface()).hug()
+        VStack {
+            Label("当前修改尚未保存，是否新建空白文档？").wrap().fontSize(NOTEPAD_PRIMARY)
+            FlowRow {
+                Button("继续编辑", {=> cancelNewFile(model)}).key("notepad-cancel-new")
+                Button("丢弃并新建", {=> confirmDiscardAndNew(model)}).role(ButtonRole.Danger)
+            }.spacing(8.vp).textStyle(TextStyle(fontSize: NOTEPAD_COMMAND))
+        }.spacing(6.vp).hug()
+    }.contentPadding(NOTEPAD_GAP).style(confirmBarSurface()).hug()
 }
 
-// 状态栏的所有内容都由模型状态派生，自身不存副本，因此不可能与文档脱节。
+private func reportPaste(model: NotepadModel, changed: Bool): Unit {
+    model.status.value = if (changed) {
+        "已粘贴"
+    } else {
+        "没有可粘贴的文本，或剪贴板不可用"
+    }
+}
+
 func statusBar(model: NotepadModel): Unit {
     HStack {
-        Label(model.status.value).muted().fontSize(FontSizes.CAPTION)
-        // 路径放进 Flexible：占据剩余宽度，过长时由 Label 单行自动省略号截断，
-        // 右侧的行数/字节统计因此始终可见；路径靠右对齐以贴近统计信息。
-        Flexible {
-            Label(documentName(model)).muted().fontSize(FontSizes.CAPTION).textAlign(TextAlign.Trailing)
-        }
-        Label(model.stats.value).muted().fontSize(FontSizes.CAPTION)
-    }.hug()
+        Flexible {Label(model.status.value).muted().fontSize(NOTEPAD_CAPTION)}
+        Label(model.stats.value).muted().fontSize(NOTEPAD_CAPTION)
+    }.spacing(NOTEPAD_GAP).hug()
 }
 
 func documentName(model: NotepadModel): String {
-    if (model.currentPath.value.size > 0) {
-        model.currentPath.value
-    } else {
-        "未保存文档"
+    let path = model.currentPath.value
+    if (path.isEmpty()) {
+        return "未命名文档"
     }
+    let parts = path.replace("\\", "/").split("/")
+    parts[parts.size - 1]
 }

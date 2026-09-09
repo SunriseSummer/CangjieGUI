@@ -6,8 +6,8 @@
  */
 package cui_typography
 
-import cui.{Chip, CrossAxisAlignment, Divider, FontSizes, HStack, Label, LengthUnits, Panel, ScrollView,
-    Spacer, VStack}
+import cui.{Chip, CrossAxisAlignment, Divider, FontSizes, HStack, Label, LengthUnits, Panel, ScrollView, Spacer, VStack,
+    FontStyle, FontWeight, TextStyle}
 
 // 阶梯与参考卡共用的示范文本：中西混排，验证同一样式对两种脚本一致生效。
 private let SPECIMEN = "永远滚烫 The quick brown fox"
@@ -17,6 +17,7 @@ func typographyView(model: TypographyModel): Unit {
         VStack {
             header()
             toolbar(model)
+            inheritancePanel(model)
             livePanel(model)
             referencePanel()
             footer(model)
@@ -27,7 +28,7 @@ func typographyView(model: TypographyModel): Unit {
 private func header(): Unit {
     VStack {
         Label("字体样式").fontSize(FontSizes.TITLE).bold()
-        Label("由系统字体实时合成粗体、斜体、下划线与删除线，中西文一致").muted().fontSize(FontSizes.CAPTION)
+        Label("真实字体面优先；字重、倾斜、装饰独立继承，缺失样式按策略合成").muted().fontSize(FontSizes.CAPTION)
     }.spacing(4.vp).crossAxisAlignment(CrossAxisAlignment.Start).hug()
 }
 
@@ -83,4 +84,19 @@ private func footer(model: TypographyModel): Unit {
         Divider()
         Label("当前样式：${model.summary()}").muted().fontSize(FontSizes.CAPTION)
     }.spacing(8.vp).crossAxisAlignment(CrossAxisAlignment.Start).hug()
+}
+
+// 独立构建器只覆盖一项；fontStyle 明确表示整组替换。
+private func inheritancePanel(model: TypographyModel): Unit {
+    Panel {
+        VStack {
+            Label("继承与局部覆盖").fontWeight(FontWeight.semiBold)
+            VStack {
+                Label("完全继承上方四个开关").wrap()
+                Label("只设字重 400，保留倾斜和装饰").fontWeight(FontWeight.normal).wrap()
+                Label("只取消斜体，保留字重和装饰").italic(value: false).wrap()
+                Label("显式整组重置：regular").fontStyle(FontStyle.regular).wrap()
+            }.spacing(8.vp).textStyle(TextStyle(fontSize: 18.fp, fontStyle: model.style()))
+        }.spacing(10.vp).hug()
+    }.contentPadding(16.vp)
 }

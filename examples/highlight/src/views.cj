@@ -6,8 +6,8 @@
  */
 package cui_highlight
 
-import cui.{Button, ButtonRole, Color, CrossAxisAlignment, FlowRow, FontSizes, HStack, Icon, IconName, Label,
-    LengthUnits, Panel, RichText, ScrollView, TextField, VStack}
+import cui.{Button, ButtonRole, Color, CrossAxisAlignment, FlowRow, FontSizes, HStack, Icon, IconSource}
+import cui.{Label, LengthUnits, Panel, RichText, ScrollView, TextField, VStack}
 
 func highlightView(model: SearchModel): Unit {
     VStack {
@@ -28,8 +28,10 @@ func highlightView(model: SearchModel): Unit {
 private func header(): Unit {
     VStack {
         Label("搜索高亮").fontSize(FontSizes.TITLE).bold()
-        Label("在搜索框输入或点预设标签，命中的关键词在正文里就地以 <mark> 高亮标记，不过滤、不跳转").muted()
-            .fontSize(FontSizes.CAPTION).wrap()
+        Label("在搜索框输入或点预设标签，命中的关键词在正文里就地以 <mark> 高亮标记，不过滤、不跳转")
+            .muted()
+            .fontSize(FontSizes.CAPTION)
+            .wrap()
     }.spacing(4.vp).crossAxisAlignment(CrossAxisAlignment.Start).hug()
 }
 
@@ -37,7 +39,7 @@ private func header(): Unit {
 private func searchBar(model: SearchModel): Unit {
     Panel {
         HStack {
-            Icon(IconName.ChevronRight).foregroundColor(Color.rgb(108, 140, 255)).iconSize(18.vp)
+            Icon(IconSource("assets/icons/chevron-right.svg")).foregroundColor(Color.rgb(108, 140, 255)).iconSize(18.vp)
             TextField(model.query).autofocus().flex()
         }.spacing(8.vp).crossAxisAlignment(CrossAxisAlignment.Center)
     }.contentPadding(12.vp, 8.vp).hug()
@@ -61,8 +63,8 @@ private func entryCard(model: SearchModel, index: Int64): Unit {
         VStack {
             RichText(model.spansFor(entry.title), key: "title-${index}").fontSize(17.0)
             RichText(model.spansFor(entry.body), key: "body-${index}").fontSize(FontSizes.BODY)
-            // Stretch both RichTexts to the card width: titles then sit on one line (a short, Start-hugged
-            // RichText can wrap its last rune on a sub-pixel width mismatch), bodies wrap at the full width.
+        // Stretch both RichTexts to the card width: titles then sit on one line (a short, Start-hugged
+        // RichText can wrap its last rune on a sub-pixel width mismatch), bodies wrap at the full width.
         }.spacing(6.vp).crossAxisAlignment(CrossAxisAlignment.Stretch)
     }.contentPadding(14.vp)
 }

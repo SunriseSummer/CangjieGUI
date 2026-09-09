@@ -315,7 +315,7 @@ public func mountEffect(key: String, setup: () -> Resource): Unit
 
 ### lifecycleEffect
 
-`mountEffect` 的版本化形式。`revision` 不变时保留当前资源；变化时先成功创建新资源，再关闭旧资源，因此创建失败不会破坏已提交资源。清理失败时，框架仍会继续清理其他资源，并在提交后抛出最先发生的异常；失败资源会保留，供下一次清理重试。
+`mountEffect` 的版本化形式。`revision` 不变时保留当前资源；变化时先成功创建新资源，再关闭旧资源，因此创建失败不会破坏已提交资源。清理失败时，框架仍会继续清理其他资源，并在提交后报告异常；多个异常聚合为 `UiAggregateException`；失败资源会保留，供下一次清理重试。
 
 ```cangjie
 public func lifecycleEffect(revision: UInt64, setup: () -> Resource): Unit

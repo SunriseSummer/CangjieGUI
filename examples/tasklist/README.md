@@ -51,3 +51,9 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot tasklist.bmp"
 ```
+
+## 练习与验收
+
+先勾选再拖动一项，确认完成态跟随任务且只在松手时提交移动。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

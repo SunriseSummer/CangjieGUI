@@ -18,9 +18,9 @@ public class TextField <: Widget
 
 ## 说明
 
-- **字节偏移语义**：光标与锚点是 UTF-8 字节偏移（始终落在字符边界上），不是字符计数。通过 `cursor`/`anchor` 参数从外部接管这两个状态时，必须让它们保持在字符边界并成对移动——只挪光标会留下陈旧锚点，凭空张开一段用户从未做过的选区，下一次按键就会把它整段替换掉。完整的编辑操作见 [`TextEditState`](TextEditState.md)。
-- **编辑快捷键**：Ctrl+A 全选、Ctrl+C 复制、Ctrl+X 剪切、Ctrl+V 粘贴、Ctrl+Z 撤销、Ctrl+Y 与 Ctrl+Shift+Z 重做；Home/End 移到两端，按住 Shift 的方向键扩展选区。粘贴的多行文本被折叠为一行（换行变空格、回车符丢弃）。剪贴板访问按尽力而为处理：没有桌面会话时复制粘贴静默失败，不会让控件崩溃。
-- **分组撤销**：500 毫秒内的连续编辑合并为一步撤销，停顿即开新组；光标跳转（点击、方向键导航）也会切分撤销组；撤销栈上限 300 步。空操作编辑（如在开头按退格）不产生撤销步。
+- **字节偏移语义**：光标与锚点是 UTF-8 字节偏移（始终落在扩展字素边界上），不是字符计数。通过 `cursor`/`anchor` 参数从外部接管这两个状态时，必须让它们保持在扩展字素边界并成对移动——只挪光标会留下陈旧锚点，凭空张开一段用户从未做过的选区，下一次按键就会把它整段替换掉。完整的编辑操作见 [`TextEditState`](TextEditState.md)。
+- **编辑快捷键**：Ctrl+A 全选、Ctrl+C 复制、Ctrl+X 剪切、Ctrl+V 粘贴、Ctrl+Z 撤销、Ctrl+Y 与 Ctrl+Shift+Z 重做；Home/End 移到两端，按住 Shift 的方向键扩展选区。粘贴的多行文本被折叠为一行（CRLF、CR、LF 均变为一个空格，输入事件也采用相同规则）。默认使用系统剪贴板；可通过 `clipboard` 注入后端。公开命令返回执行结果，常规平台失败不会修改正文或选区。
+- **分组撤销**：500 毫秒内的连续编辑合并为一步撤销，停顿即开新组；光标跳转（点击、方向键导航）也会切分撤销组；撤销／重做合计最多 300 步，并受约 8 MiB 快照预算限制。空操作编辑（如在开头按退格）不产生撤销步。
 - **水平跟随**：值比控件宽时文本窗口左移，且仅在光标越出可视窗口时移动（桌面编辑器的常见手感）；偏移有限制，文本尾部不会脱离右缘。
 - **焦点与 IME**：聚焦时每帧把光标矩形上报为 IME 候选窗锚点；`TextEditing` pre-edit 独立保存并以文本加下划线绘制，不会提前写入绑定值，`TextInput` 到达才提交；`editable: false` 渲染为只读且不进入 Tab 焦点遍历，但仍可点选、全选与复制。
 
@@ -56,11 +56,11 @@ main(): Unit {
 | [`autofocus()`](#autofocus) | 控件首次出现时申请键盘焦点，返回自身以便链式声明。 |
 | [`undo()`](#undo) | 回退最近一组编辑；同时绑定在 Ctrl+Z。 |
 | [`redo()`](#redo) | 重做最近撤销的编辑；同时绑定在 Ctrl+Y 与 Ctrl+Shift+Z。 |
-| [`measure(...)`](#measure) | [`Widget`](../core/Widget.md) 协议实现：占满可用宽度，高度固定为标准控件高 38 逻辑像素。 |
+| [`measure(...)`](#measure) | [`Widget`](../core/Widget.md) 协议实现：占满可用宽度，高度为有效行高加上下内边距，至少 38 逻辑像素。 |
 | [`layout(...)`](#layout) | [`Widget`](../core/Widget.md) 协议实现：记录分配的框架矩形，供绘制与命中测试使用。 |
 | [`draw(...)`](#draw) | [`Widget`](../core/Widget.md) 协议实现：绘制底框、选区、文本与光标，三者共用同一水平跟随偏移并整体裁剪进框内。 |
 | [`handle(...)`](#handle) | [`Widget`](../core/Widget.md) 协议实现：处理定位与拖选、双击选词与三击选行、字符输入、编辑导航键及 Ctrl 快捷键表。 |
-| [`focusableId()`](#focusableid) | [`Widget`](../core/Widget.md) 协议实现：返回本控件的焦点标识。 |
+| [`focusableId()`](#focusableid) | [`Widget`](../core/Widget.md) 协议实现：可编辑时返回焦点标识，只读时返回 None。 |
 
 ## 构造函数
 
@@ -74,7 +74,8 @@ public init(
     key!: ?String = None,
     cursor!: ?State<Int64> = None,
     anchor!: ?State<Int64> = None,
-    editable!: Bool = true
+    editable!: Bool = true,
+    clipboard!: TextClipboard = TextClipboard.system
 )
 ```
 
@@ -120,10 +121,10 @@ public func redo(): Unit
 
 ### measure
 
-[`Widget`](../core/Widget.md) 协议实现：占满可用宽度，高度固定为标准控件高 38 逻辑像素。
+[`Widget`](../core/Widget.md) 协议实现：占满可用宽度，高度为有效行高加上下内边距，至少 38 逻辑像素。
 
 ```cangjie
-public func measure(_: UiContext, available: Size): Size
+public func measure(ctx: UiContext, available: Size): Size
 ```
 
 **参数**
@@ -137,7 +138,7 @@ public func measure(_: UiContext, available: Size): Size
 [`Widget`](../core/Widget.md) 协议实现：记录分配的框架矩形，供绘制与命中测试使用。
 
 ```cangjie
-public func layout(_: UiContext, rect: Rect): Unit
+public func layout(ctx: UiContext, rect: Rect): Unit
 ```
 
 **参数**
@@ -146,7 +147,7 @@ public func layout(_: UiContext, rect: Rect): Unit
 
 ### draw
 
-[`Widget`](../core/Widget.md) 协议实现：绘制底框、选区、文本、IME pre-edit 与光标，共用同一水平跟随偏移并整体裁剪进框内。点击定位使用 SDL_ttf shaped-cluster hit test，避免长行逐前缀测量并正确处理连字/RTL。聚焦时把光标矩形上报为 IME 锚点，并请求后续帧以维持光标闪烁。
+[`Widget`](../core/Widget.md) 协议实现：绘制底框、选区、文本、IME pre-edit 与光标，共用同一水平跟随偏移并整体裁剪进框内。点击定位使用 SDL_ttf shaped-cluster hit test，避免长行逐前缀测量并按字素对齐；完整段落 bidi 编辑仍待完善。聚焦时把光标矩形上报为 IME 锚点，并请求后续帧以维持光标闪烁。
 
 ```cangjie
 public func draw(ctx: UiContext): Unit
@@ -173,13 +174,64 @@ public func handle(ctx: UiContext, event: UiEvent): Bool
 
 ### focusableId
 
-[`Widget`](../core/Widget.md) 协议实现：返回本控件的焦点标识。单子组件包装器由此转发焦点项，`.enabled(false)` 由此把控件摘出 Tab 遍历。
+[`Widget`](../core/Widget.md) 协议实现：可编辑时返回焦点标识，只读时返回 None。单子组件包装器由此转发焦点项，`.enabled(false)` 由此把控件摘出 Tab 遍历。
 
 ```cangjie
 public func focusableId(): ?String
 ```
 
 **返回值** `?String` — 该控件用于参与键盘焦点导航的标识。
+
+## 字体与输入几何
+
+支持 `Widget.textStyle(TextStyle(...))` 子树字体、字号和样式。绘制、文字测量、点击、选区与 IME 使用相同有效设置。TextField/ComboBox 高度跟随行高；TextArea 的行绘制、点击行号、滚动范围和光标跟随共用动态行高。
+
+`clipboard!`: [`TextClipboard`](TextClipboard.md)，默认 `TextClipboard.system`。已有构造调用保持兼容。
+
+## 选区与编辑命令
+
+这些命令不要求控件当前持有焦点，工具栏或菜单取得焦点后仍可操作原选区。只读控件允许选择和复制，拒绝修改正文及撤销／重做。失败或空剪贴板不会删除选区。
+
+```cangjie
+public func selectAll(): Unit
+public func selectRange(anchor: Int64, cursor: Int64): Unit
+public func selectedText(): String
+public func replaceSelection(value: String): Bool
+public func copy(): Bool
+public func cut(): Bool
+public func paste(): Bool
+public func canUndo(): Bool
+public func canRedo(): Bool
+```
+
+`selectRange` 的两个参数是 UTF-8 字节偏移，越界时钳制，落在字素内部时向前吸附到完整字素边界。`replaceSelection("")` 删除选区；没有选区时插入指定文本。复制返回是否写入成功，剪切／粘贴／替换返回正文是否改变。剪切确认写入成功且原选区未改变后才删除；NUL 不属于支持的纯文本输入。
+
+粘贴、剪切、显式替换和 IME 提交各自构成独立撤销步；连续普通输入按 500 ms 合并。历史同时限制为 300 步和约 8 MiB 快照预算（撤销、重做合计），超额淘汰最旧快照。应用直接替换绑定文本会清除旧历史；需要可撤销的应用操作请使用 `replaceSelection`。
+
+键盘支持 Ctrl/⌘+A/C/X/V/Z、Ctrl/⌘+Shift+Z 与 Ctrl/⌘+Y；Ctrl+左右键／退格／Delete 按词段操作，macOS 另支持 Option。Shift 点击保留锚点并扩展选择。失焦选区保留淡色高亮，方便工具栏操作。
+
+详见 [文本编辑指南](../../../guide/how-to/text-editing.md) 和 [TextClipboard](TextClipboard.md)。
+
+## 编辑器外观与提示
+
+```cangjie
+public func style(value: TextInputStyle): TextField
+public func placeholder(value: String): TextField
+```
+
+方法返回控件自身。`style` 设置最小行高、四边内边距、对齐、正文／选区／光标颜色和普通／聚焦背景，见 [TextInputStyle](TextInputStyle.md)。字体继续通过 `textStyle(TextStyle(...))` 继承。占位提示仅在正文和预编辑均为空时显示，不写入绑定值、剪贴板或撤销历史。
+
+彩色 Emoji 缺字会按需加入系统 Emoji 字体后备；无需预先枚举字体或为每个输入框手动注册。具体字形及组合序列取决于所选字体、系统字体版本和 SDL_ttf 的支持。完整说明见[文本编辑指南](../../../guide/how-to/text-editing.md)。
+
+## onSubmit
+
+```cangjie
+public func onSubmit(action: (String) -> Unit): TextField
+```
+
+聚焦且可编辑时，Enter 调用回调并传入当前文本。预编辑期间 Enter 由输入法确认文本，不触发提交。未设置回调时不消费 Enter，允许外层默认按钮处理；只读控件不提交。
+
+拖选越过左右内视口边界后，即使指针不动也持续横向滚动；松开、失焦或到达文本边界后停止。光标高度、闪烁间隔和选区外观参见 [TextInputStyle](TextInputStyle.md)。
 
 ## 另请参阅
 

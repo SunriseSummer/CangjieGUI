@@ -2,9 +2,9 @@ package cui.text
 
 import std.collection.ArrayList
 import sdl.{Color, FontSizes, Key, MouseButton, Rect, Size, SurfaceStyle, UiEvent}
-import cui.core.{drawFieldChevron, Bindable, CUI_CONTROL_H, CUI_SMALL_H, Overlay, PaintOutset, ScrollBar, State,
-    UiContext, Widget, resolveControlKey, buildChild, clampItemIndex, clampScrollOffset, drawSurface,
-    drawVerticalScrollBar, emit, localState, scrollBarGutter, scrollOffsetAfterWheel}
+import cui.core.{drawFieldChevron, Bindable, CUI_SMALL_H, Overlay, PaintOutset, ScrollBar, State, UiContext, Widget,
+    resolveControlKey, buildChild, clampItemIndex, clampScrollOffset, drawSurface, drawVerticalScrollBar, emit,
+    localState, scrollBarGutter, scrollOffsetAfterWheel}
 
 private let COMBO_POPUP_PAD: Float32 = 5.0
 private let COMBO_GAP: Float32 = 4.0
@@ -31,6 +31,8 @@ public class ComboBox <: Widget {
     private let field: Widget
     private let open: State<Bool>
     private let highlight: State<Int64>
+    private let openingText: State<String>
+    private let filtering: State<Bool>
     // Identifies this control's popup on the overlay stack across per-frame rebuilds, so
     // closing removes exactly its own registration (a dialog beneath it stays open).
     private let overlayOwner: String
@@ -38,6 +40,7 @@ public class ComboBox <: Widget {
     private let popupScroll: State<Float32>
     private let popupBar: ScrollBar
     private var frame = Rect.zero()
+    private var rowHeight: Float32 = CUI_SMALL_H
 
     public init(text: Bindable<String>, options: Array<String>, key!: ?String = None) {
         let ident = resolveControlKey(key, "ComboBox")
@@ -57,16 +60,20 @@ public class ComboBox <: Widget {
         this.overlayOwner = "ComboBox:${ident}"
         this.open = localState<Bool>("ComboBox:${ident}:open") {false}
         this.highlight = localState<Int64>("ComboBox:${ident}:hl") {0}
+        this.openingText = localState<String>("ComboBox:${ident}:openingText") {""}
+        this.filtering = localState<Bool>("ComboBox:${ident}:filtering") {false}
         this.popupScroll = localState<Float32>("ComboBox:${ident}:popupScroll") {0.0}
         this.popupBar = ScrollBar("ComboBox:${ident}:popupBar")
         emit(this)
     }
 
-    public func measure(_: UiContext, available: Size): Size {
-        Size(available.w, CUI_CONTROL_H)
+    public func measure(ctx: UiContext, available: Size): Size {
+        rowHeight = max(CUI_SMALL_H, ctx.textHeight() + 8.0)
+        field.measure(ctx, available)
     }
 
     public func layout(ctx: UiContext, rect: Rect): Unit {
+        rowHeight = max(CUI_SMALL_H, ctx.textHeight() + 8.0)
         frame = rect
         field.layout(ctx, rect)
         if (open.value) {
@@ -103,7 +110,14 @@ public class ComboBox <: Widget {
             case _ => ()
         }
         // Everything else — typing, caret clicks, shortcuts — is the embedded field's job.
-        field.handle(ctx, event)
+        let previous = text.value
+        let handled = field.handle(ctx, event)
+        if (open.value && previous != text.value) {
+            filtering.value = true
+            highlight.value = 0
+            popupScroll.value = 0.0
+        }
+        handled
     }
 
     public func isFlexible(): Bool {
@@ -128,13 +142,24 @@ public class ComboBox <: Widget {
 
     private func openList(ctx: UiContext): Unit {
         open.value = true
+        openingText.value = text.value
+        filtering.value = false
         highlight.value = 0
-        popupScroll.value = 0.0 // the highlight restarts at the top, so the list does too
+        for (i in 0..options.size) {
+            if (options[i] == text.value) {
+                highlight.value = i
+                break
+            }
+        }
+        popupScroll.value = 0.0 // start from a known offset, then reveal the current selection
+        revealRow(highlight.value, options, popupRect(ctx, options))
+        cursorState.value = text.value.size
+        anchorState.value = 0 // typing immediately replaces the current selection with a query
         ctx.focus(fieldId) // keep the field focused so typing filters the open list
     }
 
     private func contentHeight(filtered: Array<String>): Float32 {
-        Float32(max(1, filtered.size)) * CUI_SMALL_H
+        Float32(max(1, filtered.size)) * rowHeight
     }
 
     private func listHeight(popup: Rect): Float32 {
@@ -212,13 +237,13 @@ public class ComboBox <: Widget {
     // shared with ListView and Table keyboard navigation.
     private func revealRow(index: Int64, filtered: Array<String>, popup: Rect): Unit {
         let listH = listHeight(popup)
-        let rowTop = Float32(index) * CUI_SMALL_H
+        let rowTop = Float32(index) * rowHeight
         var next = popupScroll.value
         if (rowTop < next) {
             next = rowTop
         }
-        if (rowTop + CUI_SMALL_H > next + listH) {
-            next = rowTop + CUI_SMALL_H - listH
+        if (rowTop + rowHeight > next + listH) {
+            next = rowTop + rowHeight - listH
         }
         let clamped = clampScrollOffset(next, contentHeight(filtered), listH)
         if (clamped != popupScroll.value) {
@@ -237,6 +262,9 @@ public class ComboBox <: Widget {
     }
 
     private func filteredOptions(): Array<String> {
+        if (!filtering.value && text.value == openingText.value) {
+            return options
+        }
         let query = text.value.toAsciiLower()
         if (query.isEmpty()) {
             return options
@@ -260,7 +288,7 @@ public class ComboBox <: Widget {
         if (y < popup.y + COMBO_POPUP_PAD || y >= popup.bottom() - COMBO_POPUP_PAD) {
             return -1
         }
-        Int64((y - popup.y - COMBO_POPUP_PAD + popupScroll.value) / CUI_SMALL_H)
+        Int64((y - popup.y - COMBO_POPUP_PAD + popupScroll.value) / rowHeight)
     }
 
     /*
@@ -279,7 +307,7 @@ public class ComboBox <: Widget {
         if (fullHeight <= above) {
             return Rect(frame.x, frame.y - COMBO_GAP - fullHeight, frame.w, fullHeight)
         }
-        let height = max(CUI_SMALL_H + COMBO_POPUP_PAD * 2.0, max(below, above))
+        let height = max(rowHeight + COMBO_POPUP_PAD * 2.0, max(below, above))
         if (below >= above) {
             Rect(frame.x, frame.bottom() + COMBO_GAP, frame.w, height)
         } else {
@@ -302,7 +330,7 @@ public class ComboBox <: Widget {
         ctx.renderer.pushClip(list)
         if (filtered.isEmpty()) {
             // No suggestion matches the typed text; clicking the placeholder just dismisses.
-            let row = Rect(popup.x + 4.0, list.y, max(0.0, popup.w - 8.0), CUI_SMALL_H)
+            let row = Rect(popup.x + 4.0, list.y, max(0.0, popup.w - 8.0), rowHeight)
             drawRowLabel(ctx, "—", row, ctx.theme.mutedText)
             ctx.renderer.popClip()
             return
@@ -313,10 +341,10 @@ public class ComboBox <: Widget {
             0.0
         }
         let rowW = max(0.0, popup.w - 8.0 - gutter)
-        var i = Int64(offset / CUI_SMALL_H)
-        var y = list.y - (offset - Float32(i) * CUI_SMALL_H)
+        var i = Int64(offset / rowHeight)
+        var y = list.y - (offset - Float32(i) * rowHeight)
         while (i < filtered.size && y < list.bottom()) {
-            let row = Rect(popup.x + 4.0, y, rowW, CUI_SMALL_H)
+            let row = Rect(popup.x + 4.0, y, rowW, rowHeight)
             if (i == active) {
                 ctx.renderer.fillRoundedRect(row, ctx.theme.smallRadius, ctx.theme.accent)
                 drawRowLabel(ctx, filtered[i], row, ctx.theme.accentText)
@@ -326,7 +354,7 @@ public class ComboBox <: Widget {
             } else {
                 drawRowLabel(ctx, filtered[i], row, ctx.theme.text)
             }
-            y += CUI_SMALL_H
+            y += rowHeight
             i += 1
         }
         ctx.renderer.popClip()
@@ -334,8 +362,8 @@ public class ComboBox <: Widget {
     }
 
     private func drawRowLabel(ctx: UiContext, label: String, row: Rect, color: Color): Unit {
-        let textY = row.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
-        ctx.renderer.text(label, row.x + 8.0, textY, color, pointSize: FontSizes.CONTROL)
+        let textY = row.centerY() - ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.CONTROL)) / 2.0
+        ctx.text(label, row.x + 8.0, textY, color, pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
     }
 
     private func popupSurface(ctx: UiContext): SurfaceStyle {

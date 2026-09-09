@@ -77,3 +77,9 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot corners.bmp"
 ```
+
+## 练习与验收
+
+令尾角等于其余圆角，确认恢复普通圆角气泡。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

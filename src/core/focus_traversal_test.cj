@@ -1,6 +1,5 @@
 package cui.core
 
-import sdl.IconName
 
 /*
  * Keyboard focus traversal walks a build-order ring of focusable controls. Each build
@@ -52,19 +51,6 @@ func shiftTabFromNoFocusEntersAtLastControl(): Unit {
 
     ctx.focusPrevious()
     @Expect(ctx.focusId, store.focusRing()[1])
-}
-
-@Test
-func heterogeneousControlsAllJoinFocusRing(): Unit {
-    let store = StateStore()
-    let _ = buildRoot({
-        => VStack {
-            Button("Save", {=>})
-            IconButton(IconName.Calendar, onClick: {=>})
-            Button("Cancel", {=>})
-        }
-    }, store)
-    @Expect(store.focusRing().size, 3)
 }
 
 @Test

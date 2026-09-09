@@ -129,6 +129,7 @@ jobs:
             --profile '${{ matrix.profile }}' \
             --sdl-source '${{ steps.bootstrap.outputs.sdl_root }}' \
             --sdl-ttf-source '${{ steps.bootstrap.outputs.sdl_ttf_root }}' \
+            --sdl-image-source '${{ steps.bootstrap.outputs.sdl_image_root }}' \
             --jobs 2 "${dependencies[@]}"
 
       - name: Stage built SDL runtimes and loader paths

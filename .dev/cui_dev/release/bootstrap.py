@@ -26,7 +26,7 @@ DEFAULT_MANIFEST = CONFIG_ROOT / "cross_platform_artifacts.json"
 DEFAULT_CACHE = DEV_TARGET_ROOT / "toolchains" / "downloads"
 DEFAULT_OUTPUT = DEV_TARGET_ROOT / "toolchains"
 DEFAULT_REPORTS = DEV_TARGET_ROOT / "release"
-COMPONENT_KEYS = {"cangjie": "cangjie", "sdl": "sdl", "sdl_ttf": "sdlTtf"}
+COMPONENT_KEYS = {"cangjie": "cangjie", "sdl": "sdl", "sdl_ttf": "sdlTtf", "sdl_image": "sdlImage"}
 SUPPORTED_PROFILES = {
     "windows-x86_64", "linux-x86_64", "linux-arm64", "macos-arm64",
 }
@@ -90,7 +90,7 @@ def load_manifest(path=DEFAULT_MANIFEST):
         raise BootstrapError(f"cannot read artifact manifest {path}: {error}") from error
     if manifest.get("schemaVersion") != 1:
         raise BootstrapError("artifact manifest schemaVersion must be 1")
-    for key in ("cangjie", "sdl", "sdlTtf"):
+    for key in COMPONENT_KEYS.values():
         if not isinstance(manifest.get(key), dict) or not manifest[key].get("version"):
             raise BootstrapError(f"artifact manifest is missing {key} version data")
     artifacts = manifest["cangjie"].get("artifacts")
@@ -100,6 +100,7 @@ def load_manifest(path=DEFAULT_MANIFEST):
         validate_artifact(f"cangjie/{profile}", artifact)
     validate_artifact("sdl", manifest["sdl"].get("artifact", {}))
     validate_artifact("sdl_ttf", manifest["sdlTtf"].get("artifact", {}))
+    validate_artifact("sdl_image", manifest["sdlImage"].get("artifact", {}))
     return manifest
 
 
@@ -264,8 +265,8 @@ def locate_component_root(component, destination, profile):
                           for manager in ("cjpm", "cjpm.exe"))]
         setup = exactly_one(setups, f"SDK-root {setup_name}")
         return setup.parent, setup
-    header = "SDL.h" if component == "sdl" else "SDL_ttf.h"
-    namespace = "SDL3" if component == "sdl" else "SDL3_ttf"
+    namespace, header = {"sdl": ("SDL3", "SDL.h"), "sdl_ttf": ("SDL3_ttf", "SDL_ttf.h"),
+                         "sdl_image": ("SDL3_image", "SDL_image.h")}[component]
     headers = destination.rglob(header)
     roots = [path.parent.parent.parent for path in headers if path.parent.name == namespace]
     return exactly_one(roots, f"{component} source root"), None

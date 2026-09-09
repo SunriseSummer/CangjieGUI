@@ -4,7 +4,7 @@ import sdl.{Color, FontSizes, Key, MouseButton, Rect, Size, UiEvent}
 import cui.core.{rekeyControl, clampItemIndex, Bindable, CUI_CONTROL_H, CUI_SMALL_H, CursorShape, ScrollBar,
     maxScrollOffset, Semantics, SemanticsAction, SemanticsRole, Spring, State, UiContext, Widget, requireControlId,
     claimHoverIfInside, clampScrollOffset, drawFocusRing, drawSurface, drawVerticalScrollBar, emit,
-    focusableControlIdentity, localState, scrollLineIndex, scrollLineRemainder, scrollOffsetAfterWheel}
+    focusableControlIdentity, localState, scrollLineIndex, scrollLineRemainder, scrollByWheel}
 
 /*
  * A labelled on/off toggle bound to a `Bindable<Bool>`, with an animated check fill.
@@ -42,7 +42,7 @@ public class Checkbox <: Widget {
     }
 
     public func measure(ctx: UiContext, available: Size): Size {
-        Size(min(available.w, ctx.renderer.textWidth(label) + 34.0), CUI_CONTROL_H)
+        Size(min(available.w, ctx.textWidth(label) + 34.0), ctx.textRowHeight(minHeight: CUI_CONTROL_H, padding: 12.0))
     }
 
     public func layout(ctx: UiContext, rect: Rect): Unit {
@@ -75,8 +75,8 @@ public class Checkbox <: Widget {
             let mark = Rect(full.centerX() - w / 2.0, full.centerY() - h / 2.0, w, h)
             ctx.renderer.fillRoundedRect(mark, ctx.theme.smallRadius * t, ctx.theme.accent)
         }
-        let textY = frame.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
-        ctx.renderer.text(label, frame.x + 26.0, textY, ctx.theme.text, pointSize: FontSizes.CONTROL)
+        let textY = frame.centerY() - ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.CONTROL)) / 2.0
+        ctx.text(label, frame.x + 26.0, textY, ctx.theme.text, pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
         if (ctx.showFocusRing(controlId)) {
             drawFocusRing(ctx, box, ctx.theme.smallRadius)
         }
@@ -134,6 +134,7 @@ public class ListView <: Widget {
     // but plain wheel/drag scrolling (selection unchanged) is left alone.
     private let lastRevealed: State<Int64>
     private var frame = Rect.zero()
+    private var rowHeight: Float32 = CUI_SMALL_H
 
     public init(
         items: Array<String>,
@@ -172,18 +173,21 @@ public class ListView <: Widget {
         this
     }
 
-    public func measure(_: UiContext, available: Size): Size {
+    public func measure(ctx: UiContext, available: Size): Size {
+        rowHeight = ctx.textRowHeight()
         Size(available.w, available.h)
     }
 
-    public func layout(_: UiContext, rect: Rect): Unit {
+    public func layout(ctx: UiContext, rect: Rect): Unit {
+        rowHeight = ctx.textRowHeight()
         frame = rect
     }
 
     public func draw(ctx: UiContext): Unit {
         // Clamp writes only on change: this runs every frame, and the offset may be an
         // externally owned state whose observers should not fire for no-op writes.
-        let clampedScroll = clampScrollOffset(scrollStateValue.value, listContentHeight(items), listViewport(frame).h)
+        let clampedScroll = clampScrollOffset(scrollStateValue.value, listContentHeight(items, rowHeight: rowHeight),
+            listViewport(frame).h)
         if (clampedScroll != scrollStateValue.value) {
             scrollStateValue.value = clampedScroll
         }
@@ -198,21 +202,21 @@ public class ListView <: Widget {
 
         let viewport = listViewport(frame)
         ctx.renderer.pushClip(viewport)
-        var i = scrollLineIndex(scrollStateValue.value)
-        var y = viewport.y - scrollLineRemainder(scrollStateValue.value)
+        var i = scrollLineIndex(scrollStateValue.value, rowHeight: rowHeight)
+        var y = viewport.y - scrollLineRemainder(scrollStateValue.value, rowHeight: rowHeight)
         while (i < items.size && y < viewport.bottom()) {
-            drawRow(ctx, i, Rect(viewport.x, y, viewport.w, CUI_SMALL_H))
-            y += CUI_SMALL_H
+            drawRow(ctx, i, Rect(viewport.x, y, viewport.w, rowHeight))
+            y += rowHeight
             i += 1
         }
         ctx.renderer.popClip()
-        drawVerticalScrollBar(ctx, frame, scrollStateValue.value, listContentHeight(items), viewport.h,
-            active: scrollBar.dragging(ctx))
+        drawVerticalScrollBar(ctx, frame, scrollStateValue.value, listContentHeight(items, rowHeight: rowHeight),
+            viewport.h, active: scrollBar.dragging(ctx))
     }
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
         claimHoverIfInside(ctx, event, frame, controlId, CursorShape.Interactive)
-        let contentH = listContentHeight(items)
+        let contentH = listContentHeight(items, rowHeight: rowHeight)
         let viewportH = listViewport(frame).h
         match (event) {
             case UiEvent.MouseDown(MouseButton.Left, x, y) =>
@@ -225,7 +229,7 @@ public class ListView <: Widget {
                     // selecting; row math is only valid inside the viewport.
                     let viewport = listViewport(frame)
                     if (viewport.contains(x, y)) {
-                        let idx = Int64((y - viewport.y + scrollStateValue.value) / CUI_SMALL_H)
+                        let idx = Int64((y - viewport.y + scrollStateValue.value) / rowHeight)
                         if (idx >= 0 && idx < items.size) {
                             selected.value = idx
                         }
@@ -239,8 +243,7 @@ public class ListView <: Widget {
             case UiEvent.MouseWheel(_, wheelY, pointerX, pointerY) =>
                 // Content that fits leaves the wheel to an enclosing scroller (no dead zone).
                 if (frame.contains(pointerX, pointerY) && maxScrollOffset(contentH, viewportH) > 0.0) {
-                    scrollStateValue.value = scrollOffsetAfterWheel(scrollStateValue.value, wheelY, contentH, viewportH)
-                    return true
+                    return scrollByWheel(scrollStateValue, wheelY, contentH, viewportH)
                 }
             case UiEvent.KeyDown(Key.Up, _) => return moveSelection(ctx, -1)
             case UiEvent.KeyDown(Key.Down, _) => return moveSelection(ctx, 1)
@@ -291,15 +294,15 @@ public class ListView <: Widget {
     // Scrolls the given row's band just into view, adjusting the offset minimally.
     private func revealRow(index: Int64): Unit {
         let viewportH = listViewport(frame).h
-        let rowTop = Float32(index) * CUI_SMALL_H
-        let rowBottom = rowTop + CUI_SMALL_H
+        let rowTop = Float32(index) * rowHeight
+        let rowBottom = rowTop + rowHeight
         var scroll = scrollStateValue.value
         if (rowTop < scroll) {
             scroll = rowTop
         } else if (rowBottom > scroll + viewportH) {
             scroll = rowBottom - viewportH
         }
-        scrollStateValue.value = clampScrollOffset(scroll, listContentHeight(items), viewportH)
+        scrollStateValue.value = clampScrollOffset(scroll, listContentHeight(items, rowHeight: rowHeight), viewportH)
     }
 
     private func drawRow(ctx: UiContext, i: Int64, row: Rect): Unit {
@@ -313,12 +316,12 @@ public class ListView <: Widget {
 }
 
 private func drawRowText(ctx: UiContext, text: String, row: Rect, color: Color): Unit {
-    let textY = row.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.BODY) / 2.0
-    ctx.renderer.text(text, row.x + 6.0, textY, color, pointSize: FontSizes.BODY)
+    let textY = row.centerY() - ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.BODY)) / 2.0
+    ctx.text(text, row.x + 6.0, textY, color, pointSize: ctx.textSize(fallback: FontSizes.BODY))
 }
 
-private func listContentHeight(items: Array<String>): Float32 {
-    Float32(items.size) * CUI_SMALL_H
+private func listContentHeight(items: Array<String>, rowHeight!: Float32 = CUI_SMALL_H): Float32 {
+    Float32(items.size) * rowHeight
 }
 
 private func listViewport(frame: Rect): Rect {

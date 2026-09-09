@@ -122,7 +122,6 @@ private class GenericParagraphBuilder {
         widest = max(widest,
             input
                 .ctx
-                .renderer
                 .textWidth(line, pointSize: input.format.pointSize, style: input.format.style, font: input.format.font))
         ParagraphLayout(lines.toArray(), widest)
     }
@@ -196,12 +195,12 @@ protected func ellipsize(
     text: String,
     maxWidth: Float32,
     ps: Float32,
-    style!: FontStyle = FontStyle.regular,
+    style!: ?FontStyle = None,
     font!: ?String = None
 ): String {
     let clusters = segmentGraphemes(text)
-    let session = ctx.renderer.textMeasureSession(text, pointSize: ps, style: style, font: font)
-    let format = ParagraphFormat(maxWidth, ps, 1, style, font)
+    let session = ctx.textMeasureSession(text, pointSize: ps, style: style, font: font)
+    let format = ParagraphFormat(maxWidth, ps, 1, ctx.effectiveFontStyle(style: style), font)
     var result = ""
     try (resource = session) {
         let input = ParagraphMeasureInput(ctx, text, clusters, resource, format)
@@ -221,7 +220,7 @@ protected func wrapText(
     maxWidth: Float32,
     ps: Float32,
     maxLines: Int64,
-    style!: FontStyle = FontStyle.regular,
+    style!: ?FontStyle = None,
     font!: ?String = None
 ): Array<String> {
     layoutParagraph(ctx, text, maxWidth, ps, maxLines, style: style, font: font).lines
@@ -233,11 +232,13 @@ protected func layoutParagraph(
     maxWidth: Float32,
     ps: Float32,
     maxLines: Int64,
-    style!: FontStyle = FontStyle.regular,
+    style!: ?FontStyle = None,
     font!: ?String = None
 ): ParagraphLayout {
-    let format = ParagraphFormat(maxWidth, ps, maxLines, style, font)
-    ctx.cachedParagraphLayout(text, maxWidth, ps, maxLines, style, font, {=> buildParagraphLayout(ctx, text, format)})
+    let effectiveStyle = ctx.effectiveFontStyle(style: style)
+    let format = ParagraphFormat(maxWidth, ps, maxLines, effectiveStyle, font)
+    ctx.cachedParagraphLayout(text, maxWidth, ps, maxLines, effectiveStyle, font,
+        {=> buildParagraphLayout(ctx, text, format)})
 }
 
 private func buildParagraphLayout(ctx: UiContext, text: String, format: ParagraphFormat): ParagraphLayout {
@@ -248,9 +249,7 @@ private func buildParagraphLayout(ctx: UiContext, text: String, format: Paragrap
     if (clusters.isEmpty()) {
         return ParagraphLayout([""], 0.0)
     }
-    let session = ctx
-        .renderer
-        .textMeasureSession(text, pointSize: format.pointSize, style: format.style, font: format.font)
+    let session = ctx.textMeasureSession(text, pointSize: format.pointSize, style: format.style, font: format.font)
     var result = ParagraphLayout([""], 0.0)
     try (resource = session) {
         let input = ParagraphMeasureInput(ctx, text, clusters, resource, format)
@@ -274,9 +273,7 @@ private func buildSimpleHanParagraph(
         return ParagraphLayout([""], 0.0)
     }
     let lines = ArrayList<String>()
-    let session = ctx
-        .renderer
-        .textMeasureSession(text, pointSize: format.pointSize, style: format.style, font: format.font)
+    let session = ctx.textMeasureSession(text, pointSize: format.pointSize, style: format.style, font: format.font)
     var widest: Float32 = 0.0
     try (resource = session) {
         var start: Int64 = 0
@@ -317,9 +314,7 @@ private func finishSimpleHanParagraph(
         lines.add(text[start..text.size])
         return ParagraphLayout(lines.toArray(), max(widest, remainingFit.width))
     }
-    let ellipsisWidth = ctx
-        .renderer
-        .textWidth(TEXT_ELLIPSIS, pointSize: format.pointSize, style: format.style, font: format.font)
+    let ellipsisWidth = ctx.textWidth(TEXT_ELLIPSIS, pointSize: format.pointSize, style: format.style, font: format.font)
     if (ellipsisWidth > format.maxWidth) {
         lines.add("")
     } else {
@@ -327,7 +322,7 @@ private func finishSimpleHanParagraph(
         lines.add(text[start..start + fit.byteLength] + TEXT_ELLIPSIS)
     }
     let last = lines[lines.size - 1]
-    let lastWidth = ctx.renderer.textWidth(last, pointSize: format.pointSize, style: format.style, font: format.font)
+    let lastWidth = ctx.textWidth(last, pointSize: format.pointSize, style: format.style, font: format.font)
     ParagraphLayout(lines.toArray(), max(widest, lastWidth))
 }
 
@@ -406,7 +401,6 @@ private func ellipsizeRange(
     }
     let ellipsisWidth = input
         .ctx
-        .renderer
         .textWidth(TEXT_ELLIPSIS, pointSize: input.format.pointSize, style: input.format.style, font: input.format.font)
     if (ellipsisWidth > input.format.maxWidth) {
         return ""

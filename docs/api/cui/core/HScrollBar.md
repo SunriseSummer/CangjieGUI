@@ -63,7 +63,7 @@ main(): Unit {
 
 ### init
 
-以稳定的拖动状态标识创建控制器。控制器随组件树每帧重建，`dragId` 是它跨帧的名字。
+以稳定的拖动状态标识创建控制器。控制器可能随所属声明重新构建，`dragId` 用于关联重建前后的同一次拖拽。
 
 ```cangjie
 public init(dragId: String)

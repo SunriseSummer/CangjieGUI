@@ -60,6 +60,10 @@ class PaintModel {
         drawing
     }
 
+    func hasStrokes(): Bool {
+        strokeCount.value > 0
+    }
+
     /** 画布内按下：起笔，并把按下点作为首个采样点。 */
     func beginStroke(x: Float32, y: Float32): Unit {
         drawing = true
@@ -69,6 +73,9 @@ class PaintModel {
 
     /** 拖动采样：与上一点连成一段笔迹，再推进采样点。 */
     func extendStroke(x: Float32, y: Float32): Unit {
+        if (!drawing) {
+            return
+        }
         strokes.add(Stroke(lastX, lastY, x, y, brushSize.value, color.value))
         strokeCount.value = strokes.size
         lastX = x
@@ -84,7 +91,10 @@ class PaintModel {
 
     /** 清空画布并归零计数。 */
     func clearStrokes(): Unit {
+        drawing = false
         strokes.clear()
-        strokeCount.value = 0
+        if (strokeCount.value != 0) {
+            strokeCount.value = 0
+        }
     }
 }

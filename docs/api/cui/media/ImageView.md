@@ -1,202 +1,284 @@
-[cui](../../index.md) › [cui.media](index.md) › ImageView
-
 # ImageView
 
-位于 `cui.media` 包的公开类
-
-显示从文件加载的图像。解码后的纹理放在按 UI 线程和渲染器隔离、按路径键控的有界加权 LRU 中（逐帧快命中有二次机会），ImageView 像普通组件一样内联声明——每帧重建只查缓存、不碰磁盘；同一实例重复绘制还会复用已解析结果。覆盖写过图像文件后调用 [`invalidateImage`](functions.md#invalidateimage) 刷新。
-
-## 声明
+`cui.media` 的静态图像组件。可直接通过 `import cui.*` 使用。
 
 ```cangjie
 public class ImageView <: Widget & Resource
 ```
 
-## 继承
+支持 BMP、PNG、JPEG、GIF 静态图、SVG 子集、ICO、CUR、QOI、TGA、PNM、PCX、XPM 等 SDL_image 可用格式；以发行库实际启用的解码器为准。当前交付不要求 WebP、TIFF、AVIF、JPEG XL 的可选解码库，不播放动画。
 
-- 实现 [`Widget`](../core/Widget.md) 与标准库 `Resource`。
+默认高度 96 vp，宽度占满可用空间，`Contain` 保持比例；旧构造参数保持兼容。推荐 `.size(240.vp, 150.vp)` 设置组件尺寸，`.decodeSize(480, 300)` 独立控制缓存像素。后者对 SVG 按尺寸栅格化，对位图在完整解码后缩小，不能限制解码器临时内存。SVG 如用于高 DPI，按实际像素密度选择解码尺寸；尺寸变化后应重建组件或更新 decodeSize。
 
-## 说明
+来源与解码参数组成缓存键。样式、位置、对齐与裁剪不复制纹理；内存来源在创建时复制字节，应在构建函数外保留复用。无特效的图像沿用普通纹理绘制；定制样式进入不可变渲染命令。样式独立采用标准 Alpha 混合，颜色/透明度不会污染共享纹理，混合和采样方式均会恢复。
 
-`Resource` 实现用于兼容早期“先在外部创建，再交给 `manage`”的写法：[close()](#close) 只停用这个图像视图，纹理由线程缓存管理。缓存默认限制为 256 项和估算 128 MiB，淘汰会确定关闭纹理；单张超过预算的纹理可作为唯一条目保留，避免逐帧重新解码。图像不存在或解码失败时不绘制内容，也不会中断帧循环；失败结果同样受条目上限约束。未设置 `preferredWidth` 时占满可用宽度；设置后按指定宽度显示，可以和其他控件排在同一行。
+缓存按 UI 线程及渲染器隔离，默认 256 项、估算 128 MiB。单个超预算项可独占缓存，避免连续解码。失败同样缓存，可通过 `loadError()` 读取错误；覆盖文件后调用 `invalidateImage(path)`，或对内存来源调用同名重载。UI 线程内的刷新同时触发保留绘制失效，包括此前画空白或已被容量淘汰的失败条目。跨线程应通过 `DesktopApp.post` 把刷新交给所属 UI 线程。
+
+首次加载同步发生在绘制时；`intrinsicSize()` 显式允许在测量阶段加载，默认测量不访问磁盘。`preloadImage` 可在显示前预热。`close()` 仅停止这个视图绘制，共享纹理由缓存释放。
 
 ## 示例
 
 ```cangjie verify
 package docexample
-
 import cui.*
-
-let IMAGE_PATH = "cui-doc-cover.bmp"
-
-func writeSampleImage(): Unit {
-    try (surface = Surface.create(160, 90)) {
-        surface.clear(Color.rgb(52, 120, 246))
-        var y: Int32 = 0
-        while (y < 90) {
-            var x: Int32 = 0
-            while (x < 48) {
-                surface.writePixel(x, y, Color.rgb(246, 179, 52))
-                x += 1
-            }
-            y += 1
-        }
-        surface.saveBmp(IMAGE_PATH)
-    }
-}
-
 main(): Unit {
-    try {
-        writeSampleImage()
-        let app = DesktopApp(WindowSpec("ImageView", 420, 260))
-        app.run {
-            VStack(spacing: 10.vp) {
-                ImageView(
-                    IMAGE_PATH,
-                    fit: ImageFit.Cover,
-                    preferredWidth: Some(240.vp),
-                    preferredHeight: 150.vp
-                )
-                Label("程序生成的 160×90 BMP，以 Cover 填满 240×150 区域").muted()
-            }.padding(24.0)
-            // 运行时：图像按 Cover 填满 240×150 区域，左右边缘会被等量裁去。
-        }
-    } finally {
-        if (FileSystem.exists(IMAGE_PATH)) {
-            FileSystem.remove(IMAGE_PATH)
-        }
+    let app = DesktopApp(WindowSpec("图像", 500, 360))
+    app.run {
+        ImageView("assets/cover.jpg")
+            .size(320.vp, 200.vp)
+            .fit(ImageFit.Cover)
+            .imageAlignment(Alignment.Top)
+            .decodeSize(640, 400)
+            .cornerRadius(16.vp)
+            .imageBorder(Color.rgb(220, 224, 228))
+            .alt("封面照片")
+            .padding(24.vp)
     }
 }
 ```
 
-## 成员概览
+组件专用链式接口应放在返回通用 `Widget` 的 `.padding`、`.width` 等修饰符之前。`sourceRect` 使用解码后的像素坐标；`Original` 把一个解码像素视为一个逻辑单位。圆角作用于实际图片矩形；背景和边框作用于整个布局框。`imageOpacity` 只影响图像，装饰单独着色。
 
-**构造函数**
+`errorPlaceholder` 在失败且备用图也不可用时绘制，回调仅用于绘制，不应修改状态；异常会向上传播且裁剪栈仍会恢复。未设置占位或备用图时画空白。`alt` 默认为空（装饰图），非空时创建 Image 语义节点。
 
-| 成员 | 说明 |
-|---|---|
-| [`init(...)`](#init) | 以文件路径、适配方式与首选尺寸创建图像视图。 |
-
-**方法**
-
-| 成员 | 说明 |
-|---|---|
-| [`fit(...)`](#fit) | 选择图像像素装进分配框的方式。 |
-| [`measure(...)`](#measure) | 未指定首选宽度时填满可用宽度；否则采用首选尺寸，但不超过可用空间。 |
-| [`layout(...)`](#layout) | 记住分配的矩形。 |
-| [`draw(...)`](#draw) | 从共享缓存取纹理并按适配方式绘制（`Cover` 裁剪到框）。 |
-| [`handle(...)`](#handle) | 不处理任何事件，恒返回 `false`。 |
-| [`isClosed()`](#isclosed) | 本视图是否已退役。 |
-| [`close()`](#close) | 退役本视图（纹理归缓存所有，不随之销毁）。 |
-
-## 构造函数
+## 接口
 
 ### init
 
-以文件路径、适配方式与首选尺寸创建图像视图。
+从文件创建图像视图，可通过命名参数设置首选尺寸。
 
 ```cangjie
-public init(
-    path: String,
-    fit!: ImageFit = ImageFit.Contain,
-    preferredWidth!: ?Length = None,
-    preferredHeight!: Length = Length(96.0, LengthUnit.Vp)
-)
+public init(path: String, fit!: ImageFit = ImageFit.Contain, preferredWidth!: ?Length = None,
+        preferredHeight!: Length = Length(96.0, LengthUnit.Vp))
 ```
 
-**参数**
+### init
 
-- `path`: `String` — 图像文件路径，同时是缓存键。
-- `fit!`: [`ImageFit`](ImageFit.md) — 适配方式；默认值为 `ImageFit.Contain`。
-- `preferredWidth!`: `?Length` — 首选宽；默认 `None`（填满可用宽）。
-- `preferredHeight!`: [`Length`](../core/Length.md) — 首选高；默认值为 `Length(96.0, LengthUnit.Vp)`，即 96 虚拟像素。
+从可复用来源创建图像视图，尺寸规则与文件构造相同。
 
-## 方法
+```cangjie
+public init(source: ImageSource, fit!: ImageFit = ImageFit.Contain, preferredWidth!: ?Length = None,
+        preferredHeight!: Length = Length(96.0, LengthUnit.Vp))
+```
 
 ### fit
 
-选择图像像素装进分配框的方式。
+设置图像在布局框内的适配方式。
 
 ```cangjie
 public func fit(value: ImageFit): ImageView
 ```
 
-**参数**
+### size
 
-- `value`: [`ImageFit`](ImageFit.md) — 适配方式。
+设置测量阶段的首选宽高；长度非有限或为负时抛出 `IllegalArgumentException`。父容器仍可拉伸图片，需要固定布局框时在图片专用接口之后追加通用 `.width(...).height(...)` 修饰器。
 
-**返回值** [`ImageView`](ImageView.md) — 自身，供链式调用。
+```cangjie
+public func size(width: Length, height: Length): ImageView
+```
+
+### imageAlignment
+
+设置裁剪时保留的区域，或较小图像在布局框中的位置。
+
+```cangjie
+public func imageAlignment(value: Alignment): ImageView
+```
+
+### aspectRatio
+
+按宽高比预留空间，测量时不解码；比值非有限或非正时抛出 `IllegalArgumentException`。
+
+```cangjie
+public func aspectRatio(value: Float32): ImageView
+```
+
+### intrinsicSize
+
+允许测量时加载，按解码像素尺寸报告自然大小，必要时等比缩小到可用空间。
+
+```cangjie
+public func intrinsicSize(): ImageView
+```
+
+### decodeSize
+
+设置独立于布局的解码像素边界。SVG 按边界栅格化，位图完整解码后缩小；零表示该轴不约束。非法尺寸抛出 `IllegalArgumentException`。
+
+```cangjie
+public func decodeSize(width: Int32, height: Int32): ImageView
+```
+
+### decodeSize
+
+限制解码宽度，保留原图比例。
+
+```cangjie
+public func decodeSize(width: Int32): ImageView
+```
+
+### decodeOptions
+
+设置含像素预算的完整解码策略，不改变布局尺寸。
+
+```cangjie
+public func decodeOptions(value: ImageLoadOptions): ImageView
+```
+
+### sourceRect
+
+按解码像素选择源区域，并与图像范围求交；非法坐标抛出 `IllegalArgumentException`。
+
+```cangjie
+public func sourceRect(value: Rect): ImageView
+```
+
+### tint
+
+乘算图像 RGB 与 Alpha，不影响共享同一纹理的其他视图。
+
+```cangjie
+public func tint(value: Color): ImageView
+```
+
+### imageOpacity
+
+设置 0..1 内的图像透明度；非法值抛出 `IllegalArgumentException`。背景与边框独立着色。
+
+```cangjie
+public func imageOpacity(value: Float32): ImageView
+```
+
+### cornerRadius
+
+设置图像的抗锯齿圆角；半径非有限或为负时抛出 `IllegalArgumentException`。
+
+```cangjie
+public func cornerRadius(value: Length): ImageView
+```
+
+### sampling
+
+选择线性平滑采样或适合像素画的最近邻采样。
+
+```cangjie
+public func sampling(value: TextureScaleMode): ImageView
+```
+
+### flip
+
+镜像图像，不改变外围布局。
+
+```cangjie
+public func flip(value: TextureFlip): ImageView
+```
+
+### imageBackground
+
+绘制布局框背景，包含图像透明区域和 Contain 留白。
+
+```cangjie
+public func imageBackground(value: Color): ImageView
+```
+
+### imageBorder
+
+在布局框内部绘制边框；宽度非有限或为负时抛出 `IllegalArgumentException`。
+
+```cangjie
+public func imageBorder(color: Color, width!: Float32 = 1.0): ImageView
+```
+
+### fallback
+
+主来源失败时绘制备用来源；状态与诊断仍描述主来源。
+
+```cangjie
+public func fallback(value: ImageSource): ImageView
+```
+
+### errorPlaceholder
+
+录制布局框内的失败占位绘制；回调只绘制，不修改应用状态。
+
+```cangjie
+public func errorPlaceholder(paint: (UiContext, Rect, String) -> Unit): ImageView
+```
+
+### alt
+
+设置图像的无障碍描述；空字符串表示装饰性图像。
+
+```cangjie
+public func alt(value: String): ImageView
+```
+
+### status
+
+查询主图最近的解析状态，不执行 I/O。
+
+```cangjie
+public func status(): ImageStatus
+```
+
+### loadError
+
+查询缓存诊断；加载前或失效后返回 `None`，不触发加载。
+
+```cangjie
+public func loadError(): ?String
+```
 
 ### measure
 
-未指定首选宽度时填满可用宽度；否则采用首选尺寸，但不超过可用空间。
+
 
 ```cangjie
 public func measure(ctx: UiContext, available: Size): Size
 ```
 
-**参数**
-
-- `ctx`: [`UiContext`](../core/UiContext.md) — 本轮测量使用的 UI 上下文。
-- `available`: `Size` — 父级给出的可用尺寸约束。
-
-**返回值** `Size` — 首选尺寸。
-
 ### layout
 
-记住分配的矩形。
+
 
 ```cangjie
-public func layout(_: UiContext, rect: Rect): Unit
+public func layout(ctx: UiContext, rect: Rect): Unit
 ```
-
-**参数**
-
-- `rect`: `Rect` — 父级最终分配给组件的矩形。
 
 ### draw
 
-从共享缓存取纹理并按适配方式绘制（`Cover` 裁剪到框）。缺失/解码失败画空白。
+
 
 ```cangjie
 public func draw(ctx: UiContext): Unit
 ```
 
-**参数**
-
-- `ctx`: [`UiContext`](../core/UiContext.md) — 本轮绘制使用的 UI 上下文。
-
 ### handle
 
-不处理任何事件，恒返回 `false`。
+
 
 ```cangjie
 public func handle(_: UiContext, _: UiEvent): Bool
 ```
 
-**返回值** `Bool` — 恒为 `false`。
-
 ### isClosed
 
-本视图是否已退役。
+查询当前视图是否已停用。
 
 ```cangjie
 public func isClosed(): Bool
 ```
 
-**返回值** `Bool` — 已调用过 `close()` 即 `true`。
-
 ### close
 
-退役本视图（纹理归缓存所有，不随之销毁）。退役后 `draw` 不再绘制。
+停止绘制当前视图；共享纹理仍由有界缓存管理。
 
 ```cangjie
 public func close(): Unit
 ```
 
-## 另请参阅
+参见 [ImageSource](ImageSource.md)、[ImageFit](ImageFit.md)、[ImageStatus](ImageStatus.md)、[缓存与预热](functions.md)。
 
-- [`ImageFit`](ImageFit.md) — 适配方式。
-- [`invalidateImage`](functions.md#invalidateimage) / [`clearImageCache`](functions.md#clearimagecache) — 缓存刷新入口。
-- [`ImageCacheStats`](ImageCacheStats.md) / [`imageCacheStats`](functions.md#imagecachestats) — 缓存容量与运行统计。
-- [`CanvasWidget`](CanvasWidget.md) — 自由绘制表面。
+存活的 ImageView 会保留已解析的失败诊断，即使全局缓存随后淘汰该失败条目也不反复访问文件。调用 invalidateImage、clearImageCache 或更新 decodeOptions/decodeSize 后，下一次需要图片时重新解析。
+
+错误占位回调先录制为绘制命令，完整结束后再回放。回调抛异常或留下未配对的裁剪时，不改变调用者的裁剪栈。回调可发出绘制命令，但不应开始/结束场景、抓取画面、修改纹理状态或修改应用状态。

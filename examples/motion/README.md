@@ -2,14 +2,14 @@
 
 一个缓动曲线对比台，集中演示缓动曲线库 `Easing` 与时长动画原语 `Animator`：七条轨道各绑一种缓动曲线、
 共享同一时长，点“播放”让标记点并排推进——同一时刻各标记位置不同，直观呈现每条曲线如何分配运动，
-回弹曲线会略微越过终点再回落。自定义 `Widget` 逐帧推进各轨道并在未静止时请求下一帧，即时模式下驱动连续动画。
+回弹曲线会略微越过终点再回落。自定义 `Widget` 逐帧推进各轨道并在未静止时请求下一帧，声明式构建下驱动连续动画。
 
 ## 演示要点
 
 - `Easing` 枚举：`Linear`、`EaseIn/Out/InOut` 的 `Quad`/`Cubic`/`Sine`、`EaseOutBack`（回弹）、`CubicBezier`（CSS ease）
 - `Animator(duration, easing)`：确定时长内按曲线从当前值缓动到目标，与物理 `Spring` 互补
 - 自定义 `Widget` 在 `draw` 里对每条轨道 `animator.animate(ctx, target:)`——推进一帧 + 未停住则 `ctx.requestFrame()`，
-  是即时模式 + 脏帧跳过下驱动连续动画的正路（与 `ProgressRing`/`Toaster` 同）
+  是声明式构建 + 脏帧跳过下驱动连续动画的正路（与 `ProgressRing`/`Toaster` 同）
 - 播放/复位翻转目标，所有轨道同时朝 0 或 1 缓动；标记横坐标 `markerX` 是纯函数，便于单测
 
 ## 文件结构
@@ -27,7 +27,7 @@
 
 ### 自定义 Widget 驱动连续动画
 
-即时模式下动画状态跨帧保留（`Animator` 存于模型），自定义 Widget 在 `draw` 里推进并续帧：
+声明式构建下动画状态跨帧保留（`Animator` 存于模型），自定义 Widget 在 `draw` 里推进并续帧：
 
 ```cangjie
 public func draw(ctx: UiContext): Unit {
@@ -56,3 +56,9 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot motion.bmp"
 ```
+
+## 练习与验收
+
+为一条轨道更换缓动曲线，比较相同时刻的位置与停止条件。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

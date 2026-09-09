@@ -22,7 +22,7 @@
 
 ### 第二步：为图像指定盒子和适配方式
 
-`ImageFit.Cover` 会填满 240×150 盒，必要时裁切边缘；`Contain` 会完整显示图像，必要时留空。预览卡片通常要稳定占位，因此同时给 `preferredWidth` 和 `preferredHeight`，不要让原图尺寸决定整体布局。
+`ImageFit.Cover` 会填满 240×150 盒，必要时裁切边缘；`Contain` 会完整显示图像，必要时留空。用通用 `.width(240.vp).height(150.vp)` 约束盒子尺寸。`ImageView.size` 和 `preferredWidth/preferredHeight` 只设置测量偏好，父容器仍可能拉伸它们，不能据此保证固定盒子。
 
 ### 第三步：运行完整程序
 
@@ -35,7 +35,7 @@ package docexample
 
 import cui.*
 
-let PREVIEW_PATH = "cui-guide-preview.bmp"
+let PREVIEW_PATH = "target/guide-media/cui-guide-preview.bmp"
 
 func writePreview(): Unit {
     try (surface = Surface.create(160, 90)) {
@@ -54,13 +54,17 @@ func writePreview(): Unit {
 }
 
 main(): Unit {
+    FileSystem.createDirectory("target/guide-media")
+    if (FileSystem.exists(PREVIEW_PATH)) {
+        throw IllegalStateException("预览文件已存在，请先确认并移走该文件：${PREVIEW_PATH}")
+    }
     try {
         writePreview()
         let app = DesktopApp(WindowSpec("媒体预览", 460, 330))
         app.run {
             VStack(spacing: 12.vp) {
                 Label("构建产物").bold()
-                ImageView(PREVIEW_PATH, fit: ImageFit.Cover, preferredWidth: Some(240.vp), preferredHeight: 150.vp)
+                ImageView(PREVIEW_PATH, fit: ImageFit.Cover).width(240.vp).height(150.vp)
                 HStack(spacing: 8.vp) {
                     Badge("BMP", kind: BadgeKind.Info)
                     Label("160×90 → 240×150 Cover").muted()
@@ -79,11 +83,11 @@ main(): Unit {
 
 ### 第四步：比较 Cover 与 Contain
 
-在一个 `HStack` 中并排声明两个 180×180 的 ImageView，一个使用 `ImageFit.Cover`，另一个使用 `ImageFit.Contain`。左图会填满正方形并裁掉宽边，右图完整显示宽图并在上下留空。保持相同盒子，才能只比较适配方式。如果列表中反复显示同一路径，CUI 的纹理缓存会复用解码结果；不要在每帧生成不同文件名来绕过缓存。
+在一个 `HStack` 中并排声明两个 ImageView，用 `.width(180.vp).height(180.vp)` 为它们约束相同盒子，一个使用 `ImageFit.Cover`，另一个使用 `ImageFit.Contain`。左图会填满正方形并裁掉宽边，右图完整显示宽图并在上下留空。保持相同盒子，才能只比较适配方式。如果列表中反复显示同一路径，CUI 的纹理缓存会复用解码结果；不要在每次构建时生成不同文件名来绕过缓存。
 
 ## 确认结果
 
-执行 `cjpm run --run-args="--snapshot media.bmp"`。进程应自动退出并产生非空的 `media.bmp`；快照中能看见标题、蓝黄预览和状态摘要。退出后 `cui-guide-preview.bmp` 应已删除。普通交互运行时关闭窗口，也应走同一清理路径。
+执行 `cjpm run --run-args="--snapshot media.bmp"`。进程应自动退出并产生非空的 `media.bmp`；快照中能看见标题、蓝黄预览和状态摘要。退出后 `target/guide-media/cui-guide-preview.bmp` 应已删除，目录保留。若同名输入文件已存在，程序会在生成和清理前报错，避免覆盖已有内容。普通交互运行时关闭窗口，也应走同一清理路径。
 
 普通运行时还要拖动窗口边缘，确认图片盒保持 240×150，外层卡片仍有合理间距。快照模式只覆盖初始画面；Cover/Contain 的裁切差异最好人工查看一次，并在后续稳定环境里保存基准图。
 

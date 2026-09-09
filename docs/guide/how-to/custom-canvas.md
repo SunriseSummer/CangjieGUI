@@ -22,7 +22,7 @@
 
 ### 2. 把跨帧数据放进 State
 
-`CanvasWidget` 实例随声明式构建重建。标记位置、选中对象和笔迹属于模型状态，不能存在控件实例字段里。
+`CanvasWidget` 实例可能随所属声明重新创建。标记位置、选中对象和笔迹属于模型状态，不能只存在控件实例字段里。示例保存相对于画布左上角的位置，绘制时再加上 `frame.x/y`，因此容器移动或滚动后标记仍跟随画布。
 
 ### 3. 运行可点击画布
 
@@ -43,15 +43,16 @@ main(): Unit {
                     renderer, frame =>
                         renderer.strokeLine(frame.x + 10.0, frame.y + 10.0, frame.right() - 10.0, frame.bottom() - 10.0,
                             Pen(width: 2.0, color: Color.rgb(33, 114, 229)))
-                        renderer.fillCircle(markerX.value, markerY.value, 7.0, Color.rgb(246, 112, 52))
+                        renderer.fillCircle(frame.x + markerX.value, frame.y + markerY.value, 7.0,
+                            Color.rgb(246, 112, 52))
                 },
                 onEvent: {
                     event, frame =>
                         match (event) {
                             case UiEvent.MouseDown(MouseButton.Left, x, y) =>
                                 if (frame.contains(x, y)) {
-                                    markerX.value = x
-                                    markerY.value = y
+                                    markerX.value = x - frame.x
+                                    markerY.value = y - frame.y
                                     return true
                                 }
                             case _ => ()

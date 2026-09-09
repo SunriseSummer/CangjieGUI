@@ -1,25 +1,12 @@
-# CUI 示例应用
+# CUI 示例与学习路线
 
-本目录中的每个示例都是独立的仓颉可执行项目，并通过本地路径依赖仓库根目录的 `cui` 模块。
-示例既用于功能演示，也用于验证布局、字体、桌面集成和公开 API 的实际可用性。
+每个目录都是独立的仓颉可执行项目，通过相对路径依赖仓库根目录的 `cui`。
 
-所有示例遵循统一的工程结构（对齐 `sdl/examples` 的拆分习惯）：`main.cj` 只含入口；数据与
-状态在 `model.cj`/`state.cj`/`data.cj`；配色与表面样式在 `theme.cj`；视图在 `views.cj`；
-纯逻辑、后台任务、键盘映射等各占一个文件。窗口统一显式使用 `scale: 1.0`，控件尺寸一律以
-`vp`/`fp` 单位书写；系统高 DPI 仍由框架的 pixel density 独立处理。
-
-每个示例目录都有自己的 `README.md` 教学文档，讲解文件结构与关键实现；先看画廊，再看一句话索引。
-
-## 画廊
-
-下表截图由 `python .dev/cli.py gallery` 生成（各示例窗口的真实渲染快照，存放于
-`.images/`）；示例名即目录名，`cd examples/<名字> && cjpm run` 即可运行。
-
-封面是框架的同名示例「苍翠」——程序化绘制的千里江山式青绿山水横卷：
+## 示例画廊
 
 | |
 |---|
-| **cangcui** · 苍翠画卷（千里江山 · 青绿山水，约 3:1 横卷）<br>![cangcui](.images/cangcui.png) |
+| **cangcui** · 苍翠画卷 <br>![cangcui](.images/cangcui.png) |
 
 | | | |
 |---|---|---|
@@ -27,354 +14,107 @@
 | **paint** · 画板<br>![paint](.images/paint.png) | **process_manager** · 进程管理器<br>![process_manager](.images/process_manager.png) | **planner** · 专注规划台<br>![planner](.images/planner.png) |
 | **data_board** · 产品看板<br>![data_board](.images/data_board.png) | **command_palette** · 命令面板<br>![command_palette](.images/command_palette.png) | **notes** · 主从式笔记<br>![notes](.images/notes.png) |
 | **data_table** · 数据表格<br>![data_table](.images/data_table.png) | **contacts** · 通讯录 CRM<br>![contacts](.images/contacts.png) | **workbench** · 分栏工作台<br>![workbench](.images/workbench.png) |
-| **file_explorer** · 文件浏览器（目录树）<br>![file_explorer](.images/file_explorer.png) | **booking** · 酒店预订<br>![booking](.images/booking.png) | **editor** · 菜单栏编辑器<br>![editor](.images/editor.png) |
+| **file_explorer** · 文件浏览器（目录树）<br>![file_explorer](.images/file_explorer.png) | **booking** · 酒店预订<br>![booking](.images/booking.png) | **editor** · 写作空间<br>![editor](.images/editor.png) |
 | **timeline** · 横向日期时间轴<br>![timeline](.images/timeline.png) | **chat** · 聊天（变高虚拟列表）<br>![chat](.images/chat.png) | **gallery** · 作品画廊（虚拟化网格）<br>![gallery](.images/gallery.png) |
 | **settings** · 设置面板（折叠分区）<br>![settings](.images/settings.png) | **tasklist** · 任务优先级（拖动重排）<br>![tasklist](.images/tasklist.png) | **notify** · 通知 Toast<br>![notify](.images/notify.png) |
 | **wizard** · 账户设置向导（步骤条）<br>![wizard](.images/wizard.png) | **catalog** · 商品目录（分页）<br>![catalog](.images/catalog.png) | **scheduler** · 会议排期（时间选择）<br>![scheduler](.images/scheduler.png) |
 | **watchlist** · 观影清单（评分）<br>![watchlist](.images/watchlist.png) | **explorer** · 文件浏览器（面包屑）<br>![explorer](.images/explorer.png) | **tracker** · 问题追踪（徽标过滤）<br>![tracker](.images/tracker.png) |
 | **goals** · 每日目标（环形进度）<br>![goals](.images/goals.png) | **mail** · 邮件客户端<br>![mail](.images/mail.png) | **pomodoro** · 番茄钟<br>![pomodoro](.images/pomodoro.png) |
-| **typography** · 字体样式样张<br>![typography](.images/typography.png) | **fonts** · 本地字体加载<br>![fonts](.images/fonts.png) | **wenkai** · 霞鹜文楷样本册<br>![wenkai](.images/wenkai.png) |
+| **typography** · 字体样式样张<br>![typography](.images/typography.png) | **fonts** · 字体实验室<br>![fonts](.images/fonts.png) | **wenkai** · 霞鹜文楷样本册<br>![wenkai](.images/wenkai.png) |
 | **richtext** · 发布说明（富文本合集）<br>![richtext](.images/richtext.png) | **motion** · 缓动实验室<br>![motion](.images/motion.png) | **cards** · 样式卡片<br>![cards](.images/cards.png) |
 | **disclosure** · 折叠问答<br>![disclosure](.images/disclosure.png) | **shadows** · 多重阴影<br>![shadows](.images/shadows.png) | **gradients** · 线性渐变<br>![gradients](.images/gradients.png) |
 | **stats** · 数据看板（字号混排）<br>![stats](.images/stats.png) | **links** · 可点击链接<br>![links](.images/links.png) | **highlight** · 搜索高亮<br>![highlight](.images/highlight.png) |
 | **styleguide** · 设计令牌<br>![styleguide](.images/styleguide.png) | **skeleton** · 骨架屏<br>![skeleton](.images/skeleton.png) | **stagger** · 交错入场<br>![stagger](.images/stagger.png) |
+| **images** · 图像工作室<br>![images](.images/images.png) | **icons** · 图标工坊<br>![icons](.images/icons.png) | **symbols** · 预置图标图鉴<br>![symbols](.images/symbols.png) |
 | **corners** · 逐角圆角<br>![corners](.images/corners.png) | **dashed** · 虚线边框<br>![dashed](.images/dashed.png) | |
 
-## 示例清单
+## 学习路线
+
+| 阶段 | 示例 | 验收重点 |
+|---|---|---|
+| 入门 | [calculator](calculator/README.md) → [booking](booking/README.md) | 一次输入只修改一份事实，派生结果与画面一致 |
+| 应用结构 | [notes](notes/README.md) → [workbench](workbench/README.md) | 按业务身份编辑，模型与视图职责清晰 |
+| 数据界面 | [data_table](data_table/README.md) → [contacts](contacts/README.md) → [chat](chat/README.md) | 排序、筛选、删除和滚动后仍操作正确对象 |
+| 桌面交付 | [editor](editor/README.md) → [notepad](notepad/README.md) → [process_manager](process_manager/README.md) | 关闭确认、文件失败和后台结果可解释 |
+| 媒体与扩展 | [images](images/README.md) → [icons](icons/README.md) → [paint](paint/README.md) | 资源可加载、失败可恢复、事件边界正确 |
+
+配合[技术体系地图](../docs/guide/concepts/technology-map.md)阅读。每次练习只改一个行为，先构建，再检查输入、状态与画面。
+
+## 按任务查找
+
+### 状态、表单与应用结构
+
+| 示例 | 主要知识 |
+|---|---|
+| [calculator](calculator/README.md) | 枚举动作、状态更新、等权布局 |
+| [booking](booking/README.md) | 日期、校验与多来源派生 |
+| [data_board](data_board/README.md) | 派生计数、筛选与稳定项目身份 |
+| [settings](settings/README.md) | 折叠分区、模型状态与控件绑定 |
+| [wizard](wizard/README.md) | 分步表单与导航校验 |
+| [notes](notes/README.md) | 主从选择、字段绑定与删除确认 |
+| [workbench](workbench/README.md) | 嵌套分栏、文档绑定与派生大纲 |
+| [editor](editor/README.md) | 编辑命令、会话检查点与关闭确认 |
+| [notepad](notepad/README.md) | UTF-8 文件、异步对话框与失败保留 |
+
+### 列表、表格与导航
+
+| 示例 | 主要知识 |
+|---|---|
+| [calendar](calendar/README.md) | 日期导航、网格与生成图片 |
+| [catalog](catalog/README.md) | 分类过滤与分页 |
+| [contacts](contacts/README.md) | 强类型业务数据、草稿表单与嵌套浮层 |
+| [data_table](data_table/README.md) | 强类型 DataColumn、排序与自绘单元格 |
+| [file_explorer](file_explorer/README.md) | TreeView、路径身份与详情索引 |
+| [explorer](explorer/README.md) | 面包屑与模拟目录导航 |
+| [mail](mail/README.md) | 过滤、已读与归档状态 |
+| [chat](chat/README.md) | 变高虚拟列表与滚动定位 |
+| [timeline](timeline/README.md) | 横向虚拟列表与日期定位 |
+| [gallery](gallery/README.md) | 按行虚拟化的强类型网格 |
+| [tasklist](tasklist/README.md) | 拖动重排与按 id 绑定 |
+| [tracker](tracker/README.md) | 状态徽标与过滤绑定 |
+| [watchlist](watchlist/README.md) | 评分绑定与派生统计 |
+| [command_palette](command_palette/README.md) | 搜索焦点与应用级键盘路由 |
+| [scheduler](scheduler/README.md) | 时间选择与日程排序 |
+| [planner](planner/README.md) | 页面身份、网格与滚动组合 |
+
+### 字体与媒体
+
+| 示例 | 主要知识 |
+|---|---|
+| [typography](typography/README.md) | 字体样式、继承与局部覆盖 |
+| [fonts](fonts/README.md) | 系统族名、数值字重与解析诊断 |
+| [wenkai](wenkai/README.md) | 随附字体与静态多字重 |
+| [richtext](richtext/README.md) | 混排、基线、断行与链接 |
+| [images](images/README.md) | 文件／内存图像、适配与失败占位 |
+| [icons](icons/README.md) | 模板／原色图标、DPI 规格与无障碍 |
+| [symbols](symbols/README.md) | 单图标子包与预置资源 |
+| [links](links/README.md) | 富文本链接与键盘激活 |
+| [highlight](highlight/README.md) | 文本匹配与片段高亮 |
+| [stats](stats/README.md) | 混合字号与保留绘制示范 |
+
+### 样式与自绘
+
+| 示例 | 主要知识 |
+|---|---|
+| [cards](cards/README.md) | 背景、阴影与边框顺序 |
+| [corners](corners/README.md) | 逐角圆角与气泡造型 |
+| [dashed](dashed/README.md) | 连续虚线边框 |
+| [gradients](gradients/README.md) | 线性渐变与方向 |
+| [shadows](shadows/README.md) | 单层与多层阴影 |
+| [styleguide](styleguide/README.md) | 设计令牌的定义与使用 |
+| [paint](paint/README.md) | 画布局部坐标与拖拽事件边界 |
+| [cangcui](cangcui/README.md) | 程序化风景与自定义 Widget |
+
+### 动画、反馈与后台工作
+
+| 示例 | 主要知识 |
+|---|---|
+| [motion](motion/README.md) | Easing 与 Animator |
+| [stagger](stagger/README.md) | 动画延迟与声明身份 |
+| [skeleton](skeleton/README.md) | 共享 Pulse 与条件续帧 |
+| [disclosure](disclosure/README.md) | Reveal 与可交互自定义行 |
+| [goals](goals/README.md) | 进度值、目标与派生汇总 |
+| [notify](notify/README.md) | Toast 与帧驱动生命周期 |
+| [pomodoro](pomodoro/README.md) | 阶段计时与条件帧订阅 |
+| [process_manager](process_manager/README.md) | 后台邮箱、CSV 与系统信息 |
 
-### [`cangcui`](cangcui/README.md)：苍翠画卷（千里江山 · 青绿山水）
-
-框架同名的封面示例：约 3:1 的横卷窗口里，用渲染原语程序化绘出千里江山式的青绿山水。山脊为
-可单测的纯函数（正弦叠加 × 聚散包络 + 高斯主峰，远山圆浑、近山峭拔、主峰立于黄金分割）；
-江水穿行于近处的岛群之间（近山竖条只画到水线，沉水的山谷让出江面、岸线随山势弯转、岛下随形
-压倒影）；逐竖条「石青罩顶 → 石绿铺底」分染并沿脊勾线，网巾纹涟漪与 S 形流水写水势，虬干
-平顶的松簇、乌篷渔舟与人字飞鸟按山水关系动态落位，引首竖排「苍翠」题字与朱印。整幅确定性
-成画（快照可回归）、静态零开销，窗口拉伸时山川随宽高连续重排。
-
-### [`calculator`](calculator/README.md)：计算器
-
-展示由链式 `.flex(weight)` 构成的等宽按键网格、跨两列按键、枚举化按键与集中样式映射、
-`EventHandler` 键盘输入（数字/运算符直接键入、Enter 求值、Backspace 删位），以及标准/科学
-模式的 `if` 控制流。运算逻辑带除零、整数溢出与错误态恢复保护。
-
-### [`calendar`](calendar/README.md)：日历
-
-展示七列权重布局、年月状态导航、`derive` 派生的标题、`Time.currentDateTime` 日期信息、
-当前日期高亮，以及运行时生成 `Surface` 后由 `ImageView` 展示图像资源。
-
-### [`notepad`](notepad/README.md)：记事本
-
-展示可编辑文本区、只读模式、异步打开/保存对话框、应用内确认条（不阻塞事件循环的新建确认）、
-剪贴板、文件拖放、快捷键和由 `map` 派生的文档统计状态栏。文件对话框结果在 UI 帧中轮询。
-
-### [`paint`](paint/README.md)：画板
-
-展示 `CanvasWidget`、平滑圆头笔画、画笔粗细滑块、系统十字光标、由应用自行实现 `Widget`
-接口的 `ColorSwatch` 自定义控件，以及画布手势与工具栏按钮的事件边界处理（画布外的指针
-事件不吞、按钮手势正常收尾）。
-
-### [`process_manager`](process_manager/README.md)：进程管理器
-
-展示 `spawn` 后台任务、由互斥锁保护的结果邮箱、后台异常兜底回传、逐帧收集结果、把
-`tasklist` CSV 解析成可排序的 `Table` 进程表、`TabView`，以及 CPU、显示器和电源信息查询。
-耗时系统命令不会阻塞 UI 线程，子进程输出使用受检 UTF-8 解码。
-
-### [`planner`](planner/README.md)：专注规划台
-
-展示 `Grid` 指标卡、`FlowRow` 标签、`ProgressBar` 动画进度、`ScrollView`、`Keyed`、`rememberState`、
-`maxLines` 文本换行，以及 `Switch`（弹簧动画拨动）、`RadioButton`、
-`Dropdown`、`ComboBox`（可编辑下拉城市）、`Stepper` 等桌面控件。界面包含概览和偏好设置两个实用场景。
-
-### [`data_board`](data_board/README.md)：产品看板
-
-展示单一数据源驱动的三列 `Grid` 看板：列头计数由 `derive` 派生、卡片列表由 `ForEach` 按任务
-id 维持身份、筛选器实时作用于三列、新增按钮真正追加卡片、在制上限超出时列头切换警示色，
-以及流式标签、动态紧凑卡片和完整链式样式。
-
-### [`command_palette`](command_palette/README.md)：命令面板
-
-一个键盘驱动的模糊命令启动器（类似编辑器 Ctrl+P）：`TextField.autofocus()` 打开即聚焦搜索、
-`DerivedState` 派生的结果条数、`State.observe` 在查询变化时归零高亮，以及“焦点在搜索框、
-`↑/↓/回车` 却在应用根部拦截以操控列表”的经典命令面板交互。综合演示自动聚焦、文本选区/撤销、
-`ListView` 高亮与深色浮层主题。
-
-### [`notes`](notes/README.md)：主从式笔记
-
-左列表 + 右编辑器的主从应用：用 `notes.project` 把 `TextArea` 双向绑定到选中笔记的正文（单一
-数据源、无同步缓冲），编辑器 id 含笔记 id 实现按笔记独立的光标与撤销。综合演示 `ListView` 键盘
-导航、文本选区/撤销、`Tooltip`、`ContextMenu` 右键菜单（新建/复制/删除）、删除走 `Modal` 模态确认，
-以及首行标题（每帧计算）与字节统计的 `derive`。
-
-### [`data_table`](data_table/README.md)：数据表格
-
-一张服务器机群监控表，演示 `Table` 控件：多列、固定表头、窗口化滚动、点击列头排序（数值列
-`numeric: true` 按数值而非字典序、右对齐）、行选择以原始行索引存储故排序后仍跟随同一行、`Tab`
-聚焦后 `↑/↓/Home/End` 键盘导航、CPU 列的自定义单元格负载条（`TableColumn.cell`，显示与排序键
-解耦），以及选中行详情由 `State.map` 派生实时刷新。
-
-### [`contacts`](contacts/README.md)：通讯录（CRM）
-
-一个小而完整的增删改查界面，把 `Table`、`ComboBox`、`ContextMenu`、`Modal`、`TextField` 组合到真实
-场景：可排序联系人表格、组合框搜索、右键与工具栏共享的编辑/删除、录入表单与删除确认两个模态框
-（承载真实控件子树，表单的“公司”字段是对话框内的 `ComboBox`——嵌套浮层压在面板之上），以及
-“姓名非空才可保存”的表单校验、随选择启用的按钮、过滤即归零选择。既是这些控件的端到端集成测试，
-也是最佳实践参考。
-
-### [`workbench`](workbench/README.md)：分栏工作台
-
-一个 IDE 式的三区写作工作台，演示 `SplitView` 分栏容器：外层横向分栏（文档导航｜工作区）内再嵌
-纵向分栏（编辑器／信息），三区边界皆由可拖动、可 `Tab` 聚焦并方向键微调的分隔条分配，悬停显示
-横向/纵向调整光标。正文按 Markdown 书写，大纲与字数统计由 `derive` 从正文实时派生；编辑器用
-`docs.project` 双向绑定到选中文档正文、id 含文档 id 实现按文档独立的光标与撤销。综合演示嵌套分栏、
-`ListView`/`TextArea`/`ScrollView` 在分栏窗格中的填充，以及分栏比例由模型持有以便布局延续。
-
-### [`file_explorer`](file_explorer/README.md)：文件浏览器
-
-一个左树右详情的资源管理器，演示 `TreeView` 层级列表：以 `TreeNode` 描述目录树，展开/折叠、按深度缩进、
-文件夹与文件图标区分、点击箭头切换、点击行选中，`Tab` 聚焦后 `↑↓` 移动、`→` 展开并步入、`←` 折叠并
-步出到父级、空格切换；只绘制视口附近行故大树成本恒为一屏。布局复用 `SplitView` 分出可拖动左右两栏，
-右栏详情由选中节点 id 从索引查得、路径面包屑直接由 id 拆分得到，示范组件间的组合。
-
-### [`booking`](booking/README.md)：酒店预订
-
-一张实时结算的预订表单，演示 `DatePicker` 日期选择器：闭合态显示所选日期，点击弹出月历浮层，点选
-或键盘（方向键移动、越月自动翻页、Home/End 翻月、Enter 确认、Esc 关闭）选择日期。入住/退房两个
-`DatePicker` 与房型 `SegmentedControl`、人数 `Stepper` 一起，驱动由 `derive` 派生的晚数、单价、合计与
-有效性校验；晚数直接取 `CalendarDate.compareTo` 的天数差，退房不晚于入住即转为警示、确认按钮随之禁用。
-今日日期在入口读取后传入模型，使模型逻辑可确定性地测试。
-
-### [`editor`](editor/README.md)：菜单栏编辑器
-
-一个由应用菜单栏驱动的文本编辑器，演示 `MenuBar`：文件/编辑/帮助多个顶层菜单，菜单项带右对齐快捷键
-提示、`MenuItem.separator()` 分隔线，以及随文档是否为空动态启用/禁用（空文档时“保存/清空”自动置灰）。
-点击标题展开、菜单打开时指针滑过其他标题即切换，或 `Tab` 聚焦后 `←→` 换菜单、`↑↓` 选项（跳过分隔线
-与禁用项）、`Enter` 执行。菜单每帧由模型构建故禁用状态实时；动作作用于模型，`TextArea` 绑定正文即刻可见，
-状态栏显示上次动作与实时行数、字数。菜单基础设施与 `ContextMenu` 共享同一套 `MenuItem` 与弹层渲染。
-
-### [`timeline`](timeline/README.md)：横向日期时间轴
-
-一条横向滚动的日期带，演示 `LazyRow` 横向虚拟列表：400 天只物化视口附近的十几个日格，滚动成本恒为一屏，
-鼠标滚轮横向滚动、溢出时底部出现滚动条。每个日格上排星期（今天用强调色）、中间是可点选的日号按钮
-（选中用主色）、下排月份；选中项驱动详情面板（完整日期、星期与相对今天的天数）。日期运算全部复用
-`CalendarDate`（`addingDays`/`weekdayIndex`/`compareTo`）；横向滚动偏移由模型持有，初始滚到今天、并被
-“回到今天”复位。`LazyRow` 与 `LazyColumn` 共享同一套窗口化与逐项构建逻辑，横向滚动条则与纵向对称。
-
-### [`chat`](chat/README.md)：聊天（变高虚拟列表）
-
-一个仿主流社交软件的群聊界面，演示 `LazyList` 变高虚拟列表：每条气泡按预估高度定位，只物化视口附近的
-十几条，上翻几百条历史消息仍只付出一屏成本。贴边三段布局（顶栏/消息区/输入栏），气泡左右分列（我方右、
-蓝底白字；对方左、白底深字带细边），圆形头像在气泡外、对方名字置于气泡上方，间隔较远时插入居中时间分隔
-条——可选段都叠进预估高度，正文按估算行数用 `maxLines` 封顶、绝不超高裁切。回车或点“发送”追加消息并滚
-到底部，最新消息始终可见。行偏移是各高度的累加和、可见窗口由二分定位，`heightOf` 只需 O(1)。
-
-### [`gallery`](gallery/README.md)：作品画廊（LazyGrid 虚拟化网格）
-
-一面 60 张卡片的作品墙，演示数据驱动的虚拟化网格 `LazyGrid`：等宽分栏、按行窗口化，只有视口附近的行
-会真正构建与绘制。一行构建器 `LazyGrid(data, columns, itemHeight){ item => ... }` 搭出网格，数据保持强
-类型，卡片是普通控件组合（色块＋标题＋副标题的面板），行高固定换取 O(1) 的行定位与滚动映射。
-
-### [`settings`](settings/README.md)：设置面板（折叠分区）
-
-一个应用设置屏，演示 `Accordion` 折叠面板：外观/通知/隐私/关于四个可折叠分区，点击标题或聚焦后 Enter/Space
-展开收起，展开的分区体是真实控件（分段/滑块/开关/复选/单选/按钮），只在展开时构建、绑定到模型字段。抬头的
-“单开模式”开关驱动 `Accordion` 的 `single`：开启后展开一个分区会自动收起其它。抬头摘要由主题与共享范围
-`derive` 得到。综合演示折叠容器承载任意控件子树、惰性构建体、键盘可达与派生状态。
-
-### [`tasklist`](tasklist/README.md)：任务优先级（拖动重排）
-
-一份顺序即优先级的任务清单，演示 `ReorderableList` 拖放重排：按住每行左侧手柄上下拖动即改变任务顺序，
-拖动时其它行让开、被拖行悬浮，松手提交 `onMove(from, to)` 由模型对自己的任务表施加移动。行内容是一个
-复选框（显示标题、切换完成态）：点手柄拖动、点手柄以外命中复选框，二者互不干扰。完成态用 `project` 双向
-绑定到任务的 done 字段、随 id 迁移故重排后仍跟随该任务；顶部计数由任务表 `map` 派生。
-
-### [`notify`](notify/README.md)：通知（Toast）
-
-一个通知演示，展示 `Toaster` + `ToastLayer` 瞬态通知：四个按钮各弹一种类型（成功/信息/警告/错误）的通知，
-`ToastLayer` 负责在右下角自底向上堆叠渲染、计时、滑入与淡出。`Toaster` 是应用级控制器，从任意处 `show`
-即可；`ToastLayer` 不占布局空间、不吞事件，故放在根 `ZStack` 末层浮于内容之上，按钮点击照常。关键在于
-时间动画：`ToastLayer` 每帧按 `FrameInfo.deltaMs` 老化通知，并在有通知时调用 `ctx.requestFrame()` 驱动下一帧，
-否则空闲的脏帧循环会把动画冻住。
-
-### [`wizard`](wizard/README.md)：账户设置向导（步骤条）
-
-一个四步账户设置流程，演示 `StepIndicator` 步骤条：一排编号节点由连接线相连，已完成的步打勾、当前步高亮、
-未来步置灰；点已完成的步节点可跳回。步骤条以展示为主，`current` 由底部 上一步/下一步 按钮驱动，也可点步节点
-跳回；每一步有各自的必填校验（`stepValid`），未通过时“下一步”自动禁用。中部按当前步渲染不同表单（`TextField`
-/`SegmentedControl`/`Switch`），末步汇总确认信息。综合演示步骤条 + 分步表单 + 校验 + 步进导航，全从单一状态派生。
-
-### [`catalog`](catalog/README.md)：商品目录（分页导航）
-
-一个商品目录浏览界面，演示 `Pagination` 分页导航：140 件商品按每页 8 件分为 18 页，底栏页导航显示首页、末页、
-当前页附近的页码与折叠省略号，上一页/下一页箭头在两端自动禁用。顶部 `SegmentedControl` 分类过滤条改变结果集与
-总页数——切换分类时用 `State.observe` 把页码重置回第一页，演示分页与过滤共存时的经典处理。过滤、分页切片与显示
-区间都是当前状态的纯函数，每帧现算；商品卡片用嵌套 `Panel` + `Grid(2)` 排布，附分类色块缩略图。
-
-### [`scheduler`](scheduler/README.md)：会议排期（时间选择器）
-
-一个会议排期界面，演示 `TimePicker` 时间选择：小时网格一点选时，分钟滑杆粗调、−/+ 逐分钟微调、数字直接键入，
-方向键微调（上下按分钟、左右按小时，跨午夜环绕），并与 `DatePicker` 组成日程表单。开始/结束时间用纯函数 `TimeOfDay` 实时算出时长，
-配合主题非空校验决定“添加”是否可用；已排会议按 `(日期, 开始时间)` 升序排列。综合演示时间选择 + 日期选择 +
-派生校验 + 排序列表——时长、排序键、时间段文案都是 `TimeOfDay`/`CalendarDate` 的纯函数，便于单测。
-
-### [`watchlist`](watchlist/README.md)：观影清单（评分控件）
-
-一个观影清单评分界面，演示 `Rating` 评分控件：逐部电影一排圆点，填充到当前分、其后置空；点某点评到该位、
-再点当前分清除，悬停预览，聚焦后方向键增减（Home 清零、End 满分）。每行的评分是评分数组在该下标上的
-镜头（`State.project`），`Rating` 双向读写它；汇总的已评条数与平均分都是评分数组的纯函数，随评分实时派生。
-
-### [`explorer`](explorer/README.md)：文件浏览器（面包屑）
-
-一个仿资源管理器的文件浏览器，演示 `Breadcrumb` 面包屑路径导航：工具栏“上级”按钮（根目录置灰）与可点段
-跳回的路径构成上下导航，路径过长时中间自动折叠为省略号。目录内容按 名称/修改日期/大小 三列展示，列头与
-条目行共享列几何；整行可点的自定义 `EntryRow`——单击文件夹进入、单击文件选中、悬停高亮，底部状态栏统计
-条目并展示选中详情。模拟目录树、沿路径查找、面包屑分段与导航、大小格式化都是纯函数，便于单测。
-
-### [`tracker`](tracker/README.md)：问题追踪（徽标与过滤标签）
-
-一个问题追踪界面，演示 `Badge` 状态徽标与 `Chip` 过滤标签：每条问题以语义色徽标（中性/强调/成功/警告/危险）
-标注状态与优先级；顶部一排可点的 `Chip` 按状态切换是否显示。过滤开关是唯一数据源，逐状态用 `State.project`
-镜头绑定各 `Chip`，可见列表由它与问题列表纯函数派生。综合演示徽标 + 过滤标签 + 镜头绑定 + 派生列表。
-
-### [`goals`](goals/README.md)：每日目标（环形进度）
-
-一个每日目标仪表盘，演示 `ProgressRing` 环形进度：一圈轨道 + 从顶部顺时针扫到当前完成度的弧（圆角折线，
-任意尺寸都平滑），环心显示百分比。四个目标各一个环、顶部一个总完成度环；点 +/- 调整当前值，各环与总环
-实时更新。完成度分数与总完成度都是当前值的纯函数派生，便于单测。
-
-### [`mail`](mail/README.md)：邮件客户端（SplitView 双栏 + 自绘列表行 + 搜索过滤）
-
-一只桌面收件箱，演示典型主从式应用的组合：`SplitView` 左列表右阅读，自绘 `MailRow` 两行列表行
-（未读加粗带强调色圆点、时间右对齐、`pushClip` 列宽截断、选中/悬停底色），`TextField` 搜索按
-发件人/主题/预览过滤，`RichText` 混排计数与发件人元信息，`Badge` 未读徽标；阅读即已读、
-「归档」移出列表并把选中顺延到相邻一封。
-
-### [`pomodoro`](pomodoro/README.md)：番茄钟（ProgressRing + FrameHandler 计时 + Toast）
-
-一只番茄工作法计时器，演示按需驱动的时间线：只在运行中把界面包进 `FrameHandler`（每帧回调
-`tick(deltaMs)` 并请求下一帧），暂停即回到脏帧跳过的零开销空闲；`ProgressRing` 与 `ZStack`
-叠出环内倒计时，阶段机到点自动切换并 `Toaster.show` 通知，时长设置停表可调（`State.observe`
-联动剩余时间）、运行中整卡置灰。阶段机纯逻辑全部可单测。
-
-### [`typography`](typography/README.md)：字体样式排版样张（粗体/斜体/下划线/删除线）
-
-一张字体样式样张，演示 `Label` 的字体样式修饰符 `bold()` / `italic()` / `underline()` / `strikethrough()`：
-粗体优先加载真粗体伴生字面（如微软雅黑的 msyhbd.ttc），其余样式由渲染层经 SDL_ttf 合成，
-Latin 与 CJK 一致生效。顶部四个 `Chip`
-直接绑定模型各 `State<Bool>` 实时切换样式，字号阶梯逐档以当前样式渲染，另有静态样式参考卡作对照。综合
-演示字体样式 + 状态绑定 + 派生摘要。
-
-### [`fonts`](fonts/README.md)：本地字体文件加载（Fonts.register + fontFamily）
-
-一张字体样本册，演示从本地字体文件加载字体：`Fonts.register(name, path)` 登记字体名到文件路径，再由
-`Label.fontFamily(name)` 按名套用。加载一款衬线（Georgia）与一款等宽（Consolas），与系统默认无衬线字体
-并列对照；分段控件切换大样张字体、`Chip` 叠加粗体（加载字体也能加粗）。未注册名或打不开的文件自动回退
-系统字体。字体解析与选中映射是纯函数（存在性谓词注入），便于单测。
-
-### [`wenkai`](wenkai/README.md)：本地字体样本册（CJK 多字重加载）
-
-一页霞鹜文楷字体样本册，演示 `Fonts.register` 加载真实 CJK 字体：三个比例字重与一个等宽变体各占一个注册名，
-`fontFamily` 按名套用即换字重；大字样张、字重对比、等宽代码行并列呈现。字体文件缺失时整页回退系统字体、
-页面结构不变。目录探测与字重登记为注入式纯函数，可单测。综合演示本地字体加载 + 多字重 + CJK 样张排版。
-
-### [`richtext`](richtext/README.md)：发布说明（RichSpan 全能力合集）
-
-一页产品发布说明，把 `RichSpan` 的完整词汇拼进真实排版：版本标题行三种字号混排（大号加粗版本号 + 小号日期 +
-「最新」软底标签）、斜体导语、逐条说明（类别图标 + 软底类别标签 + 加粗主题词 + 灰底内联代码 + 划除的弃用旧
-写法 + 下划线议题链接，点击计数回显于状态条），分段控件按类别过滤。断行质量成体系：CJK 逐字符填行、拉丁
-标识符整词保持不切半、断点空格不带进续行。综合演示逐段字号/样式/高亮/链接 + 纯函数片段拼装 + 派生列表。
-
-### [`motion`](motion/README.md)：缓动实验室（Easing 曲线 + Animator）
-
-一个缓动曲线对比台，演示缓动曲线库 `Easing`（线性、二/三次 In/Out/InOut、正弦、回弹、CSS ease 贝塞尔）与时长
-动画原语 `Animator`：七条轨道共享同一时长、各绑一种曲线，播放后标记点并排推进，同一时刻位置不同，直观对比
-运动分布，回弹会越过终点再回落。自定义 `Widget` 逐帧推进并请求下一帧，即时模式下驱动连续动画。
-
-### [`cards`](cards/README.md)：样式卡片（阴影 · 圆角 · 边框）
-
-一个样式属性演练场，演示通用样式修饰符 `shadow`（可配 offset/blur/spread/color 的软阴影，含 `Shadow.elevation`
-Material 高度预设）、`background(color, radius)` 圆角填充与 `border` 圆角描边：预览卡片的阴影层级、圆角、边框可用
-Stepper/Switch 实时调整，下方另有 elevation 阶梯参考（e1..e6 阴影渐大渐柔）。综合演示样式属性 + 状态绑定 + 派生描述。
-
-### [`disclosure`](disclosure/README.md)：折叠问答（Reveal 动画 + 自定义折叠行）
-
-一份 FAQ，演示 `Reveal` 动画折叠容器与示例内定义的自绘可交互控件 `FaqRow`：点问题行（或 Tab + Enter/空格）
-展开收起答案，chevron 随展开态转向，悬停亮底、键盘焦点画标准焦点环；答案由 `Reveal` 包裹缓动高度、其下卡片
-平滑让位，标题栏带全部展开/收起与计数摘要。综合演示声明式过渡动画 + 自定义控件接入交互协议
-（`focusableControlIdentity`/`claimHoverIfInside`/`drawFocusRing`）+ 集合状态。
-
-### [`shadows`](shadows/README.md)：多重阴影（shadow(layers) + keyAmbient）
-
-一页阴影对比，演示 `shadow(layers)` 叠层投影与 `Shadow.keyAmbient` 的 Material 式「环境光 + 方向光」双层预设：
-同一层级下单层与双层并排对照（单层是一团均匀的晕，双层的深度感来自宽淡环境光与窄深方向光之差），另有
-双层 e1..e6 阶梯。层级 Stepper 实时调节。综合演示叠层阴影 + 层级预设 + 对比式版面。
-
-### [`gradients`](gradients/README.md)：线性渐变（gradientBackground）
-
-一个渐变展示台，演示 `gradientBackground(Gradient)` 样式修饰符：两色线性渐变填充圆角背景，可纵向（顶→底）
-或横向（左→右）。大预览随 Stepper 换预设、Switch 换方向实时更新，下方是 6 组现代渐变预设的样本墙。渐变复用
-与实填相同的缓存网格、逐顶点着色，不额外增加三角剖分。综合演示渐变样式 + 状态绑定 + 派生。
-
-### [`stats`](stats/README.md)：数据看板（RichText 逐段字号）
-
-一个指标看板，演示 `RichText` 的逐段字号：每张卡把「大号粗体数值 + 小号弱化单位」拼在同一行富文本里，两种
-字号在行内居中对齐、行高随最大字号增长；下方一行是按好坏着色的环比变化，顶部分时段切换。综合演示逐段字号 +
-逐段颜色 + 状态绑定 + 派生。
-
-### [`links`](links/README.md)：可点击链接（RichSpan.onTap）
-
-一个活动通知流，演示 `RichSpan` 的可点击链接：每条通知里的人名、文件、频道以链接色 + 下划线呈现，
-`RichSpan.onTap` 让它们可点击——悬停变手型光标、点击运行回调，把被点链接显示到底部详情条。无链接段的
-RichText 保持惰性。综合演示富文本内联交互 + 状态绑定 + 派生。
-
-### [`highlight`](highlight/README.md)：搜索高亮（RichSpan.highlight）
-
-一个知识卡片阅读器，演示 `RichSpan` 的 `<mark>` 式逐段背景高亮：在搜索框输入或点预设标签，命中的关键词在
-正文里就地以琥珀色高亮标记——不过滤、不跳转。高亮是纯视觉层（不改布局、不改文字色）；纯函数 `highlightSpans`
-按 rune 大小写不敏感切分文本，`TextField` 实时输入即重算。综合演示富文本逐段高亮 + 文本输入 + 匹配切分。
-
-### [`styleguide`](styleguide/README.md)：设计令牌样式指南
-
-一份“活的样式指南”，演示设计令牌尺度：间距 `Spacing`、圆角 `Radii`、动效 `Motion`（时长 + 缓动），以及既有的
-字号 `FontSizes` 与高度预设 `Shadow.elevation`。间距以宽度随值增长的示意条呈现、圆角一排色块、高度一排卡片、
-字号逐档样张；页面自身也用这些令牌排版，既是参考也是范例。综合演示设计令牌体系 + 样式属性合成运用。
-
-### [`skeleton`](skeleton/README.md)：骨架屏（Pulse 循环动画）
-
-一页加载骨架屏，演示循环/往复动画原语 `Pulse`：头像圆与长短交错的占位条底色缓慢呼吸，「加载完成」切换真实
-列表后界面回到零帧空闲。全部骨架行共用一个 Pulse（按帧戳去重、同步呼吸不倍速）；自定义 `SkeletonRow` 微件
-展示 draw 内 `animate(ctx)` + `Color.lerp` 的常亮动画标准路径。综合演示循环动画 + 自定义微件 + 加载态切换。
-
-### [`stagger`](stagger/README.md)：交错入场（Animator / Reveal 的 delay）
-
-一组入场卡片，演示动画 `delay`（CSS `transition-delay` 的对应物）：让第 i 行多等「i × 步进」毫秒，整组便从
-「一起弹出」变成「依次落位的瀑布」。每行标出自己等了多久，把交错的数学摆在明面上；三档步进可对比手感。
-纯函数 `staggerDelay`/`cascadeTotalMs` 承担全部时序数学，可单测。综合演示交错动效 + 缓动曲线 + 状态绑定。
-
-### [`corners`](corners/README.md)：逐角圆角（Corners）
-
-一个消息会话，演示 `Corners`——背景四角各自取半径（CSS 四值 `border-radius` 的对应物）。气泡整体圆润、唯独
-发送者一侧的下角收成小尾角（我的在右下、对方的在左下），底部输入条用 `Corners.top` 只圆上面两角如自底升起的
-抽屉；圆角与尾角可用 Stepper 实时调整。逐角圆角是纯装饰，不改布局。综合演示逐角圆角 + 文本输入 + 列表状态。
-
-### [`dashed`](dashed/README.md)：虚线边框（dashedBorder）
-
-一个虚线边框演练场，演示 `dashedBorder` 样式修饰符：沿圆角矩形周边等距行进画虚线，转角处仍均匀；实线段长/
-间隔长/圆角/线宽可配。预览框随 Stepper 实时调整，另有拖放区、占位卡等常见用法。虚线是既有实线 `border` 的
-独立可选变体，不影响实线描边。综合演示虚线边框样式 + 状态绑定 + 派生。
-
-## 运行方式
-
-进入任一示例项目目录执行：
-
-```powershell
-cd examples/calendar
-cjpm run
-```
-
-所有示例均支持框架提供的快照参数：
-
-```powershell
-cjpm run --run-args "--snapshot calendar.bmp"
-```
-
-程序会等待界面完成若干帧布局和绘制后保存 BMP 快照并退出，适合视觉回归检查。

@@ -1,6 +1,7 @@
 package cui.core
 
 import std.collection.ArrayList
+import sdl.text as nativeText
 
 internal struct GraphemeCluster {
     let start: Int64
@@ -37,119 +38,27 @@ internal func nextMandatoryBreak(clusters: Array<GraphemeCluster>, start: Int64)
 
 internal func segmentGraphemes(text: String): Array<GraphemeCluster> {
     let runes = text.toRuneArray()
-    if (runes.isEmpty()) {
-        return []
-    }
-    let clusters = ArrayList<GraphemeCluster>(runes.size)
-    var clusterStart: Int64 = 0
-    var byteOffset = runeByteLength(UInt32(runes[0]))
-    var clusterFirst = UInt32(runes[0])
-    var previous = clusterFirst
-    var regionalRun: Int64 = if (isRegionalIndicator(previous)) {
-        1
-    } else {
-        0
-    }
-    var viramaPending = isVirama(previous)
-    var index: Int64 = 1
-    while (index < runes.size) {
-        let current = UInt32(runes[index])
-        let currentIsMark = isUnicodeMark(current)
-        if (graphemeBreaksBefore(previous, current, currentIsMark, regionalRun, viramaPending)) {
-            clusters.add(GraphemeCluster(clusterStart, byteOffset, clusterFirst, previous))
-            clusterStart = byteOffset
-            clusterFirst = current
+    let boundaries = graphemeRuneBoundaries(runes)
+    let clusters = ArrayList<GraphemeCluster>()
+    var offset: Int64 = 0
+    for (i in 1..boundaries.size) {
+        let start = offset
+        for (j in boundaries[i - 1]..boundaries[i]) {
+            offset += runeByteLength(UInt32(runes[j]))
         }
-        byteOffset += runeByteLength(current)
-        if (isRegionalIndicator(current)) {
-            regionalRun = if (isRegionalIndicator(previous)) {
-                regionalRun + 1
-            } else {
-                1
-            }
-        } else {
-            regionalRun = 0
-        }
-        if (isVirama(current)) {
-            viramaPending = true
-        } else if (!currentIsMark && current != UInt32(0x200D)) {
-            viramaPending = false
-        }
-        previous = current
-        index += 1
+        clusters.add(GraphemeCluster(start, offset, UInt32(runes[boundaries[i - 1]]), UInt32(runes[boundaries[i] - 1])))
     }
-    clusters.add(GraphemeCluster(clusterStart, byteOffset, clusterFirst, previous))
     clusters.toArray()
 }
 
-/** Rune indices (0 plus every extended-grapheme end) for styled text layout. */
+/** Unicode 17 extended-grapheme ends in rune indices, shared with the SDL text backend. */
 protected func graphemeRuneBoundaries(runes: Array<Rune>): Array<Int64> {
-    if (runes.isEmpty()) {
-        return [0]
-    }
-    let boundaries = ArrayList<Int64>(runes.size + 1)
-    boundaries.add(0)
-    var previous = UInt32(runes[0])
-    var regionalRun: Int64 = if (isRegionalIndicator(previous)) {
-        1
-    } else {
-        0
-    }
-    var viramaPending = isVirama(previous)
-    var index: Int64 = 1
-    while (index < runes.size) {
-        let current = UInt32(runes[index])
-        let currentIsMark = isUnicodeMark(current)
-        if (graphemeBreaksBefore(previous, current, currentIsMark, regionalRun, viramaPending)) {
-            boundaries.add(index)
-        }
-        if (isRegionalIndicator(current)) {
-            regionalRun = if (isRegionalIndicator(previous)) {
-                regionalRun + 1
-            } else {
-                1
-            }
-        } else {
-            regionalRun = 0
-        }
-        if (isVirama(current)) {
-            viramaPending = true
-        } else if (!currentIsMark && current != UInt32(0x200D)) {
-            viramaPending = false
-        }
-        previous = current
-        index += 1
-    }
-    boundaries.add(runes.size)
-    boundaries.toArray()
+    nativeText.graphemeRuneBoundaries(runes)
 }
 
-private func graphemeBreaksBefore(
-    previous: UInt32,
-    current: UInt32,
-    currentIsMark: Bool,
-    regionalRun: Int64,
-    viramaPending: Bool
-): Bool {
-    if (previous == UInt32(0x000D) && current == UInt32(0x000A)) {
-        return false
-    }
-    if (isLineControl(previous) || isLineControl(current)) {
-        return true
-    }
-    if (currentIsMark || current == UInt32(0x200D) || isEmojiModifier(current) || isEmojiTag(current)) {
-        return false
-    }
-    if (previous == UInt32(0x200D) || isPrepend(previous) || viramaPending) {
-        return false
-    }
-    if (hangulJoins(previous, current)) {
-        return false
-    }
-    if (isRegionalIndicator(previous) && isRegionalIndicator(current) && regionalRun % 2 == 1) {
-        return false
-    }
-    true
+/** The same boundaries expressed as UTF-8 byte offsets. */
+protected func graphemeByteBoundaries(text: String): Array<Int64> {
+    nativeText.graphemeByteBoundaries(text)
 }
 
 private func runeByteLength(codePoint: UInt32): Int64 {
@@ -170,41 +79,6 @@ private func isLineControl(codePoint: UInt32): Bool {
 
 internal func isMandatoryBreak(cluster: GraphemeCluster): Bool {
     isLineControl(cluster.first)
-}
-
-private func isEmojiModifier(codePoint: UInt32): Bool {
-    codePoint >= UInt32(0x1F3FB) && codePoint <= UInt32(0x1F3FF)
-}
-
-private func isEmojiTag(codePoint: UInt32): Bool {
-    codePoint >= UInt32(0xE0020) && codePoint <= UInt32(0xE007F)
-}
-
-private func isRegionalIndicator(codePoint: UInt32): Bool {
-    codePoint >= UInt32(0x1F1E6) && codePoint <= UInt32(0x1F1FF)
-}
-
-private func isPrepend(codePoint: UInt32): Bool {
-    (codePoint >= UInt32(0x0600) && codePoint <= UInt32(0x0605)) || codePoint == UInt32(0x06DD) || codePoint == UInt32(0x070F) ||
-        (codePoint >= UInt32(0x0890) && codePoint <= UInt32(0x0891)) || codePoint == UInt32(0x08E2) || codePoint ==
-        UInt32(0x110BD) || codePoint == UInt32(0x110CD)
-}
-
-private func isVirama(codePoint: UInt32): Bool {
-    codePoint == UInt32(0x094D) || codePoint == UInt32(0x09CD) || codePoint == UInt32(0x0A4D) || codePoint == UInt32(0x0ACD) ||
-        codePoint == UInt32(0x0B4D) || codePoint == UInt32(0x0BCD) || codePoint == UInt32(0x0C4D) || codePoint == UInt32(0x0CCD) ||
-        codePoint == UInt32(0x0D4D) || codePoint == UInt32(0x1039) || codePoint == UInt32(0x17D2) || codePoint == UInt32(0x1A60)
-}
-
-private func hangulJoins(previous: UInt32, current: UInt32): Bool {
-    let previousL = previous >= UInt32(0x1100) && previous <= UInt32(0x115F)
-    let currentL = current >= UInt32(0x1100) && current <= UInt32(0x115F)
-    let currentV = current >= UInt32(0x1160) && current <= UInt32(0x11A7)
-    let currentT = current >= UInt32(0x11A8) && current <= UInt32(0x11FF)
-    let syllable = previous >= UInt32(0xAC00) && previous <= UInt32(0xD7A3)
-    let syllableHasTail = syllable && (previous - UInt32(0xAC00)) % UInt32(28) != UInt32(0)
-    (previousL && (currentL || currentV)) || ((currentV || (syllable && !syllableHasTail)) && (currentV || currentT)) ||
-        ((currentT || syllableHasTail) && currentT)
 }
 
 private func canBreakBetween(previous: GraphemeCluster, current: GraphemeCluster): Bool {

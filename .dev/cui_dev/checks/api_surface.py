@@ -11,16 +11,17 @@ API_ROOT = REPOSITORY_ROOT / "docs" / "api" / "cui"
 UMBRELLA_SOURCE = SOURCE_ROOT / "cui.cj"
 UMBRELLA_DOC = API_ROOT / "index.md"
 
-PACKAGE = re.compile(r"(?m)^package\s+(cui(?:\.[a-z][a-z0-9_]*)?)\s*$")
+PACKAGE = re.compile(r"(?m)^package\s+(cui(?:\.[a-z][a-z0-9_]*)*)\s*$")
 PUBLIC_TYPE = re.compile(
     r"(?m)^public\s+(?:open\s+)?(?:class|interface|struct|enum)\s+"
     r"([A-Za-z_][A-Za-z0-9_]*)"
 )
 PUBLIC_FUNCTION = re.compile(r"(?m)^public\s+func\s+([A-Za-z_][A-Za-z0-9_]*)")
+PUBLIC_VALUE = re.compile(r"(?m)^public\s+(let|const|var)\s+([A-Za-z_][A-Za-z0-9_]*)")
 CUI_IMPORT = re.compile(
-    r"(?m)^public\s+import\s+cui\.([a-z][a-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)\s*$"
+    r"(?m)^public\s+import\s+cui\.([a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*)\.([A-Za-z_][A-Za-z0-9_]*)\s*$"
 )
-SPECIAL_PAGES = {"extensions.md", "functions.md", "index.md"}
+SPECIAL_PAGES = {"extensions.md", "functions.md", "values.md", "index.md"}
 PUBLIC_MEMBER = re.compile(
     r"^public\s+(?:(?:static|mut|open|override)\s+)*"
     r"(let|var|prop|func)\s+([A-Za-z_][A-Za-z0-9_]*)"
@@ -189,6 +190,22 @@ def source_type_members(
     return result
 
 
+def source_values(source_root: Path) -> dict[tuple[str, str], str]:
+    """Return public package values and their declared mutability (excluding type fields)."""
+    result = {}
+    for path in sorted(source_root.rglob("*.cj")):
+        if path.name.endswith("_test.cj"):
+            continue
+        code = _code_only(path.read_text(encoding="utf-8"))
+        package = PACKAGE.search(code)
+        if package is None or "." not in package[1]:
+            continue
+        subpackage = package[1].split(".", 1)[1]
+        for kind, name in PUBLIC_VALUE.findall(code):
+            result[subpackage, name] = kind
+    return result
+
+
 def api_surface_failures(
     source_root: Path = SOURCE_ROOT,
     api_root: Path = API_ROOT,
@@ -199,9 +216,10 @@ def api_surface_failures(
     failures: list[str] = []
     types, functions = source_surface(source_root)
     members_by_type = source_type_members(source_root)
+    values = source_values(source_root)
 
     for subpackage, name in sorted(types):
-        package_docs = api_root / subpackage
+        package_docs = api_root.joinpath(*subpackage.split("."))
         page = package_docs / f"{name}.md"
         index = package_docs / "index.md"
         if not page.is_file():
@@ -244,7 +262,7 @@ def api_surface_failures(
             failures.append(f"package index does not link {name}.md: {index}")
 
     for subpackage, name in sorted(functions):
-        package_docs = api_root / subpackage
+        package_docs = api_root.joinpath(*subpackage.split("."))
         functions_page = package_docs / "functions.md"
         index = package_docs / "index.md"
         if not functions_page.is_file():
@@ -257,12 +275,31 @@ def api_surface_failures(
         if not index.is_file() or f"](functions.md#{anchor})" not in index.read_text(encoding="utf-8"):
             failures.append(f"package index does not link cui.{subpackage}.{name}")
 
+    for (subpackage, name), kind in sorted(values.items()):
+        package_docs = api_root.joinpath(*subpackage.split("."))
+        page = package_docs / "values.md"
+        index = package_docs / "index.md"
+        if not page.is_file():
+            failures.append(f"missing value reference for cui.{subpackage}.{name}")
+            continue
+        text = page.read_text(encoding="utf-8")
+        if re.search(rf"(?m)^###\s+{re.escape(name)}\s*$", text) is None:
+            failures.append(f"value reference has no heading for cui.{subpackage}.{name}")
+        if re.search(rf"\bpublic\s+{kind}\s+{re.escape(name)}\s*[:=]", text) is None:
+            failures.append(f"value reference has no matching public {kind} declaration: {page}")
+        if not index.is_file() or f"](values.md#{name.lower()})" not in index.read_text(encoding="utf-8"):
+            failures.append(f"package index does not link cui.{subpackage}.{name}")
+
+    for page in api_root.rglob("values.md"):
+        subpackage = ".".join(page.parent.relative_to(api_root).parts)
+        for name in re.findall(r"(?m)^###\s+([A-Za-z_][A-Za-z0-9_]*)\s*$", page.read_text(encoding="utf-8")):
+            if (subpackage, name) not in values:
+                failures.append(f"stale API value without a public declaration: cui.{subpackage}.{name}")
+
     documented_types = {
-        (directory.name, page.stem)
-        for directory in api_root.iterdir()
-        if directory.is_dir()
-        for page in directory.glob("*.md")
-        if page.name not in SPECIAL_PAGES
+        (".".join(page.parent.relative_to(api_root).parts), page.stem)
+        for page in api_root.rglob("*.md")
+        if page.parent != api_root and page.name not in SPECIAL_PAGES
     }
     for subpackage, name in sorted(documented_types - types):
         failures.append(f"stale API page without a public type: {subpackage}/{name}.md")
@@ -272,9 +309,11 @@ def api_surface_failures(
         doc_text = umbrella_doc.read_text(encoding="utf-8")
         for match in CUI_IMPORT.finditer(source_text):
             subpackage, name = match.groups()
-            type_target = f"]({subpackage}/{name}.md)"
-            function_target = f"]({subpackage}/functions.md#{name.lower()})"
-            if type_target not in doc_text and function_target not in doc_text:
+            package_path = subpackage.replace(".", "/")
+            type_target = f"]({package_path}/{name}.md)"
+            function_target = f"]({package_path}/functions.md#{name.lower()})"
+            value_target = f"]({package_path}/values.md#{name.lower()})"
+            if all(target not in doc_text for target in [type_target, function_target, value_target]):
                 failures.append(
                     f"cui umbrella reference omits re-export cui.{subpackage}.{name}"
                 )

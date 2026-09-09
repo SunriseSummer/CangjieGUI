@@ -6,10 +6,109 @@ from pathlib import Path
 
 from cui_dev.checks.api_surface import api_surface_failures
 from cui_dev.checks.doc_snippets import verified_snippets
-from cui_dev.checks.docs import broken_links
+from cui_dev.checks.docs import broken_links, fence_failures, markdown_files
 
 
 class ApiDocumentationTests(unittest.TestCase):
+    def test_example_readme_is_checked_but_generated_dependency_docs_are_not(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            example = root / "examples" / "demo"
+            example.mkdir(parents=True)
+            page = example / "README.md"
+            page.write_text("[missing](missing.md)\n", encoding="utf-8")
+            generated = example / "target" / ".dep-cache" / "README.md"
+            generated.parent.mkdir(parents=True)
+            generated.write_text("[generated](missing.md)\n", encoding="utf-8")
+            self.assertEqual(markdown_files([root / "examples"]), [page])
+            self.assertEqual(len(broken_links(page)), 1)
+
+    def test_root_readme_program_is_discovered_and_requires_verification(self):
+        with tempfile.TemporaryDirectory() as raw:
+            page = Path(raw) / "README.md"
+            source = "package docexample\nmain(): Unit {}\n"
+            page.write_text("```cangjie verify\n" + source + "```\n", encoding="utf-8")
+            snippets, failures = verified_snippets((page,), strict_roots=(page,))
+            self.assertEqual(failures, [])
+            self.assertEqual(len(snippets), 1)
+            page.write_text("```cangjie\n" + source + "```\n", encoding="utf-8")
+            _, failures = verified_snippets((page,), strict_roots=(page,))
+            self.assertEqual(len(failures), 1)
+
+    def test_fences_allow_nested_examples_but_reject_unmatched_bare_fence(self):
+        with tempfile.TemporaryDirectory() as raw:
+            page = Path(raw) / "README.md"
+            page.write_text("````markdown\n```cangjie\nmain() {}\n```\n````\n", encoding="utf-8")
+            self.assertEqual(fence_failures(page), [])
+            page.write_text("# Exercise\n\n```\n\n## Next lesson\n", encoding="utf-8")
+            self.assertEqual(fence_failures(page), [(3, "unclosed Markdown code fence")])
+
+    def test_public_value_requires_matching_declaration_index_and_umbrella_link(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            source = root / "src"
+            source.mkdir()
+            api = root / "api"
+            docs = api / "symbols" / "clock"
+            docs.mkdir(parents=True)
+            (source / "clock.cj").write_text(
+                "package cui.symbols.clock\npublic let ICON_CLOCK: IconSource = load()\n", encoding="utf-8"
+            )
+            umbrella = source / "cui.cj"
+            umbrella.write_text("package cui\npublic import cui.symbols.clock.ICON_CLOCK\n", encoding="utf-8")
+            umbrella_doc = api / "index.md"
+            umbrella_doc.write_text("# cui\n", encoding="utf-8")
+            failures = api_surface_failures(source, api, umbrella, umbrella_doc)
+            self.assertTrue(any("missing value reference" in item for item in failures))
+            self.assertTrue(any("umbrella reference omits" in item for item in failures))
+            (docs / "values.md").write_text(
+                "### ICON_CLOCK\n\npublic var ICON_CLOCK: IconSource\n", encoding="utf-8"
+            )
+            failures = api_surface_failures(source, api, umbrella, umbrella_doc)
+            self.assertTrue(any("no matching public let" in item for item in failures))
+            self.assertTrue(any("package index does not link" in item for item in failures))
+            (docs / "values.md").write_text(
+                "### ICON_CLOCK\n\npublic let ICON_CLOCK: IconSource\n", encoding="utf-8"
+            )
+            (docs / "index.md").write_text("[ICON_CLOCK](values.md#icon_clock)\n", encoding="utf-8")
+            umbrella_doc.write_text("[ICON_CLOCK](symbols/clock/values.md#icon_clock)\n", encoding="utf-8")
+            self.assertEqual(api_surface_failures(source, api, umbrella, umbrella_doc), [])
+            (docs / "values.md").write_text(
+                "### ICON_CLOCK\npublic let ICON_CLOCK: IconSource\n### ICON_STALE\n", encoding="utf-8"
+            )
+            self.assertTrue(any("stale API value" in item for item in
+                                api_surface_failures(source, api, umbrella, umbrella_doc)))
+
+    def test_nested_packages_have_the_same_coverage_and_stale_page_checks(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            source = root / "src"
+            api = root / "api"
+            package_docs = api / "symbols" / "clock"
+            source.mkdir()
+            package_docs.mkdir(parents=True)
+            (source / "clock.cj").write_text(
+                "package cui.symbols.clock\npublic func clockIcon(): Unit {}\n", encoding="utf-8"
+            )
+            umbrella = source / "cui.cj"
+            umbrella.write_text(
+                "package cui\npublic import cui.symbols.clock.clockIcon\n", encoding="utf-8"
+            )
+            umbrella_doc = api / "index.md"
+            umbrella_doc.write_text(
+                "[clock](symbols/clock/functions.md#clockicon)\n", encoding="utf-8"
+            )
+            failures = api_surface_failures(source, api, umbrella, umbrella_doc)
+            self.assertTrue(any("missing function reference" in item for item in failures))
+            (package_docs / "functions.md").write_text("### clockIcon\n", encoding="utf-8")
+            (package_docs / "index.md").write_text(
+                "[clockIcon](functions.md#clockicon)\n", encoding="utf-8"
+            )
+            self.assertEqual(api_surface_failures(source, api, umbrella, umbrella_doc), [])
+            (package_docs / "Stale.md").write_text("# Stale\n", encoding="utf-8")
+            self.assertTrue(any("stale API page" in item for item in
+                                api_surface_failures(source, api, umbrella, umbrella_doc)))
+
     def test_local_markdown_anchor_must_exist(self):
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)

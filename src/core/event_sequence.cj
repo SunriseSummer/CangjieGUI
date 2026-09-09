@@ -14,9 +14,7 @@ protected func dispatchEventSequence(
     complete: (UiEvent) -> Unit
 ): Unit {
     for (event in events) {
-        prepare(event)
-        route(event)
-        complete(event)
+        dispatchWithCompletion(event, prepare, route, complete)
     }
 }
 
@@ -30,12 +28,28 @@ protected func dispatchEventRecord(
 ): Unit {
     context.beginEvent(record.metadata)
     try {
-        prepare(record.event)
-        route(record.event)
-        complete(record.event)
+        dispatchWithCompletion(record.event, prepare, route, complete)
     } finally {
         context.endEvent()
     }
+}
+
+private func dispatchWithCompletion(event: UiEvent, prepare: (UiEvent) -> Unit, route: (UiEvent) -> Unit,
+    complete: (UiEvent) -> Unit): Unit {
+    try {
+        prepare(event)
+        route(event)
+    } catch (error: Exception) {
+        throw rollbackUiFailure(
+            error,
+            {
+                =>
+                complete(event);
+                None
+            }
+        )
+    }
+    complete(event)
 }
 
 /** Dispatches deferred native events while installing each event-time metadata snapshot. */

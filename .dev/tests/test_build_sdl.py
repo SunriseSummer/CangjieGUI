@@ -11,7 +11,8 @@ from cui_dev.release import build_sdl
 def source_tree(root, family):
     root.mkdir(parents=True)
     (root / "CMakeLists.txt").write_text("", encoding="utf-8")
-    namespace, header = ("SDL3", "SDL.h") if family == "sdl" else ("SDL3_ttf", "SDL_ttf.h")
+    namespace, header = {"sdl": ("SDL3", "SDL.h"), "sdl_ttf": ("SDL3_ttf", "SDL_ttf.h"),
+                         "sdl_image": ("SDL3_image", "SDL_image.h")}[family]
     include = root / "include" / namespace
     include.mkdir(parents=True)
     (include / header).write_text("", encoding="utf-8")
@@ -19,6 +20,17 @@ def source_tree(root, family):
 
 
 class BuildSdlRuntimeTests(unittest.TestCase):
+    def test_image_build_uses_static_formats_without_optional_codecs(self):
+        commands = build_sdl.configure_commands(
+            "cmake", Path("sdl"), Path("ttf"), Path("build"), Path("prefix"), 2,
+            image_source=Path("image"))
+        self.assertEqual(len(commands), 9)
+        self.assertIn("-DSDLIMAGE_STRICT=ON", commands[6])
+        self.assertIn("-DSDLIMAGE_BACKEND_STB=ON", commands[6])
+        for codec in ("AVIF", "JXL", "TIF", "WEBP"):
+            self.assertIn(f"-DSDLIMAGE_{codec}=OFF", commands[6])
+        self.assertEqual(commands[8][1], "--install")
+
     def test_build_plan_is_shared_only_strict_and_installable(self):
         commands = build_sdl.configure_commands(
             "cmake", Path("sdl"), Path("ttf"), Path("build"), Path("prefix"), 3)
@@ -67,6 +79,9 @@ class BuildSdlRuntimeTests(unittest.TestCase):
             with self.assertRaisesRegex(build_sdl.BootstrapError, "no ttf"):
                 build_sdl.runtime_inventory(prefix, "linux")
             (prefix / "libSDL3_ttf.so.0").write_bytes(b"ttf")
+            with self.assertRaisesRegex(build_sdl.BootstrapError, "no image"):
+                build_sdl.runtime_inventory(prefix, "linux")
+            (prefix / "libSDL3_image.so.0").write_bytes(b"image")
             inventory = build_sdl.runtime_inventory(prefix, "linux")
             self.assertEqual(inventory["sdl"][0]["sha256"],
                              "8fd2cf493428683399f6d3cf8c7df3dd80e46d106d003e9dc4d77306d7c19fee")
@@ -77,6 +92,7 @@ class BuildSdlRuntimeTests(unittest.TestCase):
             root = Path(temporary)
             sdl = source_tree(root / "sdl", "sdl")
             ttf = source_tree(root / "ttf", "sdl_ttf")
+            image = source_tree(root / "image", "sdl_image")
             prefix = root / "prefix"
             calls = []
 
@@ -85,13 +101,14 @@ class BuildSdlRuntimeTests(unittest.TestCase):
                 if command[1:2] == ["--install"] and "sdl_ttf" in command[2]:
                     (prefix / "libSDL3.so").write_bytes(b"sdl")
                     (prefix / "libSDL3_ttf.so").write_bytes(b"ttf")
+                    (prefix / "libSDL3_image.so").write_bytes(b"image")
                 return 0, "ok", "", False
 
             result = build_sdl.build(
                 "linux-x86_64", sdl, ttf, root / "build", prefix,
-                runner=runner, host_profile="linux-x86_64")
-            self.assertEqual(len(calls), 6)
-            self.assertEqual(len(result["commands"]), 6)
+                runner=runner, host_profile="linux-x86_64", image_source=image)
+            self.assertEqual(len(calls), 9)
+            self.assertEqual(len(result["commands"]), 9)
             self.assertEqual(result["hostProfile"], "linux-x86_64")
 
 

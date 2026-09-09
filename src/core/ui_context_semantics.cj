@@ -26,6 +26,9 @@ extend UiContext {
 
     /** Performs an accessibility action against the latest registration for `id`. */
     public func performSemanticsAction(id: String, action: SemanticsAction): Bool {
+        if (!allowsModalSemanticsAction(id)) {
+            return false
+        }
         match (ensureCommittedSemantics().actionsById.get(id)) {
             case Some(target) => target.perform(action)
             case None => false

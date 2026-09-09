@@ -1,6 +1,6 @@
 package cui.core
 
-import sdl.{Rect, Size, UiEvent}
+import sdl.{MouseButton, Rect, Size, UiEvent}
 
 /**
  * A horizontally scrolling list that materializes only the columns near the viewport — the horizontal
@@ -228,21 +228,24 @@ public class LazyRow <: Widget {
                 }
                 return false
             case UiEvent.MouseWheel(wheelX, wheelY, pointerX, pointerY) =>
-                // The wheel scrolls the strip along its axis. A horizontal delta (trackpad pan, tilt
-                // wheel) drives it directly; otherwise the vertical wheel is remapped so a plain mouse
-                // scrolls too — wheel toward the user (scroll down) advances the strip right.
-                // Content that fits leaves the wheel to an enclosing scroller (no dead zone).
-                if (spatialClip.contains(pointerX, pointerY) && maxScrollOffset(content, viewportW) > 0.0) {
-                    let delta = if (wheelX != 0.0) {
-                        -wheelX
-                    } else {
-                        wheelY
-                    }
-                    scrollStateValue.value = scrollOffsetAfterWheel(scrollStateValue.value, delta, content, viewportW)
+                if (!spatialClip.contains(pointerX, pointerY)) {
+                    return false
+                }
+                if (dispatchLazyVisibleItems(visibleItems, ctx, event)) {
                     return true
                 }
-            case UiEvent.MouseDown(_, x, y) =>
-                if (scrollBar.press(ctx, frame, scrollStateValue, content, viewportW, x, y)) {
+                let delta = if (wheelX != 0.0) {
+                    -wheelX
+                } else {
+                    wheelY
+                }
+                return scrollByWheel(scrollStateValue, delta, content, viewportW)
+            case UiEvent.MouseDown(button, x, y) =>
+                let primary = match (button) {
+                    case MouseButton.Left => true;
+                    case _ => false
+                }
+                if (primary && scrollBar.press(ctx, frame, scrollStateValue, content, viewportW, x, y)) {
                     return true
                 }
                 if (!spatialClip.contains(x, y)) {
@@ -263,15 +266,7 @@ public class LazyRow <: Widget {
             case _ => ()
         }
         // Route to the materialized columns, right-most first, so an item consumes its own clicks.
-        var i = visibleItems.size - 1
-        while (i >= 0) {
-            let (_, widget) = visibleItems[i]
-            if (widget.handle(ctx, event)) {
-                return true
-            }
-            i -= 1
-        }
-        false
+        dispatchLazyVisibleItems(visibleItems, ctx, event)
     }
 
     public func isFlexible(): Bool {

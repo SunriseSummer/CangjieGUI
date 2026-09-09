@@ -185,7 +185,7 @@ public struct Theme {
                 border: panelEdge,
                 radius: controlRadius,
                 borderWidth: borderWidth,
-                shadow: shadow.withAlpha(20),
+                shadow: shadow.withAlpha(min(Int64(shadow.a), 20)),
                 shadowOffsetY: 1.0
             )
         }

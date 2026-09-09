@@ -7,7 +7,7 @@
 从用户能看到的症状进入，不要先猜组件内部：
 
 1. `cjpm build` 失败，先走“构建/依赖”。
-2. 构建成功但窗口启动时报 SDL3/SDL3_ttf，走“运行库”。
+2. 构建成功但窗口启动时报 SDL3、SDL3_ttf 或 SDL3_image，走“运行库”。
 3. 点击后文字不变、到下一次点击才显示上次结果、短暂变化后复原，或后台任务偶发无结果，走“状态与线程边界”。
 4. 插入、排序、过滤或滚出视口后，选择/编辑状态跟错项，走“列表身份与虚拟化”。
 5. 小窗口裁切、滚轮无效或大窗口没有主区域伸缩，走“布局溢出”。
@@ -25,16 +25,16 @@
 
 - **布局约束**：固定宽高超过视口、伸缩区域选错、把大量行放进普通 `ScrollView`，或估计行高与实际换行内容不符。
 
-- **事件/浮层**：用普通 `Panel` 冒充 Modal、根 `EventHandler` 抢走文本键、把“恢复 opener 焦点”当成当前 API 保证，或创建 `Toaster` 却没有 `ToastLayer`。
+- **事件/浮层**：用普通 `Panel` 冒充 Modal、根 `EventHandler` 抢走文本键、打开者使用不稳定 key，导致关闭时无法恢复原焦点，或创建 `Toaster` 却没有 `ToastLayer`。
 
 ## 诊断步骤
 
 ### 症状一：项目无法构建，或构建后窗口无法启动
 
-先执行 `cjpm build`。若退出码非 0，只检查错误指向的 `cjpm.toml` 路径、导入和公开签名；不要先复制 DLL。构建通过后再执行 `cjpm run`。Windows 下若启动器报告 SDL3/SDL3_ttf 缺失，把仓库的实际运行库目录临时加到当前终端：
+先执行 `cjpm build`。若退出码非 0，只检查错误指向的 `cjpm.toml` 路径、导入和公开签名；不要先复制 DLL。构建通过后再执行 `cjpm run`。Windows 下若启动器报告 SDL3、SDL3_ttf 或 SDL3_image 缺失，把仓库的实际运行库目录临时加到当前终端：
 
 ```powershell
-$env:PATH = "C:\path\to\workspace\sdl\.sdl3;$env:PATH"
+$env:PATH = "C:\path\to\workspace\CangjieSDL\.sdl3;$env:PATH"
 cjpm build
 cjpm run
 ```
@@ -76,7 +76,7 @@ cjpm run
 
 ### 症状五：Modal 背景仍响应、Tab 越界或关闭后按键异常
 
-只保留一个背景按钮、一个打开按钮和一个 `Modal`。真正的 `Modal` 会吞掉背景事件并把 Tab 限制在对话框的可聚焦控件；普通居中 `Panel` 不会。分别通过 Esc、遮罩、取消和确认关闭，记录关闭后的当前焦点与下一次 Tab；当前公开 API 没有 opener/restore-target 参数，不要把恢复到打开按钮写成通过条件。
+只保留一个背景按钮、一个打开按钮和一个 `Modal`。真正的 `Modal` 会吞掉背景事件并把 Tab 限制在对话框的可聚焦控件；普通居中 `Panel` 不会。分别通过 Esc、遮罩、取消和确认关闭，记录关闭后的当前焦点与下一次 Tab；设置稳定 key，并确认关闭后恢复到仍存活的打开者；打开者已卸载或嵌套模态仍存在时，应检查后备焦点是否位于正确的活动子树。
 
 若 Toast 不出现，确认同一棵根 `ZStack` 同时包含长期存在的 `Toaster` 与 `ToastLayer(toaster)`。若出现后不消失，确认帧仍在推进；不要用阻塞 `sleep` 等待 Toast。
 

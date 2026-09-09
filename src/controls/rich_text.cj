@@ -1,9 +1,10 @@
 package cui.controls
 
+import cui.media.paintIcon
 import std.collection.{ArrayList, HashMap}
-import sdl.{Color, FontSizes, Key, MouseButton, Rect, Size, UiEvent, drawIcon}
-import cui.core.{CUI_SMALL_H, CursorShape, Length, LengthUnit, UiContext, UiEnvironmentKey, Widget, drawFocusRing, emit,
-    focusableControlIdentity, resolveControlKey, sameUiEnvironment}
+import sdl.{Color, Key, MouseButton, Rect, Size, UiEvent}
+import cui.core.{CUI_SMALL_H, CursorShape, Length, LengthUnit, UiContext, UiEnvironmentKey, Widget}
+import cui.core.{drawFocusRing, emit, focusableControlIdentity, resolveControlKey, sameUiEnvironment}
 
 // Gap after an inline icon before the next span.
 private let RICH_SPAN_GAP: Float32 = 3.0
@@ -17,9 +18,10 @@ private func sameRichMeasureKey(left: Float32, right: Float32): Bool {
 
 /**
  * Inline styled text: a sequence of `RichSpan`s (coloured, styled text runs and inline icons) laid out
- * on one line, wrapping to the available width across as many lines as needed. Runs vary by colour,
+ * with mandatory line breaks and wrapping to the available width. Empty lines are preserved.
+ * Runs vary by colour,
  * weight/slant/decoration, typeface, and point size (a run with no `fontSize` inherits the RichText's
- * base size); icons flow inline. Differently-sized runs on a line are centred against each other and the
+ * base size); icons flow inline. Differently-sized runs on a line share a baseline and the
  * line grows to the tallest. This is the multi-style, text-with-icons counterpart to the single `Label`.
  *
  * ```
@@ -27,13 +29,13 @@ private func sameRichMeasureKey(left: Float32, right: Float32): Bool {
  *     RichSpan.text("128", color: accent).bold().fontSize(24.0),
  *     RichSpan.muted(" MB").fontSize(13.0),
  *     RichSpan.text("  已同步 ").italic(),
- *     RichSpan.icon(IconName.Save, color: ok)
+ *     RichSpan.icon(IconSource("assets/icons/save.svg"), color: ok)
  * ])
  * ```
  */
 public class RichText <: Widget {
     private let spans: Array<RichSpan>
-    private var pointSize: Length
+    private var pointSize: ?Length
     private let controlId: String
     // Focus-stop id per link span index — a keyboard focus stop and click-press slot for each link.
     // None for the common linkless RichText, which allocates nothing (the tree is rebuilt every frame).
@@ -48,7 +50,7 @@ public class RichText <: Widget {
 
     public init(
         spans: Array<RichSpan>,
-        fontSize!: Length = Length(FontSizes.BODY, LengthUnit.Fp),
+        fontSize!: ?Length = None,
         key!: ?String = None
     ) {
         this.spans = spans
@@ -77,7 +79,7 @@ public class RichText <: Widget {
 
     /** Sets the point size shared by all text runs. */
     public func fontSize(value: Length): RichText {
-        pointSize = value
+        pointSize = Some(value)
         this
     }
 
@@ -88,7 +90,7 @@ public class RichText <: Widget {
 
     public func measure(ctx: UiContext, available: Size): Size {
         let ps = resolvedPointSize(ctx)
-        let lineHeight = ctx.renderer.textHeight(pointSize: ps)
+        let lineHeight = ctx.textHeight(pointSize: ps)
         let layout = layoutFor(ctx, available.w, ps, lineHeight)
         // Hug a single line so inline use in a row sizes to its content; fill the width once it wraps.
         // Single-line is judged by the line count, not by height — a lone line holding a run bigger
@@ -108,13 +110,13 @@ public class RichText <: Widget {
 
     public func draw(ctx: UiContext): Unit {
         let ps = resolvedPointSize(ctx)
-        let lineHeight = ctx.renderer.textHeight(pointSize: ps)
+        let lineHeight = ctx.textHeight(pointSize: ps)
         let layout = layoutFor(ctx, frame.w, ps, lineHeight)
         // Centre the content block vertically, matching Label, so a RichText and a Label in the same
         // row share a baseline instead of the RichText riding measure()'s extra headroom.
         let offsetY = max(0.0, (frame.h - layout.height) / 2.0)
         for (item in layout.items) {
-            // The fragment's box in window space; its y already centres it within its (possibly
+            // The fragment's box in window space; its y already aligns its baseline within its (possibly
             // taller) line, so icons and differently-sized text need no further offset here.
             let box = fragmentRect(item, offsetY)
             let color = colorFor(ctx, item)
@@ -126,10 +128,9 @@ public class RichText <: Widget {
                 case None => ()
             }
             match (item.kind) {
-                case PlacedKind.PlacedText(text) => ctx
-                    .renderer
-                    .text(text, box.x, box.y, color, pointSize: item.size, style: item.style, font: item.font)
-                case PlacedKind.PlacedIcon(icon) => drawIcon(ctx.renderer, icon, box, color)
+                case PlacedKind.PlacedText(text) => ctx.text(item.paintText.getOrDefault({=> text}), box.x, box.y, color,
+                    pointSize: item.size, style: item.style, font: item.font)
+                case PlacedKind.PlacedIcon(icon) => paintIcon(ctx, icon, box, color)
             }
             // A keyboard focus ring around the focused link's fragment (shown for keyboard focus only).
             match (linkIdFor(item.spanIndex)) {
@@ -241,7 +242,7 @@ public class RichText <: Widget {
     // layout, hit-testing each link fragment's box — the very rect draw paints it into.
     private func linkFragmentAt(ctx: UiContext, mx: Float32, my: Float32): ?PlacedItem {
         let ps = resolvedPointSize(ctx)
-        let lineHeight = ctx.renderer.textHeight(pointSize: ps)
+        let lineHeight = ctx.textHeight(pointSize: ps)
         let layout = layoutFor(ctx, frame.w, ps, lineHeight)
         let offsetY = max(0.0, (frame.h - layout.height) / 2.0)
         for (item in layout.items) {
@@ -269,7 +270,7 @@ public class RichText <: Widget {
     }
 
     private func resolvedPointSize(ctx: UiContext): Float32 {
-        max(1.0, ctx.resolve(pointSize))
+        ctx.textSize(override: pointSize)
     }
 
     // Exact float comparison is deliberate: the keys are reused values, so equality means same inputs.
@@ -287,14 +288,18 @@ public class RichText <: Widget {
                 1 && layout.width <= width)) => layout
             case _ =>
                 let sizes = resolveSpanSizes(ctx, ps)
+                let effective = Array<RichSpan>(spans.size) {i => spans[i].inheritedStyle(ctx.effectiveFontStyle())}
                 let layout = layoutRichSpans(
-                    spans,
+                    effective,
                     sizes,
                     width,
                     richIconSize(lineHeight),
                     RICH_SPAN_GAP,
-                    {text, size, style, font => ctx.renderer.textWidth(text, pointSize: size, style: style, font: font)},
-                    {size, style, font => ctx.renderer.textHeight(pointSize: size, style: style, font: font)}
+                    RichTextMeasurements(
+                        {text, size, style, font => ctx.textWidth(text, pointSize: size, style: style, font: font)},
+                        {size, style, font => ctx.textHeight(pointSize: size, style: style, font: font)}, ascentOf: {
+                            size, style, font => ctx.fontMetrics(pointSize: size, style: style, font: font).ascent
+                        })
                 )
                 cached = Some(layout)
                 cachedWidthKey = width

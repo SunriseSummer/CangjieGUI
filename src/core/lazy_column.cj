@@ -1,7 +1,7 @@
 package cui.core
 
 import std.collection.ArrayList
-import sdl.{Rect, Size, UiEvent}
+import sdl.{MouseButton, Rect, Size, UiEvent}
 
 // The viewport height assumed on the very first frame, before layout has measured the real one — a
 // full-ish screen, so the first frame is populated rather than blank. Layout corrects it at once.
@@ -240,13 +240,19 @@ public class LazyColumn <: Widget {
                 }
                 return false
             case UiEvent.MouseWheel(_, wheelY, pointerX, pointerY) =>
-                // Content that fits leaves the wheel to an enclosing scroller (no dead zone).
-                if (spatialClip.contains(pointerX, pointerY) && maxScrollOffset(content, viewportH) > 0.0) {
-                    scrollStateValue.value = scrollOffsetAfterWheel(scrollStateValue.value, wheelY, content, viewportH)
+                if (!spatialClip.contains(pointerX, pointerY)) {
+                    return false
+                }
+                if (dispatchLazyVisibleItems(visibleItems, ctx, event)) {
                     return true
                 }
-            case UiEvent.MouseDown(_, x, y) =>
-                if (scrollBar.press(ctx, frame, scrollStateValue, content, viewportH, x, y)) {
+                return scrollByWheel(scrollStateValue, wheelY, content, viewportH)
+            case UiEvent.MouseDown(button, x, y) =>
+                let primary = match (button) {
+                    case MouseButton.Left => true;
+                    case _ => false
+                }
+                if (primary && scrollBar.press(ctx, frame, scrollStateValue, content, viewportH, x, y)) {
                     return true
                 }
                 if (!spatialClip.contains(x, y)) {
@@ -267,15 +273,7 @@ public class LazyColumn <: Widget {
             case _ => ()
         }
         // Route to the materialized rows, top-most first, so a row consumes its own clicks.
-        var i = visibleItems.size - 1
-        while (i >= 0) {
-            let (_, widget) = visibleItems[i]
-            if (widget.handle(ctx, event)) {
-                return true
-            }
-            i -= 1
-        }
-        false
+        dispatchLazyVisibleItems(visibleItems, ctx, event)
     }
 
     public func isFlexible(): Bool {

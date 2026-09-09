@@ -54,3 +54,9 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot settings.bmp"
 ```
+
+## 练习与验收
+
+新增一个绑定到模型的设置项，确认分区收起再展开后值仍保留。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

@@ -1,8 +1,10 @@
 package cui.controls
 
-import sdl.{FontSizes, IconName, Key, MouseButton, Pen, Rect, Size, SurfaceStyle, UiEvent, clampF32, drawIcon}
-import cui.core.{Bindable, CUI_CONTROL_H, CursorShape, Overlay, State, UiContext, Widget, resolveControlKey,
-    claimHoverIfInside, drawSurface, emit, localState, registerFocusable, registerRectOverlayWhen}
+import sdl.{FontSizes, Key, MouseButton, Pen, Rect, Size, SurfaceStyle, UiEvent, clampF32}
+import cui.core.{Bindable, CUI_CONTROL_H, CursorShape, State, UiContext, Widget}
+import cui.core.{resolveControlKey, claimHoverIfInside, drawSurface, emit, localState}
+import cui.core.{registerFocusable, registerRectOverlayWhen}
+import cui.symbols.clock.ICON_CLOCK
 
 private let TP_FIELD_W: Float32 = 132.0
 private let TP_CELL_W: Float32 = 34.0
@@ -14,7 +16,6 @@ private let TP_LABEL_H: Float32 = 22.0
 private let TP_SECTION_GAP: Float32 = 6.0
 private let TP_HOUR_COLS: Int64 = 6
 private let TP_HOUR_ROWS: Int64 = 4 // 24 hours across 6 columns
-private let TP_POPUP_W: Float32 = TP_CELL_W * Float32(TP_HOUR_COLS) + TP_PAD * 2.0
 // The minute editor row: −/+ step buttons flanking the editable value box, drawn as one
 // stepper-style surface so it reads like the framework `Stepper`.
 private let TP_STEP_BTN_W: Float32 = 34.0
@@ -57,6 +58,11 @@ public class TimePicker <: Widget {
     private let editing: State<Bool>
     private let editBuffer: State<String>
     private var frame = Rect.zero()
+    private var cellWidth: Float32 = TP_CELL_W
+    private var cellHeight: Float32 = TP_CELL_H
+    private var labelHeight: Float32 = TP_LABEL_H
+    private var stepButtonWidth: Float32 = TP_STEP_BTN_W
+    private var valueWidth: Float32 = TP_VALUE_W
 
     public init(selected: Bindable<TimeOfDay>, minuteStep!: Int64 = 5, hour12!: Bool = false, key!: ?String = None) {
         let ident = resolveControlKey(key, "TimePicker")
@@ -75,32 +81,35 @@ public class TimePicker <: Widget {
         emit(this)
     }
 
-    public func measure(_: UiContext, available: Size): Size {
-        Size(min(available.w, TP_FIELD_W), CUI_CONTROL_H)
+    private func refreshFontGeometry(ctx: UiContext): Unit {
+        cellWidth = max(TP_CELL_W, ctx.textWidth("00") + 12.0)
+        cellHeight = ctx.textRowHeight(minHeight: TP_CELL_H)
+        labelHeight = max(TP_LABEL_H, ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.CAPTION)) + 6.0)
+        stepButtonWidth = max(TP_STEP_BTN_W, ctx.textWidth("+") + 16.0)
+        valueWidth = max(TP_VALUE_W, ctx.textWidth("00") + 16.0)
+    }
+
+    private func popupWidth(): Float32 {
+        cellWidth * Float32(TP_HOUR_COLS) + TP_PAD * 2.0
+    }
+
+    public func measure(ctx: UiContext, available: Size): Size {
+        refreshFontGeometry(ctx)
+        Size(min(available.w, max(TP_FIELD_W, ctx.textWidth(currentLabel()) + TEMPORAL_FIELD_CHROME)),
+            ctx.textRowHeight(minHeight: CUI_CONTROL_H, padding: 16.0))
     }
 
     public func layout(ctx: UiContext, rect: Rect): Unit {
+        refreshFontGeometry(ctx)
         frame = rect
         registerRectOverlayWhen(ctx, open.value, {=> popupRect(ctx)}, {c, e, popup => handleOverlay(c, e, popup)},
             {c, popup => drawPopup(c, popup)}, overlayOwner)
     }
 
     public func draw(ctx: UiContext): Unit {
-        drawSurface(ctx, frame, ctx.theme.fieldSurface(active: ctx.showFocusRing(id) || open.value))
-        let labelArea = Rect(frame.x + 10.0, frame.y, max(0.0, frame.w - 36.0), frame.h)
-        ctx.renderer.pushClip(labelArea)
-        let textY = frame.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
-        ctx.renderer.text(currentLabel(), labelArea.x, textY, ctx.theme.text, pointSize: FontSizes.CONTROL)
-        ctx.renderer.popClip()
-        drawIcon(ctx.renderer, IconName.Clock, Rect(frame.right() - 26.0, frame.centerY() - 8.0, 16.0, 16.0),
-            ctx.theme.mutedText)
-
-        if (open.value) {
-            let popup = popupRect(ctx)
-            ctx.setOverlay(
-                Overlay(handleEvent: {c, e => handleOverlay(c, e, popup)}, render: {c => drawPopup(c, popup)},
-                    owner: overlayOwner))
-        }
+        drawTemporalPickerField(ctx, frame, currentLabel(), ctx.showFocusRing(id) || open.value, ICON_CLOCK)
+        registerRectOverlayWhen(ctx, open.value, {=> popupRect(ctx)}, {c, e, popup => handleOverlay(c, e, popup)},
+            {c, popup => drawPopup(c, popup)}, overlayOwner)
     }
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
@@ -330,50 +339,50 @@ public class TimePicker <: Widget {
      * viewport horizontally (the pop-up is wider than the field).
      */
     private func popupRect(ctx: UiContext): Rect {
-        let h = popupHeight()
-        let x = clampF32(frame.x, TP_MARGIN, max(TP_MARGIN, ctx.viewportWidth - TP_POPUP_W - TP_MARGIN))
+        let h = popupHeight(cellHeight: cellHeight, labelHeight: labelHeight)
+        let x = clampF32(frame.x, TP_MARGIN, max(TP_MARGIN, ctx.viewportWidth - popupWidth() - TP_MARGIN))
         let below = frame.bottom() + TP_GAP
         let y = if (below + h <= ctx.viewportHeight - TP_MARGIN) {
             below
         } else {
             max(TP_MARGIN, frame.y - TP_GAP - h)
         }
-        Rect(x, y, TP_POPUP_W, h)
+        Rect(x, y, popupWidth(), h)
     }
 
     private func hoursOriginY(popup: Rect): Float32 {
-        popup.y + TP_PAD + TP_LABEL_H
+        popup.y + TP_PAD + labelHeight
     }
 
     private func minuteLabelY(popup: Rect): Float32 {
-        hoursOriginY(popup) + Float32(TP_HOUR_ROWS) * TP_CELL_H + TP_SECTION_GAP
+        hoursOriginY(popup) + Float32(TP_HOUR_ROWS) * cellHeight + TP_SECTION_GAP
     }
 
     // The editor surface hangs below the 分 label by the same inset that separates the 时 label
     // from the first hour cell's fill, so both sections breathe identically.
     private func stepperRowY(popup: Rect): Float32 {
-        minuteLabelY(popup) + TP_LABEL_H + TP_CELL_INSET
+        minuteLabelY(popup) + labelHeight + TP_CELL_INSET
     }
 
     private func minusRect(popup: Rect): Rect {
-        Rect(popup.x + TP_PAD + TP_EDITOR_INSET, stepperRowY(popup), TP_STEP_BTN_W, TP_CELL_H)
+        Rect(popup.x + TP_PAD + TP_EDITOR_INSET, stepperRowY(popup), stepButtonWidth, cellHeight)
     }
 
     private func valueRect(popup: Rect): Rect {
-        Rect(popup.x + TP_PAD + TP_EDITOR_INSET + TP_STEP_BTN_W, stepperRowY(popup), TP_VALUE_W, TP_CELL_H)
+        Rect(popup.x + TP_PAD + TP_EDITOR_INSET + stepButtonWidth, stepperRowY(popup), valueWidth, cellHeight)
     }
 
     private func plusRect(popup: Rect): Rect {
-        Rect(popup.x + TP_PAD + TP_EDITOR_INSET + TP_STEP_BTN_W + TP_VALUE_W, stepperRowY(popup), TP_STEP_BTN_W,
-            TP_CELL_H)
+        Rect(popup.x + TP_PAD + TP_EDITOR_INSET + stepButtonWidth + valueWidth, stepperRowY(popup), stepButtonWidth,
+            cellHeight)
     }
 
     private func stepperRect(popup: Rect): Rect {
-        Rect(popup.x + TP_PAD + TP_EDITOR_INSET, stepperRowY(popup), TP_STEP_BTN_W * 2.0 + TP_VALUE_W, TP_CELL_H)
+        Rect(popup.x + TP_PAD + TP_EDITOR_INSET, stepperRowY(popup), stepButtonWidth * 2.0 + valueWidth, cellHeight)
     }
 
     private func sliderRect(popup: Rect): Rect {
-        Rect(popup.x + TP_PAD, stepperRowY(popup) + TP_CELL_H + TP_ROW_GAP, popup.w - TP_PAD * 2.0, TP_SLIDER_H)
+        Rect(popup.x + TP_PAD, stepperRowY(popup) + cellHeight + TP_ROW_GAP, popup.w - TP_PAD * 2.0, TP_SLIDER_H)
     }
 
     // The track shares the stepper's left edge and pulls in symmetrically on the right, so the
@@ -390,19 +399,19 @@ public class TimePicker <: Widget {
     private func hourCellRect(popup: Rect, hour: Int64): Rect {
         let col = hour % TP_HOUR_COLS
         let row = hour / TP_HOUR_COLS
-        Rect(popup.x + TP_PAD + Float32(col) * TP_CELL_W, hoursOriginY(popup) + Float32(row) * TP_CELL_H, TP_CELL_W,
-            TP_CELL_H)
+        Rect(popup.x + TP_PAD + Float32(col) * cellWidth, hoursOriginY(popup) + Float32(row) * cellHeight, cellWidth,
+            cellHeight)
     }
 
     // The hour (0–23) under a pointer inside the hours grid, or -1 when off it.
     private func hourAt(popup: Rect, x: Float32, y: Float32): Int64 {
         let gx = popup.x + TP_PAD
         let gy = hoursOriginY(popup)
-        if (x < gx || x >= gx + TP_CELL_W * Float32(TP_HOUR_COLS) || y < gy || y >= gy + TP_CELL_H * Float32(TP_HOUR_ROWS)) {
+        if (x < gx || x >= gx + cellWidth * Float32(TP_HOUR_COLS) || y < gy || y >= gy + cellHeight * Float32(TP_HOUR_ROWS)) {
             return -1
         }
-        let col = Int64((x - gx) / TP_CELL_W)
-        let row = Int64((y - gy) / TP_CELL_H)
+        let col = Int64((x - gx) / cellWidth)
+        let row = Int64((y - gy) / cellHeight)
         row * TP_HOUR_COLS + col
     }
 
@@ -419,8 +428,8 @@ public class TimePicker <: Widget {
     }
 
     private func drawSectionLabel(ctx: UiContext, text: String, x: Float32, y: Float32): Unit {
-        let ty = y + (TP_LABEL_H - ctx.renderer.textHeight(pointSize: FontSizes.CAPTION)) / 2.0
-        ctx.renderer.text(text, x + TP_CELL_INSET, ty, ctx.theme.mutedText, pointSize: FontSizes.CAPTION)
+        let ty = y + (labelHeight - ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.CAPTION))) / 2.0
+        ctx.text(text, x + TP_CELL_INSET, ty, ctx.theme.mutedText, pointSize: ctx.textSize(fallback: FontSizes.CAPTION))
     }
 
     private func drawCell(ctx: UiContext, cell: Rect, text: String, isSelected: Bool): Unit {
@@ -435,9 +444,9 @@ public class TimePicker <: Widget {
         } else {
             ctx.theme.text
         }
-        let tw = ctx.renderer.textWidth(text, pointSize: FontSizes.CONTROL)
-        let ty = cell.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
-        ctx.renderer.text(text, cell.centerX() - tw / 2.0, ty, color, pointSize: FontSizes.CONTROL)
+        let tw = ctx.textWidth(text, pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
+        let ty = cell.centerY() - ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.CONTROL)) / 2.0
+        ctx.text(text, cell.centerX() - tw / 2.0, ty, color, pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
     }
 
     // One stepper-style surface (like the framework `Stepper`): − and + at the sides, the editable
@@ -452,12 +461,13 @@ public class TimePicker <: Widget {
         if (isEditing) {
             let buffer = editBuffer.value
             if (buffer.isEmpty()) {
-                ctx.renderer.textCenter(padTwo(minute), box, ctx.theme.mutedText, pointSize: FontSizes.CONTROL)
+                ctx.textCenter(padTwo(minute), box, ctx.theme.mutedText,
+                    pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
             } else {
-                ctx.renderer.textCenter(buffer, box, ctx.theme.text, pointSize: FontSizes.CONTROL)
+                ctx.textCenter(buffer, box, ctx.theme.text, pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
             }
         } else {
-            ctx.renderer.textCenter(padTwo(minute), box, ctx.theme.text, pointSize: FontSizes.CONTROL)
+            ctx.textCenter(padTwo(minute), box, ctx.theme.text, pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
         }
     }
 
@@ -466,7 +476,7 @@ public class TimePicker <: Widget {
         if (inner.contains(ctx.mouseX, ctx.mouseY)) {
             ctx.renderer.fillRoundedRect(inner, ctx.theme.smallRadius, ctx.theme.fieldActive)
         }
-        ctx.renderer.textCenter(glyph, cell, ctx.theme.text, pointSize: FontSizes.TITLE)
+        ctx.textCenter(glyph, cell, ctx.theme.text, pointSize: ctx.textSize(fallback: FontSizes.TITLE))
     }
 
     // The coarse minute slider, in the framework `Slider`'s visual language: full track for 0–59
@@ -500,9 +510,9 @@ public class TimePicker <: Widget {
     }
 }
 
-private func popupHeight(): Float32 {
-    TP_PAD * 2.0 + TP_LABEL_H + Float32(TP_HOUR_ROWS) * TP_CELL_H + TP_SECTION_GAP + TP_LABEL_H + TP_CELL_INSET +
-        TP_CELL_H + TP_ROW_GAP + TP_SLIDER_H
+private func popupHeight(cellHeight!: Float32 = TP_CELL_H, labelHeight!: Float32 = TP_LABEL_H): Float32 {
+    TP_PAD * 2.0 + labelHeight + Float32(TP_HOUR_ROWS) * cellHeight + TP_SECTION_GAP + labelHeight + TP_CELL_INSET +
+        cellHeight + TP_ROW_GAP + TP_SLIDER_H
 }
 
 // Clamp the minute spacing into a sensible 1–60 range.

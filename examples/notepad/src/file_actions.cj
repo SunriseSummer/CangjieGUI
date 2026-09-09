@@ -11,9 +11,9 @@ import std.fs.File
 import std.fs.Path
 import cui.{FileSystem, FileSystemEntryType}
 
-// “新建”入口：缓冲区已有内容时只亮出确认条，把决定权留给用户；为空则直接重置。
+// 只有相对最近一次成功保存／载入存在修改时才确认；干净文档可直接新建。
 func newFile(model: NotepadModel): Unit {
-    if (model.body.value.size > 0) {
+    if (model.dirty.value) {
         model.confirmingNew.value = true
         return
     }
@@ -37,6 +37,8 @@ private func resetBuffer(model: NotepadModel): Unit {
     model.bodyCursor.value = 0
     model.bodyAnchor.value = 0
     model.currentPath.value = ""
+    model.bodyScroll.value = 0.0
+    model.markSaved()
     model.status.value = "已新建空白文档"
 }
 
@@ -54,6 +56,7 @@ func saveFileToPath(model: NotepadModel, path: String, message: String): Unit {
     try {
         File.writeTo(Path(path), model.body.value.toArray())
         model.currentPath.value = path
+        model.markSaved()
         model.status.value = message
     } catch (e: Exception) {
         model.status.value = "无法保存文件"
@@ -77,6 +80,8 @@ func loadFile(model: NotepadModel, path: String, message: String): Unit {
         model.bodyCursor.value = model.body.value.size
         model.bodyAnchor.value = model.body.value.size
         model.currentPath.value = path
+        model.bodyScroll.value = 0.0
+        model.markSaved()
         model.status.value = message
     } catch (e: Exception) {
         model.status.value = "无法读取文件"

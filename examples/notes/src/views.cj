@@ -1,18 +1,11 @@
-/*
- * 笔记视图层：顶部标题与工具栏、左侧笔记列表、右侧编辑器与统计。
- *
- *  - 侧栏 ListView 可 Tab 聚焦、方向键切换笔记，选中项驱动右侧编辑器
- *  - 编辑器是绑定到选中笔记正文的 TextArea，自带选区/撤销；id 含笔记 id 故状态按笔记独立
- *  - 工具栏图标按钮用 Tooltip 补充说明
- */
+/* 主从笔记布局：稳定的笔记身份、单一正文绑定、可键盘操作的列表与确认框。 */
 package cui_notes
 
-import cui.{Button, ButtonRole, ContextMenu, CrossAxisAlignment, FontSizes, HStack, IconButton, IconName, Label,
-    LengthUnits, ListView, MenuItem, Modal, Panel, Spacer, TextArea, Tooltip, VStack, ZStack}
+import cui.{Button, ButtonRole, ContextMenu, CrossAxisAlignment, Divider, Flexible, FontWeight, HStack}
+import cui.{Icon, IconSource, Label, LengthInsets, LengthUnits, ListView, MenuItem, Modal, Panel}
+import cui.{Spacer, TextArea, TextInputStyle, VStack, ZStack}
 
 func notesView(model: NotesModel): Unit {
-    // ZStack 把删除确认模态框叠放在主内容之上；模态框不占布局空间且相对视口自行居中，
-    // 因此隐藏时对下方布局没有任何影响。
     ZStack {
         VStack {
             appHeader(model)
@@ -20,71 +13,45 @@ func notesView(model: NotesModel): Unit {
                 sidebar(model)
                 editorArea(model)
             }.spacing(14.vp)
-        }.spacing(14.vp).padding(18.vp)
+            Label("当前会话内保存 · Tab 聚焦列表，方向键切换笔记").fontSize(11.fp).muted()
+        }.spacing(14.vp).padding(20.vp)
         deleteConfirmModal(model)
-    }
-}
-
-// 破坏性操作需经模态确认：右键菜单只负责唤起确认框，最终由对话框按钮执行或取消。
-func deleteConfirmModal(model: NotesModel): Unit {
-    Modal(model.confirmDelete) {
-        VStack {
-            Label("删除这条笔记？").fontSize(FontSizes.TITLE)
-            Label("删除后无法恢复。").muted().fontSize(FontSizes.CAPTION)
-            HStack {
-                Spacer()
-                Button("取消", {=> model.confirmDelete.value = false})
-                Button(
-                    "删除",
-                    {
-                        =>
-                        model.deleteSelected()
-                        model.confirmDelete.value = false
-                    },
-                    role: ButtonRole.Danger
-                )
-            }.spacing(8.vp)
-        }.spacing(14.vp).minWidth(240.vp)
     }
 }
 
 func appHeader(model: NotesModel): Unit {
     HStack {
-        VStack {
-            Label("笔记").fontSize(NOTES_TITLE)
-            Label("左侧方向键切换，右侧编辑（Ctrl+Z 撤销）").muted().fontSize(FontSizes.CAPTION)
-        }.spacing(2.vp).hug()
-        Spacer()
-        toolbar(model)
-    }.crossAxisAlignment(CrossAxisAlignment.Center).hug()
-}
-
-func toolbar(model: NotesModel): Unit {
-    HStack {
-        Tooltip(text: "新建笔记") {
-            IconButton(IconName.NewDocument) {
-                => model.addNote()
-            }.label("新建")
+        Icon(IconSource("assets/icons/document.svg")).iconSize(24.vp).foregroundColor(NOTES_ACCENT)
+        Flexible {
+            VStack {
+                Label("我的笔记").fontSize(22.fp).fontWeight(FontWeight.semiBold)
+                Label("记录日常，也收藏灵感").fontSize(12.fp).muted()
+            }.spacing(3.vp).hug()
         }
-        Tooltip(text: "删除当前笔记") {
-            IconButton(IconName.Trash) {
-                => model.confirmDelete.value = true
-            }.label("删除").role(ButtonRole.Danger)
-        }
-    }.spacing(8.vp).hug()
+        Button("新建笔记", {=> model.addNote()}, role: ButtonRole.Primary).fontSize(13.fp).key("notes-new")
+    }.spacing(12.vp).crossAxisAlignment(CrossAxisAlignment.Center).hug()
 }
 
 func sidebar(model: NotesModel): Unit {
-    // 在列表任意位置右键即可在指针处弹出菜单。“复制笔记”仅在此处提供，
-    // 演示上下文菜单可承载常驻工具栏之外的操作。
-    ContextMenu(items: [
-        MenuItem("新建笔记", {=> model.addNote()}),
-        MenuItem("复制笔记", {=> model.duplicateSelected()}),
-        MenuItem("删除笔记", {=> model.confirmDelete.value = true})
-    ]) {
+    let hasNote = !model.notes.value.isEmpty()
+    ContextMenu(
+        items: [
+            MenuItem("新建笔记", {=> model.addNote()}),
+            MenuItem("复制笔记", {=> model.duplicateSelected()}, enabled: hasNote),
+            MenuItem("删除笔记", {=> model.confirmDelete.value = true}, enabled: hasNote)
+        ]
+    ) {
         Panel {
-            ListView(model.titles(), model.selected)
-        }.contentPadding(6.vp).hug().width(220.vp)
+            VStack {
+                HStack {
+                    Label("全部笔记").fontSize(12.fp).muted()
+                    Spacer()
+                    Label("${model.notes.value.size}").fontSize(12.fp).muted()
+                }.hug()
+                Divider()
+                ListView(model.titles(), model.selected, key: "notes-list")
+            }.spacing(12.vp)
+        }.style(notesCard()).contentPadding(12.vp).hug().width(190.vp)
     }
 }
 
@@ -92,12 +59,47 @@ func editorArea(model: NotesModel): Unit {
     Panel {
         VStack {
             if (model.notes.value.isEmpty()) {
-                Label("还没有笔记。点击“新建”开始。").muted()
-            }
-            if (!model.notes.value.isEmpty()) {
+                Spacer()
+                VStack {
+                    Icon(IconSource("assets/icons/document.svg")).iconSize(32.vp).foregroundColor(NOTES_ACCENT)
+                    Label("还没有笔记").fontSize(18.fp)
+                    Label("点击“新建笔记”，写下第一句话。").fontSize(12.fp).muted()
+                }.spacing(14.vp).crossAxisAlignment(CrossAxisAlignment.Center).hug()
+                Spacer()
+            } else {
+                HStack {
+                    Flexible {Label(noteTitle(model.body.value)).fontSize(15.fp).fontWeight(FontWeight.semiBold)}
+                    Button("删除笔记", {=> model.confirmDelete.value = true}).fontSize(12.fp).key("notes-delete")
+                }.spacing(10.vp).crossAxisAlignment(CrossAxisAlignment.Center).hug()
+                Divider()
                 TextArea(model.body, key: model.editorId())
+                    .placeholder("写下值得记住的事…")
+                    .style(TextInputStyle(surface: notesPaper(), padding: LengthInsets(8.vp), lineHeight: 28.fp))
+                Divider()
+                Label(model.stats.value).fontSize(11.fp).muted()
             }
-            Label(model.stats.value).muted().fontSize(FontSizes.CAPTION)
-        }.spacing(10.vp)
-    }.contentPadding(14.vp).flex()
+        }.spacing(12.vp)
+    }.style(notesCard()).contentPadding(16.vp).flex()
+}
+
+func deleteConfirmModal(model: NotesModel): Unit {
+    Modal(model.confirmDelete, dismissOnBackdrop: false, initialFocus: "notes-delete-cancel") {
+        VStack {
+            Label("删除这条笔记？").fontSize(19.fp).fontWeight(FontWeight.semiBold)
+            Label("删除后无法恢复。").fontSize(13.fp).muted()
+            HStack {
+                Spacer()
+                Button("保留笔记", {=> model.confirmDelete.value = false}).fontSize(13.fp).key("notes-delete-cancel")
+                Button(
+                    "删除",
+                    {
+                        =>
+                            model.deleteSelected()
+                            model.confirmDelete.value = false
+                    },
+                    role: ButtonRole.Danger
+                ).fontSize(13.fp).key("notes-delete-confirm")
+            }.spacing(8.vp).hug()
+        }.spacing(16.vp).minWidth(260.vp)
+    }
 }

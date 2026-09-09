@@ -7,8 +7,8 @@
  */
 package cui_richtext
 
-import cui.{CrossAxisAlignment, FontSizes, Label, LengthUnits, Panel, RichSpan, RichText, ScrollView,
-    SegmentedControl, VStack}
+import cui.{CrossAxisAlignment, FontSizes, Label, LengthUnits, Panel, RichSpan, RichText, ScrollView, SegmentedControl,
+    VStack, FontWeight, FontRole, TextStyle}
 import std.collection.ArrayList
 
 func richtextView(model: RichTextModel): Unit {
@@ -26,14 +26,16 @@ func richtextView(model: RichTextModel): Unit {
             }.spacing(14.vp)
         }.flex()
         statusBar(model)
-    }.spacing(12.vp).padding(20.vp)
+    }.spacing(12.vp).padding(20.vp).textStyle(TextStyle(fontFamily: FontRole.systemUI, fontSize: 15.fp))
 }
 
 private func header(): Unit {
     VStack {
         Label("发布说明").fontSize(FontSizes.TITLE).bold()
-        Label("一段 RichText 拼出一条说明：图标、软底标签、加粗主题、灰底代码、划除旧写法、下划线链接").muted()
-            .fontSize(FontSizes.CAPTION).wrap()
+        Label("一段 RichText 拼出一条说明：图标、软底标签、加粗主题、灰底代码、划除旧写法、下划线链接")
+            .muted()
+            .fontSize(FontSizes.CAPTION)
+            .wrap()
     }.spacing(4.vp).crossAxisAlignment(CrossAxisAlignment.Start).hug()
 }
 
@@ -66,8 +68,7 @@ private func versionSpans(section: ReleaseSection): Array<RichSpan> {
 }
 
 private func noteRow(model: RichTextModel, section: ReleaseSection, note: ReleaseNote): Unit {
-    RichText(noteSpans(note, {=> model.openIssue(note.issue)}),
-        key: "note-${section.version}-${note.subject}")
+    RichText(noteSpans(note, {=> model.openIssue(note.issue)}), key: "note-${section.version}-${note.subject}")
 }
 
 /*
@@ -79,10 +80,13 @@ func noteSpans(note: ReleaseNote, onOpen: () -> Unit): Array<RichSpan> {
     let spans = ArrayList<RichSpan>()
     spans.add(RichSpan.icon(categoryIcon(note.category), color: categoryColor(note.category)))
     spans.add(RichSpan.text("  "))
-    spans.add(RichSpan.text(" ${categoryName(note.category)} ", color: categoryColor(note.category))
-        .highlight(categorySoft(note.category)).fontSize(12.0))
+    spans.add(
+        RichSpan
+            .text(" ${categoryName(note.category)} ", color: categoryColor(note.category))
+            .highlight(categorySoft(note.category))
+            .fontSize(12.0))
     spans.add(RichSpan.text("  "))
-    spans.add(RichSpan.text(note.subject).bold())
+    spans.add(RichSpan.text(note.subject).fontWeight(FontWeight.semiBold))
     spans.add(RichSpan.text("：${note.desc}"))
     if (!note.oldApi.isEmpty()) {
         spans.add(RichSpan.text("，"))
@@ -92,7 +96,8 @@ func noteSpans(note: ReleaseNote, onOpen: () -> Unit): Array<RichSpan> {
     if (!note.code.isEmpty()) {
         // 代码片段的高亮盒紧贴字形（不含内衬空格）：行尾断开时不会留下孤悬的空格高亮条。
         spans.add(RichSpan.text(" "))
-        spans.add(RichSpan.text(note.code, color: CODE_INK).highlight(CODE_BG).fontSize(13.0))
+        spans.add(
+            RichSpan.text(note.code, color: CODE_INK).fontFamily(FontRole.monospace).highlight(CODE_BG).fontSize(13.0))
     }
     if (!note.tail.isEmpty()) {
         spans.add(RichSpan.text("，${note.tail}"))

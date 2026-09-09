@@ -49,7 +49,7 @@ main(): Unit {
 
 | 成员 | 说明 |
 |---|---|
-| [`measure(ctx: UiContext, available: Size)`](#measure) | 按最长标签测量等宽段的自然宽度并限制到可用宽度，高度固定 38（[`Widget`](../core/Widget.md) 协议）。 |
+| [`measure(ctx: UiContext, available: Size)`](#measure) | 按最长标签测量等宽段的自然宽度并限制到可用宽度，高度为 `max(38, 有效文字行高 + 12)`（[`Widget`](../core/Widget.md) 协议）。 |
 | [`layout(_: UiContext, rect: Rect)`](#layout) | 记录分配的矩形作为整个控件的命中与绘制区域（[`Widget`](../core/Widget.md) 协议）。 |
 | [`draw(ctx: UiContext)`](#draw) | 绘制字段底面、滑动选中块与各段标签，键盘聚焦时叠加焦点环（[`Widget`](../core/Widget.md) 协议）。 |
 | [`handle(ctx: UiContext, event: UiEvent)`](#handle) | 左键按下选中命中段并获得焦点，聚焦后 Left/Right 步进选中（[`Widget`](../core/Widget.md) 协议）。 |
@@ -80,7 +80,7 @@ public init(items: Array<String>, selected: Bindable<Int64>, key!: ?String = Non
 ### measure
 
 每段自然宽度取 96 逻辑像素与“最长标签实际文字宽度 + 两侧各 12 像素留白”中的较大值；控件宽度为等宽段
-总和，但不超过父级可用宽度，高度固定 38（[`Widget`](../core/Widget.md) 协议）。空 `items` 仍按一段 96 计。
+总和，但不超过父级可用宽度，高度为 `max(38, 有效文字行高 + 12)`（[`Widget`](../core/Widget.md) 协议）。空 `items` 仍按一段 96 计。
 
 ```cangjie
 public func measure(ctx: UiContext, available: Size): Size

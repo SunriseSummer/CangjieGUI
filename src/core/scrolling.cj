@@ -1,6 +1,6 @@
 package cui.core
 
-import sdl.{Rect, Size, UiEvent, clampF32}
+import sdl.{MouseButton, Rect, Size, UiEvent, clampF32}
 
 internal let CUI_SCROLL_W: Float32 = 6.0
 internal let CUI_SCROLL_MARGIN: Float32 = 2.0
@@ -22,7 +22,24 @@ protected func scrollOffsetAfterWheel(
     contentH: Float32,
     viewportH: Float32
 ): Float32 {
-    clampF32(current - wheelY * CUI_SCROLL_WHEEL_STEP, 0.0, maxScrollOffset(contentH, viewportH))
+    let offset = clampScrollOffset(current, contentH, viewportH)
+    if (wheelY.isNaN() || wheelY.isInf()) {
+        return offset
+    }
+    clampF32(offset - wheelY * CUI_SCROLL_WHEEL_STEP, 0.0, maxScrollOffset(contentH, viewportH))
+}
+
+/** Applies a finite wheel delta only when it moves the viewport; otherwise lets it bubble. */
+protected func scrollByWheel(offset: State<Float32>, wheel: Float32, content: Float32, viewport: Float32): Bool {
+    if (wheel.isNaN() || wheel.isInf() || wheel == 0.0) {
+        return false
+    }
+    let next = scrollOffsetAfterWheel(offset.value, wheel, content, viewport)
+    if (next == offset.value) {
+        return false
+    }
+    offset.value = next
+    true
 }
 
 protected func maxScrollOffset(contentH: Float32, viewportH: Float32): Float32 {
@@ -30,15 +47,21 @@ protected func maxScrollOffset(contentH: Float32, viewportH: Float32): Float32 {
 }
 
 protected func clampScrollOffset(current: Float32, contentH: Float32, viewportH: Float32): Float32 {
-    clampF32(current, 0.0, maxScrollOffset(contentH, viewportH))
+    let offset = if (current.isNaN()) {
+        Float32(0.0)
+    } else {
+        current
+    }
+    clampF32(offset, 0.0, maxScrollOffset(contentH, viewportH))
 }
 
-protected func scrollLineIndex(offset: Float32): Int64 {
-    Int64(max(0.0, offset) / CUI_SMALL_H)
+protected func scrollLineIndex(offset: Float32, rowHeight!: Float32 = CUI_SMALL_H): Int64 {
+    Int64(max(0.0, offset) / max(1.0, rowHeight))
 }
 
-protected func scrollLineRemainder(offset: Float32): Float32 {
-    max(0.0, offset) - Float32(scrollLineIndex(offset)) * CUI_SMALL_H
+protected func scrollLineRemainder(offset: Float32, rowHeight!: Float32 = CUI_SMALL_H): Float32 {
+    let height = max(1.0, rowHeight)
+    max(0.0, offset) - Float32(scrollLineIndex(offset, rowHeight: height)) * height
 }
 
 /** The scrollbar track rectangle: a fixed-width lane inset from the frame's right edge. */
@@ -52,7 +75,7 @@ internal func scrollThumbHeight(track: Rect, contentH: Float32, viewportH: Float
     if (contentH <= 0.0) {
         return track.h
     }
-    max(CUI_SCROLL_MIN_THUMB_H, track.h * viewportH / contentH)
+    min(track.h, max(CUI_SCROLL_MIN_THUMB_H, track.h * viewportH / contentH))
 }
 
 /** Thumb top for a given scroll offset. */
@@ -209,7 +232,7 @@ internal func scrollThumbWidth(track: Rect, contentW: Float32, viewportW: Float3
     if (contentW <= 0.0) {
         return track.w
     }
-    max(CUI_SCROLL_MIN_THUMB_H, track.w * viewportW / contentW)
+    min(track.w, max(CUI_SCROLL_MIN_THUMB_H, track.w * viewportW / contentW))
 }
 
 /** Thumb left edge for a given scroll offset. */
@@ -404,13 +427,21 @@ public class ScrollView <: Widget {
     public func handle(ctx: UiContext, event: UiEvent): Bool {
         match (event) {
             case UiEvent.MouseWheel(_, wheelY, pointerX, pointerY) =>
-                // Fitting content does not consume the wheel, so an enclosing scroller can react.
-                if (spatialClip.contains(pointerX, pointerY) && maxScrollOffset(contentHeight, frame.h) > 0.0) {
-                    scrollOffset.value = scrollOffsetAfterWheel(scrollOffset.value, wheelY, contentHeight, frame.h)
+                if (!spatialClip.contains(pointerX, pointerY)) {
+                    return false
+                }
+                // Descendants get first choice. A viewport at its limit bubbles the event so its
+                // enclosing scroller can continue; a horizontal-only wheel also remains available.
+                if (child.handle(ctx, event)) {
                     return true
                 }
-            case UiEvent.MouseDown(_, x, y) =>
-                if (scrollBar.press(ctx, frame, scrollOffset, contentHeight, frame.h, x, y)) {
+                return scrollByWheel(scrollOffset, wheelY, contentHeight, frame.h)
+            case UiEvent.MouseDown(button, x, y) =>
+                let primary = match (button) {
+                    case MouseButton.Left => true;
+                    case _ => false
+                }
+                if (primary && scrollBar.press(ctx, frame, scrollOffset, contentHeight, frame.h, x, y)) {
                     return true
                 }
                 if (!spatialClip.contains(x, y)) {

@@ -28,7 +28,7 @@ cache_root = cache_root.resolve()
 os.environ["PYTHONPYCACHEPREFIX"] = str(cache_root)
 sys.pycache_prefix = str(cache_root)
 
-from cui_dev.checks import doc_snippets, docs, packages
+from cui_dev.checks import doc_snippets, docs, packages, symbol_linking
 from cui_dev.e2e import desktop_lifecycle, examples
 from cui_dev.release import bootstrap, build_sdl, stage_runtime, verify_bundle
 from cui_dev.snapshots import gallery, images
@@ -62,6 +62,7 @@ def _tool_tests(_arguments: Sequence[str] | None = None) -> int:
 COMMANDS: dict[tuple[str, ...], Command] = {
     ("check", "docs"): _without_arguments(docs.main),
     ("check", "snippets"): doc_snippets.main,
+    ("check", "symbol-linking"): symbol_linking.main,
     ("test", "tools"): _tool_tests,
     ("test", "packages"): packages.main,
     ("test", "examples"): examples.main,

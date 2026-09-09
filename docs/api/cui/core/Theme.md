@@ -49,7 +49,7 @@ main(): Unit {
 | [`static dark()`](#dark) | 返回内置深色主题。 |
 | [`panelSurface()`](#panelsurface) | 返回标准面板表面：`panel` 填充、`panelEdge` 描边、`radius` 圆角与柔和阴影。 |
 | [`raisedSurface()`](#raisedsurface) | 返回浮起表面：`panelRaised` 填充，阴影偏移比面板更深一档。 |
-| [`fieldSurface(active: Bool)`](#fieldsurface) | 返回输入域表面；激活时改用 `fieldActive` 填充、`accent` 描边并加淡淡的强调辉光。 |
+| [`fieldSurface(active!: Bool = false)`](#fieldsurface) | 返回输入域表面；激活时改用 `fieldActive` 填充、`accent` 描边并加淡淡的强调辉光。 |
 | [`buttonSurface(role: ButtonRole)`](#buttonsurface) | 按按钮角色返回表面：`Primary` 用 `accent`，`Danger` 用 `danger`，`Normal` 用 `panelRaised`。 |
 | [`selectedSurface()`](#selectedsurface) | 返回选中态表面：`accent` 填充与描边、控件圆角、无阴影。 |
 
@@ -170,18 +170,21 @@ public func raisedSurface(): SurfaceStyle
 返回输入域表面；激活时改用 `fieldActive` 填充、`accent` 描边并加淡淡的强调辉光。未激活时为 `field` 填充、`panelEdge` 描边、无阴影。
 
 ```cangjie
-public func fieldSurface(active: Bool): SurfaceStyle
+public func fieldSurface(active!: Bool = false): SurfaceStyle
 ```
 
 **参数**
 
-- `active`: `Bool` — 输入域是否处于激活（聚焦）状态。
+- `active!`: `Bool` — 输入域是否处于激活（聚焦）状态，默认 `false`。调用示例：`theme.fieldSurface(active: true)`。
 
 **返回值** `SurfaceStyle` — 输入域外观，圆角取 `controlRadius`。
 
 ### buttonSurface
 
 按按钮角色返回表面：`Primary` 用 `accent`，`Danger` 用 `danger`，`Normal` 用 `panelRaised`。三种角色都取 `controlRadius` 圆角，投影浓淡随角色区分。
+
+普通按钮阴影使用 `shadow` 的颜色，透明度不超过主题指定值与 20；设置透明 `shadow` 可以关闭普通按钮阴影。
+Primary／Danger 使用强调色的独立投影。普通按钮不指定自定义 `SurfaceStyle` 时仍保留悬停与按压填充反馈。
 
 ```cangjie
 public func buttonSurface(role: ButtonRole): SurfaceStyle

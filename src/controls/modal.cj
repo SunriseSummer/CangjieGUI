@@ -29,14 +29,21 @@ public class Modal <: Widget {
     // stay in the global ring but cannot receive events while the dialog is open).
     private let contentFocusables: Array<String>
     private let onDismiss: ?() -> Unit
+    private let initialFocus: ?String
+    private let dismissOnEscape: Bool
+    private let dismissOnBackdrop: Bool
     // Identifies this dialog's overlay registration across per-frame rebuilds, so dismissing
     // removes exactly this dialog from the overlay stack (never a popup opened above it).
     private let overlayOwner: String
     private var dialogRect = Rect.zero()
 
-    public init(presented: Bindable<Bool>, onDismiss!: ?() -> Unit = None, body!: () -> Unit) {
+    public init(presented: Bindable<Bool>, onDismiss!: ?() -> Unit = None, initialFocus!: ?String = None,
+        dismissOnEscape!: Bool = true, dismissOnBackdrop!: Bool = true, body!: () -> Unit) {
         this.presented = presented
         this.onDismiss = onDismiss
+        this.initialFocus = initialFocus
+        this.dismissOnEscape = dismissOnEscape
+        this.dismissOnBackdrop = dismissOnBackdrop
         this.overlayOwner = controlIdentity("Modal")
         if (presented.value) {
             let focusStart = focusableCountNow()
@@ -68,7 +75,8 @@ public class Modal <: Widget {
                 // registers later and naturally sits above the modal in the overlay stack.
                 ctx.setOverlay(
                     Overlay(handleEvent: {c, e => handleModal(c, e)}, render: {c => drawModal(c)}, owner: overlayOwner))
-                body.layout(ctx, dialogRect.inset(MODAL_PADDING))
+                ctx.enterModalFocus(overlayOwner, contentFocusables, initialFocus)
+                ctx.withModalContent(overlayOwner, {=> body.layout(ctx, dialogRect.inset(MODAL_PADDING))})
             case None => ()
         }
     }
@@ -95,7 +103,10 @@ public class Modal <: Widget {
 
     private func handleModal(ctx: UiContext, event: UiEvent): Bool {
         match (event) {
-            case UiEvent.KeyDown(Key.Escape, _) => dismiss(ctx)
+            case UiEvent.KeyDown(Key.Escape, _) =>
+                if (dismissOnEscape) {
+                    dismiss(ctx)
+                }
             case UiEvent.KeyDown(Key.Tab, _) => cycleDialogFocus(ctx, if (ctx.eventModifiers().shift) {
                 -1
             } else {
@@ -105,7 +116,9 @@ public class Modal <: Widget {
                 if (dialogRect.contains(x, y)) {
                     routeToContent(ctx, event)
                 } else {
-                    dismiss(ctx) // a press on the backdrop dismisses
+                    if (dismissOnBackdrop) {
+                        dismiss(ctx)
+                    }
                 }
             case _ => routeToContent(ctx, event)
         }

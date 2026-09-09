@@ -5,7 +5,8 @@ import std.deriving.*
 import sdl.{FontStyle, Fonts}
 
 private let DEFAULT_PARAGRAPH_CACHE_BYTES: Int64 = 4 * 1024 * 1024
-private let PARAGRAPH_ENTRY_OVERHEAD: Int64 = 128
+private let PARAGRAPH_ENTRY_OVERHEAD: Int64 = 160
+private let PARAGRAPH_LINE_OVERHEAD: Int64 = 32
 
 /** Process-local paragraph-layout cache counters exposed through `UiContext`. */
 public struct ParagraphCacheStats {
@@ -25,26 +26,33 @@ public struct ParagraphCacheStats {
 }
 
 @Derive[Equatable, Hashable]
-internal struct ParagraphCacheKey {
+internal class ParagraphCacheKey {
     let text: String
     let widthBits: UInt32
     let pointSizeBits: UInt32
     let styleFlags: Int32
+    let weight: Int64
+    let variations: String
     let font: String
     let fontRevision: UInt64
     let maxLines: Int64
+    let environment: UiEnvironmentKey
 
-    init(text: String, width: Float32, pointSize: Float32, style: FontStyle, font: ?String, maxLines: Int64) {
+    init(text: String, width: Float32, pointSize: Float32, style: FontStyle, font: ?String, maxLines: Int64,
+        environment: UiEnvironmentKey) {
         this.text = text
         this.widthBits = width.toBits()
         this.pointSizeBits = pointSize.toBits()
         this.styleFlags = style.ttfFlags()
+        this.weight = style.weight.value
+        this.variations = style.variations.key()
         this.font = match (font) {
             case Some(value) => value
             case None => ""
         }
         this.fontRevision = Fonts.revision()
         this.maxLines = maxLines
+        this.environment = environment
     }
 }
 
@@ -65,7 +73,8 @@ private class ParagraphCacheEntry {
 /*
  * A byte-budgeted true LRU. Paragraph strings vary by orders of magnitude, so an entry-count cap
  * permits one huge document to dominate memory. Keys retain the immutable input String rather than
- * concatenate it into another key; the derived value key supplies collision-safe equality.
+ * concatenate it into another key. The immutable key object is shared by the bucket and LRU entry;
+ * derived structural equality keeps independently constructed requests equivalent across GC.
  */
 internal class ParagraphLayoutCache {
     private let byteBudget: Int64
@@ -81,16 +90,7 @@ internal class ParagraphLayoutCache {
         this.byteBudget = max(0, byteBudget)
     }
 
-    func getOrCompute(
-        text: String,
-        width: Float32,
-        pointSize: Float32,
-        maxLines: Int64,
-        style: FontStyle,
-        font: ?String,
-        compute: () -> ParagraphLayout
-    ): ParagraphLayout {
-        let key = ParagraphCacheKey(text, width, pointSize, style, font, maxLines)
+    func getOrCompute(key: ParagraphCacheKey, compute: () -> ParagraphLayout): ParagraphLayout {
         match (entries.get(key)) {
             case Some(entry) =>
                 hitCount += 1
@@ -99,7 +99,7 @@ internal class ParagraphLayoutCache {
             case None => missCount += 1
         }
         let layout = compute()
-        let weight = entryWeight(text, layout)
+        let weight = entryWeight(key, layout)
         if (weight > byteBudget || byteBudget == 0) {
             return layout
         }
@@ -167,10 +167,14 @@ internal class ParagraphLayoutCache {
     }
 }
 
-private func entryWeight(text: String, layout: ParagraphLayout): Int64 {
-    var bytes = text.size + PARAGRAPH_ENTRY_OVERHEAD
+private func entryWeight(key: ParagraphCacheKey, layout: ParagraphLayout): Int64 {
+    var bytes = key.text.size + key.font.size + key.variations.size + key.environment.fontFamily.size + key
+        .environment
+        .fontVariations
+        .size + PARAGRAPH_ENTRY_OVERHEAD
     for (line in layout.lines) {
-        bytes += line.size
+        // Even an empty line occupies an array slot and String descriptor.
+        bytes += PARAGRAPH_LINE_OVERHEAD + line.size
     }
     bytes
 }

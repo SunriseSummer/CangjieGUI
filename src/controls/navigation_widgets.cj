@@ -42,7 +42,7 @@ public class SegmentedControl <: Widget {
 
     public func measure(ctx: UiContext, available: Size): Size {
         let desired = segmentedRowDesiredWidth(ctx, items)
-        Size(min(available.w, desired), CUI_CONTROL_H)
+        Size(min(available.w, desired), ctx.textRowHeight(minHeight: CUI_CONTROL_H, padding: 12.0))
     }
 
     public func layout(_: UiContext, rect: Rect): Unit {
@@ -103,6 +103,7 @@ public class TabView <: Widget {
     private let controlId: String
     private let indicatorSpring: Spring
     private var frame = Rect.zero()
+    private var headerHeight: Float32 = CUI_CONTROL_H
     private var laidOutPage: Int64 = -1
 
     public init(labels: Array<String>, selected: Bindable<Int64>, key!: ?String = None, body!: () -> Unit) {
@@ -145,6 +146,7 @@ public class TabView <: Widget {
     }
 
     public func layout(ctx: UiContext, rect: Rect): Unit {
+        headerHeight = ctx.textRowHeight(minHeight: CUI_CONTROL_H, padding: 12.0)
         frame = rect
         layoutActivePage(ctx)
     }
@@ -159,8 +161,7 @@ public class TabView <: Widget {
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
         // Only the tab strip is a click target; pages claim their own hover shapes.
-        claimHoverIfInside(ctx, event, Rect(frame.x, frame.y, frame.w, CUI_CONTROL_H), controlId,
-            CursorShape.Interactive)
+        claimHoverIfInside(ctx, event, Rect(frame.x, frame.y, frame.w, headerHeight), controlId, CursorShape.Interactive)
         if (handleTabs(ctx, event)) {
             ensureActivePageLayout(ctx)
             return true
@@ -230,14 +231,14 @@ public class TabView <: Widget {
     }
 
     private func pageFrame(): Rect {
-        Rect(frame.x, frame.y + CUI_CONTROL_H + CUI_GAP, frame.w, max(0.0, frame.h - CUI_CONTROL_H - CUI_GAP))
+        Rect(frame.x, frame.y + headerHeight + CUI_GAP, frame.w, max(0.0, frame.h - headerHeight - CUI_GAP))
     }
 
     private func drawTabs(ctx: UiContext): Unit {
         if (labels.size == 0) {
             return
         }
-        let header = Rect(frame.x, frame.y, frame.w, CUI_CONTROL_H)
+        let header = Rect(frame.x, frame.y, frame.w, ctx.textRowHeight(minHeight: headerHeight, padding: 12.0))
         drawSurface(ctx, header, ctx.theme.fieldSurface())
         let target = Float32(clampItemIndex(selected.value, labels.size))
         drawSlidingSegments(ctx, header, labels, indicatorSpring.animate(ctx, target: target))
@@ -249,7 +250,7 @@ public class TabView <: Widget {
     private func handleTabs(ctx: UiContext, event: UiEvent): Bool {
         match (event) {
             case UiEvent.MouseDown(MouseButton.Left, x, y) =>
-                let header = Rect(frame.x, frame.y, frame.w, CUI_CONTROL_H)
+                let header = Rect(frame.x, frame.y, frame.w, ctx.textRowHeight(minHeight: headerHeight, padding: 12.0))
                 if (header.contains(x, y) && labels.size > 0) {
                     ctx.focus(controlId)
                     let tabW = frame.w / Float32(labels.size)
@@ -299,7 +300,7 @@ private func drawSlidingSegments(ctx: UiContext, row: Rect, items: Array<String>
 private func segmentedRowDesiredWidth(ctx: UiContext, items: Array<String>): Float32 {
     var widest: Float32 = 0.0
     for (item in items) {
-        widest = max(widest, ctx.renderer.textWidth(item, pointSize: FontSizes.BODY))
+        widest = max(widest, ctx.textWidth(item, pointSize: ctx.textSize(fallback: FontSizes.BODY)))
     }
     let segmentCount = max(1, items.size)
     max(SEGMENT_MIN_WIDTH, widest + 2.0 * SEGMENT_LABEL_PADDING) * Float32(segmentCount)
@@ -312,7 +313,7 @@ private func drawSegmentLabel(ctx: UiContext, text: String, cell: Rect, color: C
     let fitted = fittedSegmentLabel(ctx, text, cell.w)
     ctx.renderer.pushClip(textArea)
     try {
-        ctx.renderer.textCenter(fitted, textArea, color, pointSize: FontSizes.BODY)
+        ctx.textCenter(fitted, textArea, color, pointSize: ctx.textSize(fallback: FontSizes.BODY))
     } finally {
         ctx.renderer.popClip()
     }

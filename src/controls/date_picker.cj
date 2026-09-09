@@ -1,8 +1,10 @@
 package cui.controls
 
-import sdl.{FontSizes, IconName, Key, MouseButton, Pen, Rect, Size, SurfaceStyle, UiEvent, clampF32, drawIcon}
-import cui.core.{Bindable, CUI_CONTROL_H, CursorShape, Overlay, State, UiContext, Widget, resolveControlKey,
-    claimHoverIfInside, drawSurface, emit, localState, registerFocusable, registerRectOverlayWhen}
+import sdl.{FontSizes, Key, MouseButton, Pen, Rect, Size, SurfaceStyle, UiEvent, clampF32}
+import cui.core.{Bindable, CUI_CONTROL_H, CursorShape, State, UiContext, Widget}
+import cui.core.{resolveControlKey, claimHoverIfInside, drawSurface, emit, localState}
+import cui.core.{registerFocusable, registerRectOverlayWhen}
+import cui.symbols.calendar.ICON_CALENDAR
 
 private let DP_FIELD_W: Float32 = 176.0
 private let DP_CELL_W: Float32 = 34.0
@@ -13,9 +15,31 @@ private let DP_PAD: Float32 = 8.0
 private let DP_GAP: Float32 = 4.0
 private let DP_MARGIN: Float32 = 4.0
 private let DP_GRID_ROWS: Int64 = 6
-private let DP_POPUP_W: Float32 = DP_CELL_W * 7.0 + DP_PAD * 2.0
-private let DP_POPUP_H: Float32 = DP_PAD * 2.0 + DP_HEADER_H + DP_WEEKDAY_H + DP_CELL_H * Float32(DP_GRID_ROWS)
 private let DP_WEEKDAYS: Array<String> = ["日", "一", "二", "三", "四", "五", "六"]
+
+// Publish one complete geometry snapshot after font measurements succeed.
+private struct DatePickerFontGeometry {
+    let cellWidth: Float32
+    let cellHeight: Float32
+    let headerHeight: Float32
+    let weekdayHeight: Float32
+
+    init(context!: ?UiContext = None) {
+        match (context) {
+            case Some(ctx) =>
+                cellWidth = max(DP_CELL_W, ctx.textWidth("00") + 12.0)
+                cellHeight = ctx.textRowHeight(minHeight: DP_CELL_H)
+                headerHeight = ctx.textRowHeight(minHeight: DP_HEADER_H)
+                weekdayHeight = max(DP_WEEKDAY_H,
+                    ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.CAPTION)) + 6.0)
+            case None =>
+                cellWidth = DP_CELL_W
+                cellHeight = DP_CELL_H
+                headerHeight = DP_HEADER_H
+                weekdayHeight = DP_WEEKDAY_H
+        }
+    }
+}
 
 /*
  * A date field with a pop-up month calendar. The closed control shows the bound `CalendarDate`; opening
@@ -38,6 +62,7 @@ public class DatePicker <: Widget {
     private let viewMonth: State<Int64>
     private let focusedDay: State<Int64>
     private var frame = Rect.zero()
+    private var fontGeometry = DatePickerFontGeometry()
 
     public init(selected: Bindable<CalendarDate>, key!: ?String = None) {
         let ident = resolveControlKey(key, "DatePicker")
@@ -52,32 +77,30 @@ public class DatePicker <: Widget {
         emit(this)
     }
 
-    public func measure(_: UiContext, available: Size): Size {
-        Size(min(available.w, DP_FIELD_W), CUI_CONTROL_H)
+    private func popupWidth(): Float32 {
+        fontGeometry.cellWidth * 7.0 + DP_PAD * 2.0
+    }
+    private func popupHeight(): Float32 {
+        DP_PAD * 2.0 + fontGeometry.headerHeight + fontGeometry.weekdayHeight + fontGeometry.cellHeight * Float32(DP_GRID_ROWS)
+    }
+
+    public func measure(ctx: UiContext, available: Size): Size {
+        fontGeometry = DatePickerFontGeometry(context: ctx)
+        Size(min(available.w, max(DP_FIELD_W, ctx.textWidth(currentLabel()) + TEMPORAL_FIELD_CHROME)),
+            ctx.textRowHeight(minHeight: CUI_CONTROL_H, padding: 16.0))
     }
 
     public func layout(ctx: UiContext, rect: Rect): Unit {
+        fontGeometry = DatePickerFontGeometry(context: ctx)
         frame = rect
         registerRectOverlayWhen(ctx, open.value, {=> popupRect(ctx)}, {c, e, popup => handleOverlay(c, e, popup)},
             {c, popup => drawPopup(c, popup)}, overlayOwner)
     }
 
     public func draw(ctx: UiContext): Unit {
-        drawSurface(ctx, frame, ctx.theme.fieldSurface(active: ctx.showFocusRing(id) || open.value))
-        let labelArea = Rect(frame.x + 10.0, frame.y, max(0.0, frame.w - 36.0), frame.h)
-        ctx.renderer.pushClip(labelArea)
-        let textY = frame.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
-        ctx.renderer.text(currentLabel(), labelArea.x, textY, ctx.theme.text, pointSize: FontSizes.CONTROL)
-        ctx.renderer.popClip()
-        drawIcon(ctx.renderer, IconName.Calendar, Rect(frame.right() - 26.0, frame.centerY() - 8.0, 16.0, 16.0),
-            ctx.theme.mutedText)
-
-        if (open.value) {
-            let popup = popupRect(ctx)
-            ctx.setOverlay(
-                Overlay(handleEvent: {c, e => handleOverlay(c, e, popup)}, render: {c => drawPopup(c, popup)},
-                    owner: overlayOwner))
-        }
+        drawTemporalPickerField(ctx, frame, currentLabel(), ctx.showFocusRing(id) || open.value, ICON_CALENDAR)
+        registerRectOverlayWhen(ctx, open.value, {=> popupRect(ctx)}, {c, e, popup => handleOverlay(c, e, popup)},
+            {c, popup => drawPopup(c, popup)}, overlayOwner)
     }
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
@@ -223,28 +246,28 @@ public class DatePicker <: Widget {
      * the viewport horizontally (the calendar is wider than the field).
      */
     private func popupRect(ctx: UiContext): Rect {
-        let x = clampF32(frame.x, DP_MARGIN, max(DP_MARGIN, ctx.viewportWidth - DP_POPUP_W - DP_MARGIN))
+        let x = clampF32(frame.x, DP_MARGIN, max(DP_MARGIN, ctx.viewportWidth - popupWidth() - DP_MARGIN))
         let below = frame.bottom() + DP_GAP
-        let y = if (below + DP_POPUP_H <= ctx.viewportHeight - DP_MARGIN) {
+        let y = if (below + popupHeight() <= ctx.viewportHeight - DP_MARGIN) {
             below
         } else {
-            max(DP_MARGIN, frame.y - DP_GAP - DP_POPUP_H)
+            max(DP_MARGIN, frame.y - DP_GAP - popupHeight())
         }
-        Rect(x, y, DP_POPUP_W, DP_POPUP_H)
+        Rect(x, y, popupWidth(), popupHeight())
     }
 
     private func headerRect(popup: Rect): Rect {
-        Rect(popup.x + DP_PAD, popup.y + DP_PAD, popup.w - DP_PAD * 2.0, DP_HEADER_H)
+        Rect(popup.x + DP_PAD, popup.y + DP_PAD, popup.w - DP_PAD * 2.0, fontGeometry.headerHeight)
     }
 
     private func prevArrowRect(popup: Rect): Rect {
         let header = headerRect(popup)
-        Rect(header.x, header.y, DP_HEADER_H, DP_HEADER_H)
+        Rect(header.x, header.y, fontGeometry.headerHeight, fontGeometry.headerHeight)
     }
 
     private func nextArrowRect(popup: Rect): Rect {
         let header = headerRect(popup)
-        Rect(header.right() - DP_HEADER_H, header.y, DP_HEADER_H, DP_HEADER_H)
+        Rect(header.right() - fontGeometry.headerHeight, header.y, fontGeometry.headerHeight, fontGeometry.headerHeight)
     }
 
     private func gridOriginX(popup: Rect): Float32 {
@@ -252,12 +275,12 @@ public class DatePicker <: Widget {
     }
 
     private func gridOriginY(popup: Rect): Float32 {
-        popup.y + DP_PAD + DP_HEADER_H + DP_WEEKDAY_H
+        popup.y + DP_PAD + fontGeometry.headerHeight + fontGeometry.weekdayHeight
     }
 
     private func cellRect(popup: Rect, row: Int64, col: Int64): Rect {
-        Rect(gridOriginX(popup) + Float32(col) * DP_CELL_W, gridOriginY(popup) + Float32(row) * DP_CELL_H, DP_CELL_W,
-            DP_CELL_H)
+        Rect(gridOriginX(popup) + Float32(col) * fontGeometry.cellWidth,
+            gridOriginY(popup) + Float32(row) * fontGeometry.cellHeight, fontGeometry.cellWidth, fontGeometry.cellHeight)
     }
 
     // The day number under a pointer inside the grid, or 0 when the pointer is off the grid or on a
@@ -265,11 +288,11 @@ public class DatePicker <: Widget {
     private func dayAt(popup: Rect, x: Float32, y: Float32): Int64 {
         let gx = gridOriginX(popup)
         let gy = gridOriginY(popup)
-        if (x < gx || x >= gx + DP_CELL_W * 7.0 || y < gy || y >= gy + DP_CELL_H * Float32(DP_GRID_ROWS)) {
+        if (x < gx || x >= gx + fontGeometry.cellWidth * 7.0 || y < gy || y >= gy + fontGeometry.cellHeight * Float32(DP_GRID_ROWS)) {
             return 0
         }
-        let col = Int64((x - gx) / DP_CELL_W)
-        let row = Int64((y - gy) / DP_CELL_H)
+        let col = Int64((x - gx) / fontGeometry.cellWidth)
+        let row = Int64((y - gy) / fontGeometry.cellHeight)
         let monthStart = CalendarDate(viewYear.value, viewMonth.value, 1)
         let firstWd = monthStart.firstWeekdayIndex()
         let day = row * 7 + col - firstWd + 1
@@ -293,9 +316,10 @@ public class DatePicker <: Widget {
     private func drawHeader(ctx: UiContext, popup: Rect): Unit {
         let header = headerRect(popup)
         let title = "${viewYear.value} 年 ${viewMonth.value} 月"
-        let titleW = ctx.renderer.textWidth(title, pointSize: FontSizes.CONTROL)
-        let titleY = header.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
-        ctx.renderer.text(title, header.centerX() - titleW / 2.0, titleY, ctx.theme.text, pointSize: FontSizes.CONTROL)
+        let titleW = ctx.textWidth(title, pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
+        let titleY = header.centerY() - ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.CONTROL)) / 2.0
+        ctx.text(title, header.centerX() - titleW / 2.0, titleY, ctx.theme.text,
+            pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
         drawArrow(ctx, prevArrowRect(popup), pointsLeft: true)
         drawArrow(ctx, nextArrowRect(popup), pointsLeft: false)
     }
@@ -321,13 +345,15 @@ public class DatePicker <: Widget {
 
     private func drawWeekdayRow(ctx: UiContext, popup: Rect): Unit {
         let gx = gridOriginX(popup)
-        let wy = popup.y + DP_PAD + DP_HEADER_H
-        let labelY = wy + (DP_WEEKDAY_H - ctx.renderer.textHeight(pointSize: FontSizes.CAPTION)) / 2.0
+        let wy = popup.y + DP_PAD + fontGeometry.headerHeight
+        let labelY = wy +
+            (fontGeometry.weekdayHeight - ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.CAPTION))) / 2.0
         for (col in 0..7) {
             let label = DP_WEEKDAYS[col]
-            let lw = ctx.renderer.textWidth(label, pointSize: FontSizes.CAPTION)
-            let cx = gx + Float32(col) * DP_CELL_W + DP_CELL_W / 2.0
-            ctx.renderer.text(label, cx - lw / 2.0, labelY, ctx.theme.mutedText, pointSize: FontSizes.CAPTION)
+            let lw = ctx.textWidth(label, pointSize: ctx.textSize(fallback: FontSizes.CAPTION))
+            let cx = gx + Float32(col) * fontGeometry.cellWidth + fontGeometry.cellWidth / 2.0
+            ctx.text(label, cx - lw / 2.0, labelY, ctx.theme.mutedText,
+                pointSize: ctx.textSize(fallback: FontSizes.CAPTION))
         }
     }
 
@@ -377,9 +403,9 @@ public class DatePicker <: Widget {
             ctx.theme.text
         }
         let text = "${day}"
-        let tw = ctx.renderer.textWidth(text, pointSize: FontSizes.CONTROL)
-        let ty = cell.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
-        ctx.renderer.text(text, cell.centerX() - tw / 2.0, ty, color, pointSize: FontSizes.CONTROL)
+        let tw = ctx.textWidth(text, pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
+        let ty = cell.centerY() - ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.CONTROL)) / 2.0
+        ctx.text(text, cell.centerX() - tw / 2.0, ty, color, pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
     }
 
     private func popupSurface(ctx: UiContext): SurfaceStyle {

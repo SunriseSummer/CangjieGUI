@@ -73,8 +73,6 @@ import cui.*
 | [`Grid`](core/Grid.md) | 把子组件排进固定列数、等宽单元格的网格容器，行高取本行最高的单元格。 |
 | [`HScrollBar`](core/HScrollBar.md) | `ScrollBar` 的水平镜像：为沿 x 轴滚动的表面提供同样的滑块拖拽与轨道分页控制器。 |
 | [`HStack`](core/HStack.md) | 沿水平主轴排布子组件的弹性栈容器：以尾随 lambda 声明子组件，间距、主轴/交叉轴对齐与弹性参与可链式配置。 |
-| [`Icon`](core/Icon.md) | 以方形边长绘制的非交互矢量图标，默认 18 vp、取主题文字色。 |
-| [`IconButton`](core/IconButton.md) | 以图标为面、可选带文字标签的按钮，激活方式与 `Button` 完全相同。 |
 | [`IdentifiedAction`](core/IdentifiedAction.md) | 一个稳定元素 ID 与其局部 Action 的值对。 |
 | [`IdentifiedArray`](core/IdentifiedArray.md) | 以分块持久顺序存储和唯一 ID 索引支持重复子特征。 |
 | [`Keyed`](core/Keyed.md) | 给子树赋予稳定声明式标识的透明包装组件：其下的局部状态键与控件交互标识都以该键为命名空间。 |
@@ -149,6 +147,7 @@ import cui.*
 | [`Transition`](core/Transition.md) | 一次纯归约得到的下一模型与惰性效果批次。 |
 | [`Tooltip`](core/Tooltip.md) | 为任意控件包上悬停提示：指针在子组件上驻留 500 毫秒后，提示文本被绘制在整棵组件树之上；其余时刻是完全透明的包装。 |
 | [`UiContext`](core/UiContext.md) | 每帧传给全部组件回调的服务枢纽：渲染器与主题、指针与帧状态，以及焦点、悬停、按下、拖拽、提示与浮层等共享交互协议。 |
+| [`UiAggregateException`](core/UiAggregateException.md) | 保留一次 UI 操作中全部原始异常、堆栈与发生顺序。 |
 | [`VStack`](core/VStack.md) | 沿垂直主轴排布子组件的弹性栈容器：以尾随 lambda 声明子组件，间距、主轴/交叉轴对齐与弹性参与可链式配置。 |
 | [`Widget`](core/Widget.md) | 所有组件共同实现的立即模式契约：每帧参与测量、布局、绘制与事件处理，并自带尺寸、内边距、表面、阴影、弹性、可见性等整套链式修饰器。 |
 | [`ZStack`](core/ZStack.md) | 把子组件按声明顺序自底向顶叠放、并在同一框架内对齐的层叠容器。 |
@@ -205,7 +204,8 @@ import cui.*
 | 符号 | 说明 |
 |---|---|
 | [`ComboBox`](text/ComboBox.md) | 可输入的下拉组合框：在内嵌单行编辑框上浮出建议列表，输入即过滤；绑定文本就是控件的值，自由输入即使不匹配任何选项也被保留。 |
-| [`TextArea`](text/TextArea.md) | 多行文本编辑控件：把编辑写回绑定的 `Bindable<String>`，带垂直滚动与右缘滚动条，行间导航按字节列对齐。 |
+| [`TextArea`](text/TextArea.md) | 多行文本编辑控件：把编辑写回绑定的 `Bindable<String>`，带垂直滚动与右缘滚动条，支持像素列导航与横向光标跟随。 |
+| [`TextClipboard`](text/TextClipboard.md) | 可注入的纯文本剪贴板后端，报告读写失败并拒绝 NUL。 |
 | [`TextEditState`](text/TextEditState.md) | 有光标的文本框与文本域共享的文本编辑模型：文本绑定、光标与选择锚点，以及在这三者上实现的全部编辑操作（插入/删除、按字符/行/整体移动与扩展选择、词与行选择）。 |
 | [`TextField`](text/TextField.md) | 单行文本编辑控件：把输入写回绑定的 `Bindable<String>`，按桌面惯例提供点选拖选、双击选词、Ctrl 快捷键、分组撤销与光标水平跟随。 |
 
@@ -213,6 +213,15 @@ import cui.*
 
 | 符号 | 说明 |
 |---|---|
+| [Icon](media/Icon.md) | 用户媒体资源构成的非交互图标。 |
+| [IconButton](media/IconButton.md) | 用户媒体图标与可选文字组成的按钮。 |
+| [IconSource](media/IconSource.md) | 不可变的应用图标资源定义，包含 ImageSource、原色／模板意图及可选位图规格表。 |
+| [IconVariant](media/IconVariant.md) | 应用提供的一个正方形位图规格，pixels 为原始画布边长（物理像素），不是 vp。 |
+| [IconRenderingMode](media/IconRenderingMode.md) | Original 保留媒体 RGB，忽略 foregroundColor；Template 以透明度为覆盖范围，使用前景色替换 RGB。 |
+| [IconStyle](media/IconStyle.md) | 不可变的图标样式，可在 Icon 与 IconButton 之间复用。 |
+| [paintIcon](media/functions.md#painticon) | 自定义组件绘制用户图标。 |
+| [preloadIcon](media/functions.md#preloadicon) | 显式物理尺寸预热。 |
+| [invalidateIcon](media/functions.md#invalidateicon) | 刷新全部图标规格。 |
 | [`CanvasWidget`](media/CanvasWidget.md) | 自由绘制表面：弹性填满分得的空间、画主题输入底色、裁剪到框，然后把原始 `Renderer` 与框矩形交给 `onDraw`——坐标是绝对的，绘制方从矩形偏移、不从零点起。 |
 | [`clearImageCache`](media/functions.md#clearimagecache) | 清空图像缓存并关闭每个缓存纹理；图像在下一次绘制时重载。 |
 | [`ImageCacheStats`](media/ImageCacheStats.md) | 当前 UI 线程的图像缓存命中、失败、容量与淘汰诊断。 |
@@ -250,13 +259,11 @@ import cui.*
 | `clampF32` | 把值限制在闭区间 [`low`, `high`]。 |
 | `Color` | 8 位通道的 RGBA 颜色。 |
 | `SdlException` | 本模块统一抛出的异常类型：SDL 调用失败、参数非法或资源已关闭时携带描述信息抛出。 |
-| `drawIcon` | 在给定矩形内以圆头粗描边绘制一枚内置矢量图标。 |
 | `EventKeyModifiers` | 随键盘事件复制的修饰键快照，延迟派发仍保持事件发生时语义。 |
 | `Fonts` | 进程级注册表，把应用字体名映射到字体文件路径，类似 CSS 的 `@font-face` 表。 |
 | `FontSizes` | 渲染器与应用共用的标准字号常量集合（点值）。 |
 | `FontStyle` | 叠加在基础 UI 字体上的文本样式：字重、倾斜与两种线条修饰。 |
 | `FrameInfo` | 以毫秒计的帧计时信息：`elapsedMs` 为 SDL 初始化以来的总时长，`deltaMs` 为距上一帧的间隔。 |
-| `IconName` | 内置矢量图标的名称，交给 `drawIcon` 在 24 单位网格上以圆头粗描边绘制。 |
 | `ImageFileFormat` | `Surface` 能读写的图像文件格式。 |
 | `imageFormatFromPath` | 按扩展名推断图像文件格式：`.png` / `.PNG` 为 PNG，其余一律为 BMP。 |
 | `Insets` | 逻辑像素下的四边间距——内边距、外边距、留白。 |
@@ -389,3 +396,22 @@ import cui.*
 | [`cui.text`](text/index.md) | 文本编辑控件：单行 TextField、多行 TextArea、带建议的 ComboBox 与共享编辑模型 TextEditState。 |
 | [`cui.media`](media/index.md) | 图像与自绘：文件图像视图 ImageView（线程/渲染器隔离的有界纹理缓存）与自由绘制表面 CanvasWidget。 |
 | [`cui.desktop`](desktop/index.md) | 桌面应用对象：DesktopApp 拥有窗口与渲染循环，驱动构建-布局-绘制-事件分发。 |
+
+## 字体设置
+
+根包重新导出 [`TextStyle`](core/TextStyle.md)，以及 SDL 的 `FontSource`、`FontFamily`、`FontMetrics`、`FontResolution`、`ResolvedFontFace`、`FontCacheStats`、`InstalledFontFace`；通常只需 `import cui.*`。
+
+根包还导出 [`TextInputStyle`](text/TextInputStyle.md)，用于编辑器行高、内边距、对齐、颜色和背景。
+
+[`TextSelectionWidth`](text/TextSelectionWidth.md) 控制多行选区的水平覆盖策略；默认采用内容宽度。
+
+根包还导出 `FontWeight`、`FontVariation`、`FontVariations`、`FontAxis`、`FontRole`、`FontFaceDefinition`，用于数值字重、通用字体角色和变量字体设置。
+
+- [CloseRequest](desktop/CloseRequest.md)：异步关闭决定。
+- [DesktopPostStats](desktop/DesktopPostStats.md)：有界投递队列诊断。
+
+- [ImageSource](media/ImageSource.md)
+- [ImageStatus](media/ImageStatus.md)
+- [preloadImage](media/functions.md#preloadimage)
+
+预置图标通过独立 [cui.symbols 子包](symbols/index.md) 导入，不在此全量再导出；链接边界见[指南](../../guide/how-to/preset-icons.md)。

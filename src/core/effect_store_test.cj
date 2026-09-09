@@ -424,8 +424,10 @@ func effectStorePreservesCommitFailureWhenHandoffAlsoFails(): Unit {
     try {
         store.dispatch(EffectTestAction(1, effects: ["also-fail"]),
             handleEffects: {effects => probe.interpret(effects)})
-    } catch (error: IllegalStateException) {
-        probe.failureMessage = error.message
+    } catch (error: UiAggregateException) {
+        probe.failureMessage = error.primary.message
+        @Expect(error.failures.size, Int64(2))
+        @Expect(error.failures[1].message, "expected effect interpreter failure")
     }
 
     @Expect(store.get().count, Int64(1))

@@ -4,7 +4,7 @@
 
 位于 `cui.text` 包的公开类
 
-多行文本编辑控件：把编辑写回绑定的 `Bindable<String>`，带垂直滚动与右缘滚动条，行间导航按字节列对齐。沿用单行编辑的全部桌面惯例（多击选择、Ctrl 快捷键表、分组撤销），文档的行拆分按文本修订号缓存，滚动不会每帧重拆整篇文本；绑定可以是 [`State`](../core/State.md)，也可以是任何 [`Bindable`](../core/Bindable.md) 实现。
+多行文本编辑控件：把编辑写回绑定的 `Bindable<String>`，带垂直滚动与右缘滚动条，行间导航保持文字的水平像素位置。沿用单行编辑的全部桌面惯例（多击选择、Ctrl 快捷键表、分组撤销），文档的行拆分同时校验文本值与修订号，滚动不会每帧重拆整篇文本；绑定可以是 [`State`](../core/State.md)，也可以是任何 [`Bindable`](../core/Bindable.md) 实现。
 
 ## 声明
 
@@ -19,11 +19,11 @@ public class TextArea <: Widget
 ## 说明
 
 - **字节偏移语义**：与 [`TextField`](TextField.md) 相同，光标与选区锚点是 UTF-8 字节偏移。从外部接管 `cursor` 后再从外部移动它（加载文件、程序化粘贴）时必须连同 `anchor` 一起移动，否则陈旧锚点会张开一段用户从未做过的选区，下一次按键将整段替换。完整的编辑操作见 [`TextEditState`](TextEditState.md)。
-- **键盘表**：方向键按字符移动，Up/Down 跨行且尽量保持字节列；Home/End 移到**行**首尾（单行控件则是全文首尾）；Enter 插入换行；按住 Shift 的所有导航键扩展选区；Ctrl+A/C/X/V/Z/Y 与 Ctrl+Shift+Z 同单行控件。
-- **只读模式**：`editable: false` 时仍可移动光标、选择和复制；Ctrl+X 只复制而不删除，粘贴与撤销/重做会被忽略，控件不进入 Tab 焦点遍历。
-- **滚动**：滚轮只在内容超出视口时被消费（内容装得下时让给外层滚动容器，不留死区）；键盘编辑与导航后视口滚动最小距离让光标所在行可见，指针路径不做跟随。滚动偏移每帧限制在内容范围，且仅在值变化时写回，外部接管的滚动状态不会收到空写通知。
-- **粘贴换行处理**：保留多行内容，但把 Windows 的 CRLF 和单独的 CR 统一为 `\n`；否则行尾残留的 `\r` 会干扰 End、退格和文字测量。剪贴板不可用时复制/粘贴会静默失败，不会让控件退出。
-- **撤销**：与单行控件相同——500 毫秒内连续编辑合并一步、光标跳转切分撤销组、栈上限 300 步；撤销/重做后自动滚动到光标行。
+- **键盘表**：方向键按字符移动，Up/Down 跨行保持水平像素位置，经过短行后仍记住原列；Home/End 移到**行**首尾（单行控件则是全文首尾）；Ctrl/⌘+Home/End 跳到文档首尾；Enter 插入换行；按住 Shift 的所有导航键扩展选区；Ctrl+A/C/X/V/Z/Y 与 Ctrl+Shift+Z 同单行控件。
+- **只读模式**：`editable: false` 时仍可移动光标、选择和复制；剪切、粘贴、替换与撤销／重做均不修改正文，复制仍可用，控件不进入 Tab 焦点遍历。
+- **滚动**：长行会横向跟随光标，绘制、选区和点击命中使用同一水平偏移；滚轮只在内容超出视口时被消费（内容装得下时让给外层滚动容器，不留死区）；键盘编辑与导航后视口滚动最小距离让光标所在行可见，拖拽移动到可视区域以外时也会跟随选择端点；越界后即使指针静止也持续滚动，速度有上限，松开、失焦或到达边界时停止。滚动偏移每帧限制在内容范围，且仅在值变化时写回，外部接管的滚动状态不会收到空写通知。
+- **粘贴换行处理**：保留多行内容，但把 Windows 的 CRLF 和单独的 CR 统一为 `\n`；否则行尾残留的 `\r` 会干扰 End、退格和文字测量。剪贴板不可用时公开命令返回失败，正文与选区保持不变。
+- **撤销**：与单行控件相同——500 毫秒内连续编辑合并一步、光标跳转切分撤销组、双栈合计上限 300 步、约 8 MiB；撤销/重做后自动滚动到光标行。
 
 ## 示例
 
@@ -77,7 +77,8 @@ public init(
     scroll!: ?State<Float32> = None,
     cursor!: ?State<Int64> = None,
     anchor!: ?State<Int64> = None,
-    editable!: Bool = true
+    editable!: Bool = true,
+    clipboard!: TextClipboard = TextClipboard.system
 )
 ```
 
@@ -127,7 +128,7 @@ public func redo(): Unit
 [`Widget`](../core/Widget.md) 协议实现：占满全部可用空间。
 
 ```cangjie
-public func measure(_: UiContext, available: Size): Size
+public func measure(ctx: UiContext, available: Size): Size
 ```
 
 **参数**
@@ -141,7 +142,7 @@ public func measure(_: UiContext, available: Size): Size
 [`Widget`](../core/Widget.md) 协议实现：记录分配的框架矩形，供绘制与命中测试使用。
 
 ```cangjie
-public func layout(_: UiContext, rect: Rect): Unit
+public func layout(ctx: UiContext, rect: Rect): Unit
 ```
 
 **参数**
@@ -194,6 +195,61 @@ public func focusableId(): ?String
 ```
 
 **返回值** `?String` — 可编辑时返回参与键盘焦点导航的标识；只读文本区返回 `None`。
+
+## 字体与输入几何
+
+支持 `Widget.textStyle(TextStyle(...))` 子树字体、字号和样式。绘制、文字测量、点击、选区与 IME 使用相同有效设置。TextField/ComboBox 高度跟随行高；TextArea 的行绘制、点击行号、滚动范围和光标跟随共用动态行高。
+
+默认提供文本值、聚焦和可编辑时的 SetValue 语义；SetValue 与键盘输入共享换行校验及撤销逻辑。尚未提供完整的原生无障碍文本范围／选区模式。
+
+`clipboard!`: [`TextClipboard`](TextClipboard.md)，默认 `TextClipboard.system`。已有构造调用保持兼容。
+
+## 选区与编辑命令
+
+这些命令不要求控件当前持有焦点，工具栏或菜单取得焦点后仍可操作原选区。只读控件允许选择和复制，拒绝修改正文及撤销／重做。失败或空剪贴板不会删除选区。
+
+```cangjie
+public func selectAll(): Unit
+public func selectRange(anchor: Int64, cursor: Int64): Unit
+public func selectedText(): String
+public func replaceSelection(value: String): Bool
+public func copy(): Bool
+public func cut(): Bool
+public func paste(): Bool
+public func canUndo(): Bool
+public func canRedo(): Bool
+```
+
+`selectRange` 的两个参数是 UTF-8 字节偏移，越界时钳制，落在字素内部时向前吸附到完整字素边界。`replaceSelection("")` 删除选区；没有选区时插入指定文本。复制返回是否写入成功，剪切／粘贴／替换返回正文是否改变。剪切确认写入成功且原选区未改变后才删除；NUL 不属于支持的纯文本输入。
+
+粘贴、剪切、显式替换和 IME 提交各自构成独立撤销步；连续普通输入按 500 ms 合并。历史同时限制为 300 步和约 8 MiB 快照预算（撤销、重做合计），超额淘汰最旧快照。应用直接替换绑定文本会清除旧历史；需要可撤销的应用操作请使用 `replaceSelection`。
+
+键盘支持 Ctrl/⌘+A/C/X/V/Z、Ctrl/⌘+Shift+Z 与 Ctrl/⌘+Y；Ctrl+左右键／退格／Delete 按词段操作，macOS 另支持 Option。Shift 点击保留锚点并扩展选择。失焦选区保留淡色高亮，方便工具栏操作。
+
+详见 [文本编辑指南](../../../guide/how-to/text-editing.md) 和 [TextClipboard](TextClipboard.md)。
+
+## 编辑器外观与提示
+
+```cangjie
+public func style(value: TextInputStyle): TextArea
+public func placeholder(value: String): TextArea
+```
+
+方法返回控件自身。`style` 设置最小行高、四边内边距、对齐、正文／选区／光标颜色和普通／聚焦背景，见 [TextInputStyle](TextInputStyle.md)。字体继续通过 `textStyle(TextStyle(...))` 继承。占位提示仅在正文和预编辑均为空时显示，不写入绑定值、剪贴板或撤销历史。
+
+彩色 Emoji 缺字会按需加入系统 Emoji 字体后备；无需预先枚举字体或为每个输入框手动注册。具体字形及组合序列取决于所选字体、系统字体版本和 SDL_ttf 的支持。完整说明见[文本编辑指南](../../../guide/how-to/text-editing.md)。
+
+## wrap
+
+```cangjie
+public func wrap(value!: Bool = true): TextArea
+```
+
+默认不软换行，调用 `.wrap()` 启用。按可用宽度在词段／字素边界换行，保留空格、CRLF、空行和全部文档字节；超宽字素单独占行并裁剪，不拆开 Emoji。切换模式、宽度、字体或缩放会重新排可视行。
+
+上下键保持像素列，Home／End 定位可视行首尾，PageUp／PageDown 按一页可视行移动，Shift 扩展选区；Ctrl/⌘ + Home／End 仍定位文档首尾。软换行行尾保留光标落在上一可视行的亲和性。绘制、点击、选区、预编辑和滚动共用这些行边界。
+
+键盘事件处理后立即更新外部滚动状态；直接调用编辑命令时，光标跟随在下一次绘制生效。滚轮浏览允许光标留在屏外，输入法候选锚点钳制到视口边缘，避免误停输入会话。
 
 ## 另请参阅
 

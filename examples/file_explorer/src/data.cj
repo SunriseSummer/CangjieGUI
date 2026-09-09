@@ -7,7 +7,7 @@
 package cui_file_explorer
 
 import std.collection.HashMap
-import cui.{IconName, TreeNode}
+import cui.{IconSource, TreeNode}
 
 /** 选中节点的元信息，供详情面板展示。 */
 struct FileInfo {
@@ -25,11 +25,11 @@ struct FileInfo {
 }
 
 func folder(path: String, children: Array<TreeNode>): TreeNode {
-    TreeNode(path, basename(path), children: children, icon: IconName.OpenFolder)
+    TreeNode(path, basename(path), children: children, icon: IconSource("assets/icons/folder.svg"))
 }
 
 func file(path: String): TreeNode {
-    TreeNode(path, basename(path), icon: IconName.NewDocument)
+    TreeNode(path, basename(path), icon: IconSource("assets/icons/document.svg"))
 }
 
 /** 路径末段（去掉目录前缀）。空串 split 得空数组，故取末段前判空。 */
@@ -45,39 +45,57 @@ func basename(path: String): String {
 /** 一棵示意目录树：本项目的主要结构（截取，足以演示展开/折叠与层级导航）。 */
 func seedRoots(): Array<TreeNode> {
     [
-        folder("CangjieGUI", [
-            folder("CangjieGUI/src", [
-                folder("CangjieGUI/src/core", [
-                    file("CangjieGUI/src/core/widget.cj"),
-                    file("CangjieGUI/src/core/state.cj"),
-                    file("CangjieGUI/src/core/layout_widgets.cj"),
-                    file("CangjieGUI/src/core/split_view.cj")
-                ]),
-                folder("CangjieGUI/src/controls", [
-                    file("CangjieGUI/src/controls/selection_widgets.cj"),
-                    file("CangjieGUI/src/controls/table.cj"),
-                    file("CangjieGUI/src/controls/tree_view.cj")
-                ]),
-                folder("CangjieGUI/src/text", [
-                    file("CangjieGUI/src/text/text_field.cj"),
-                    file("CangjieGUI/src/text/text_area.cj")
-                ])
-            ]),
-            folder("CangjieGUI/examples", [
-                folder("CangjieGUI/examples/workbench", [
-                    file("CangjieGUI/examples/workbench/README.md")
-                ]),
-                folder("CangjieGUI/examples/file_explorer", [
-                    file("CangjieGUI/examples/file_explorer/README.md")
-                ])
-            ]),
-            folder("CangjieGUI/docs", [
-                file("CangjieGUI/docs/components.md"),
-                file("CangjieGUI/docs/architecture.md")
-            ]),
-            file("CangjieGUI/README.md"),
-            file("CangjieGUI/LICENSE")
-        ])
+        folder(
+            "CangjieGUI",
+            [
+                folder(
+                    "CangjieGUI/src",
+                    [
+                        folder(
+                            "CangjieGUI/src/core",
+                            [
+                                file("CangjieGUI/src/core/widget.cj"),
+                                file("CangjieGUI/src/core/state.cj"),
+                                file("CangjieGUI/src/core/layout_widgets.cj"),
+                                file("CangjieGUI/src/core/split_view.cj")
+                            ]
+                        ),
+                        folder(
+                            "CangjieGUI/src/controls",
+                            [
+                                file("CangjieGUI/src/controls/selection_widgets.cj"),
+                                file("CangjieGUI/src/controls/table.cj"),
+                                file("CangjieGUI/src/controls/tree_view.cj")
+                            ]
+                        ),
+                        folder(
+                            "CangjieGUI/src/text",
+                            [
+                                file("CangjieGUI/src/text/text_field.cj"),
+                                file("CangjieGUI/src/text/text_area.cj")
+                            ]
+                        )
+                    ]
+                ),
+                folder(
+                    "CangjieGUI/examples",
+                    [
+                        folder("CangjieGUI/examples/workbench", [file("CangjieGUI/examples/workbench/README.md")]),
+                        folder("CangjieGUI/examples/file_explorer",
+                            [file("CangjieGUI/examples/file_explorer/README.md")])
+                    ]
+                ),
+                folder(
+                    "CangjieGUI/docs",
+                    [
+                        file("CangjieGUI/docs/components.md"),
+                        file("CangjieGUI/docs/architecture.md")
+                    ]
+                ),
+                file("CangjieGUI/README.md"),
+                file("CangjieGUI/LICENSE")
+            ]
+        )
     ]
 }
 

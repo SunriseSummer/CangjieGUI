@@ -45,7 +45,8 @@ public class Switch <: Widget {
     }
 
     public func measure(ctx: UiContext, available: Size): Size {
-        Size(min(available.w, SWITCH_TRACK_W + 12.0 + ctx.renderer.textWidth(label)), CUI_CONTROL_H)
+        Size(min(available.w, SWITCH_TRACK_W + 12.0 + ctx.textWidth(label)),
+            ctx.textRowHeight(minHeight: CUI_CONTROL_H, padding: 12.0))
     }
 
     public func layout(_: UiContext, rect: Rect): Unit {
@@ -68,8 +69,9 @@ public class Switch <: Widget {
         let knobX = offX + (onX - offX) * t
         ctx.renderer.fillCircle(knobX, track.centerY() + 1.0, 8.5, ctx.theme.shadow.withAlpha(28))
         ctx.renderer.fillCircle(knobX, track.centerY(), 8.0, ctx.theme.panelRaised)
-        let textY = frame.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
-        ctx.renderer.text(label, track.right() + 12.0, textY, ctx.theme.text, pointSize: FontSizes.CONTROL)
+        let textY = frame.centerY() - ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.CONTROL)) / 2.0
+        ctx.text(label, track.right() + 12.0, textY, ctx.theme.text,
+            pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
         if (ctx.showFocusRing(controlId)) {
             drawFocusRing(ctx, track, SWITCH_TRACK_H / 2.0)
         }
@@ -118,7 +120,7 @@ public class RadioButton <: Widget {
     }
 
     public func measure(ctx: UiContext, available: Size): Size {
-        Size(min(available.w, ctx.renderer.textWidth(label) + 34.0), CUI_CONTROL_H)
+        Size(min(available.w, ctx.textWidth(label) + 34.0), ctx.textRowHeight(minHeight: CUI_CONTROL_H, padding: 12.0))
     }
 
     public func layout(_: UiContext, rect: Rect): Unit {
@@ -143,8 +145,8 @@ public class RadioButton <: Widget {
         if (t > 0.001) {
             ctx.renderer.fillCircle(centerX, centerY, 4.5 * t, ctx.theme.accent)
         }
-        let textY = centerY - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
-        ctx.renderer.text(label, frame.x + 26.0, textY, ctx.theme.text, pointSize: FontSizes.CONTROL)
+        let textY = centerY - ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.CONTROL)) / 2.0
+        ctx.text(label, frame.x + 26.0, textY, ctx.theme.text, pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
         if (ctx.showFocusRing(controlId)) {
             drawFocusRing(ctx, Rect(centerX - 9.0, centerY - 9.0, 18.0, 18.0), 9.0)
         }
@@ -183,10 +185,10 @@ public class Picker <: Widget {
     public func measure(ctx: UiContext, available: Size): Size {
         var textW: Float32 = 0.0
         for (item in items) {
-            textW = max(textW, ctx.renderer.textWidth(item, pointSize: FontSizes.CONTROL))
+            textW = max(textW, ctx.textWidth(item, pointSize: ctx.textSize(fallback: FontSizes.CONTROL)))
         }
         let natural = max(PICKER_MIN_W, textW + PICKER_BUTTON_W * 2.0 + 16.0)
-        Size(min(available.w, natural), CUI_CONTROL_H)
+        Size(min(available.w, natural), ctx.textRowHeight(minHeight: CUI_CONTROL_H, padding: 12.0))
     }
 
     public func layout(_: UiContext, rect: Rect): Unit {
@@ -204,10 +206,10 @@ public class Picker <: Widget {
         // over the chevrons or escape the control surface.
         let labelArea = Rect(frame.x + PICKER_BUTTON_W, frame.y, max(0.0, frame.w - PICKER_BUTTON_W * 2.0), frame.h)
         ctx.renderer.pushClip(labelArea)
-        ctx.renderer.textCenter(label, labelArea, ctx.theme.text, pointSize: FontSizes.CONTROL)
+        ctx.textCenter(label, labelArea, ctx.theme.text, pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
         ctx.renderer.popClip()
-        ctx.renderer.textCenter("‹", leftButton(), ctx.theme.mutedText, pointSize: FontSizes.TITLE)
-        ctx.renderer.textCenter("›", rightButton(), ctx.theme.mutedText, pointSize: FontSizes.TITLE)
+        ctx.textCenter("‹", leftButton(), ctx.theme.mutedText, pointSize: ctx.textSize(fallback: FontSizes.TITLE))
+        ctx.textCenter("›", rightButton(), ctx.theme.mutedText, pointSize: ctx.textSize(fallback: FontSizes.TITLE))
     }
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
@@ -324,8 +326,10 @@ public class Stepper <: Widget {
     // Content-adaptive width: the value area fits the current number (with a floor so one
     // or two digits stay stable and uncramped), plus the two step buttons.
     public func measure(ctx: UiContext, available: Size): Size {
-        let valueW = max(40.0, ctx.renderer.textWidth("${value.value}", pointSize: FontSizes.CONTROL) + 20.0)
-        Size(min(available.w, valueW + STEPPER_BUTTON_W * 2.0), CUI_CONTROL_H)
+        let valueW = max(40.0,
+            ctx.textWidth("${value.value}", pointSize: ctx.textSize(fallback: FontSizes.CONTROL)) + 20.0)
+        Size(min(available.w, valueW + STEPPER_BUTTON_W * 2.0),
+            ctx.textRowHeight(minHeight: CUI_CONTROL_H, padding: 12.0))
     }
 
     public func layout(_: UiContext, rect: Rect): Unit {
@@ -334,9 +338,10 @@ public class Stepper <: Widget {
 
     public func draw(ctx: UiContext): Unit {
         drawSurface(ctx, frame, ctx.theme.fieldSurface(active: ctx.showFocusRing(id)))
-        ctx.renderer.textCenter("−", decrementButton(), ctx.theme.text, pointSize: FontSizes.TITLE)
-        ctx.renderer.textCenter("${value.value}", valueFrame(), ctx.theme.text, pointSize: FontSizes.CONTROL)
-        ctx.renderer.textCenter("+", incrementButton(), ctx.theme.text, pointSize: FontSizes.TITLE)
+        ctx.textCenter("−", decrementButton(), ctx.theme.text, pointSize: ctx.textSize(fallback: FontSizes.TITLE))
+        ctx.textCenter("${value.value}", valueFrame(), ctx.theme.text,
+            pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
+        ctx.textCenter("+", incrementButton(), ctx.theme.text, pointSize: ctx.textSize(fallback: FontSizes.TITLE))
     }
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {

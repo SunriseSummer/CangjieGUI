@@ -288,7 +288,7 @@ public func draw(ctx: UiContext): Unit
 
 ### handle
 
-滚轮滚动列表、滚动条按下/拖拽优先处理，其余事件从视觉最上层的行开始分发。帧事件广播给全部已构建行且不消费；内容不足一屏时滚轮不消费、让给外层滚动容器；行拖拽进行中允许指针越出视口继续跟踪。
+滚轮滚动列表、滚动条按下/拖拽优先处理，其余事件从视觉最上层的行开始分发。显式传入的 `Frame` 广播给全部已构建行且不消费；内容不足一屏时滚轮不消费、让给外层滚动容器；行拖拽进行中允许指针越出视口继续跟踪。
 
 ```cangjie
 public func handle(ctx: UiContext, event: UiEvent): Bool
@@ -320,6 +320,8 @@ public func focusableIds(): Array<String>
 ```
 
 **返回值** `Array<String>` — 声明顺序的焦点标识。
+
+桌面宿主的正常帧回调使用独立订阅表，不依赖列表逐行广播 `Frame`。
 
 ## 另请参阅
 

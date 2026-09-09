@@ -3,7 +3,7 @@
  *
  * 编辑器不复制正文，而是用 `notes.project` 把 TextArea 双向绑定到“当前选中笔记的正文”——
  * 读取取选中笔记，写入整表替换该笔记，单一数据源、无需手工同步缓冲区。切换笔记只改 `selected`，
- * 绑定即读到新笔记；编辑器的 id 含笔记 id，故光标与撤销历史按笔记独立、切换时自然重置。
+ * 绑定即读到新笔记；编辑器的 id 含笔记 id，避免不同文档共用光标与撤销历史。
  */
 package cui_notes
 
@@ -34,9 +34,8 @@ class NotesModel {
     }
 
     /*
-     * 按笔记区分的编辑器 id，让 TextArea 的光标与撤销历史按笔记各自保留。
-     * 切换笔记即改变 id，新选中的笔记获得全新的编辑会话，
-     * 不会沿用上一条笔记的光标位置或撤销栈。
+     * 按笔记区分编辑器身份；切换时不沿用上一条笔记的光标与撤销栈。
+     * 卸载的编辑会话由框架回收，本示例不长期缓存每条笔记的编辑历史。
      */
     func editorId(): String {
         if (notes.value.isEmpty()) {
@@ -49,11 +48,13 @@ class NotesModel {
     func addNote(): Unit {
         nextId += 1
         let arr = notes.value
-        notes.value = Array<Note>(arr.size + 1, {i => if (i < arr.size) {
-            arr[i]
-        } else {
-            Note(nextId, "")
-        }})
+        notes.value = Array<Note>(arr.size + 1, {
+            i => if (i < arr.size) {
+                arr[i]
+            } else {
+                Note(nextId, "")
+            }
+        })
         selected.value = notes.value.size - 1
     }
 

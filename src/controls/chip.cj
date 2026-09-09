@@ -27,7 +27,7 @@ public class Chip <: Widget {
     }
 
     public func measure(ctx: UiContext, _: Size): Size {
-        Size(ctx.renderer.textWidth(text, pointSize: FontSizes.CONTROL) + 2.0 * CHIP_HPAD, CHIP_H)
+        Size(ctx.textWidth(text, pointSize: ctx.textSize(fallback: FontSizes.CONTROL)) + 2.0 * CHIP_HPAD, CHIP_H)
     }
 
     public func layout(_: UiContext, rect: Rect): Unit {
@@ -64,19 +64,20 @@ public class Chip <: Widget {
         } else {
             ctx.theme.text
         }
-        let tw = ctx.renderer.textWidth(text, pointSize: FontSizes.CONTROL)
-        let ty = frame.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
-        ctx.renderer.text(text, frame.centerX() - tw / 2.0, ty, color, pointSize: FontSizes.CONTROL)
+        let tw = ctx.textWidth(text, pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
+        let ty = frame.centerY() - ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.CONTROL)) / 2.0
+        ctx.text(text, frame.centerX() - tw / 2.0, ty, color, pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
     }
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
         claimHoverIfInside(ctx, event, frame, id, CursorShape.Interactive)
         match (event) {
-            case UiEvent.MouseDown(MouseButton.Left, x, y) => if (frame.contains(x, y)) {
-                ctx.focus(id)
-                toggle()
-                return true
-            }
+            case UiEvent.MouseDown(MouseButton.Left, x, y) =>
+                if (frame.contains(x, y)) {
+                    ctx.focus(id)
+                    toggle()
+                    return true
+                }
             case UiEvent.KeyDown(Key.Space, _) => return toggleIfFocused(ctx)
             case UiEvent.KeyDown(Key.Enter, _) => return toggleIfFocused(ctx)
             case _ => ()

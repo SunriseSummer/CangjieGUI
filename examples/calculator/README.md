@@ -82,3 +82,9 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot calc.bmp"
 ```
+
+## 练习与验收
+
+增加一个共享鼠标与键盘入口的计算操作，验证错误恢复与显示更新。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

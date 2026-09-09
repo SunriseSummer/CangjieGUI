@@ -23,9 +23,9 @@ main(): Unit {
     let src = TreeNode(
         "src",
         "src",
-        icon: IconName.OpenFolder,
+        icon: IconSource("assets/icons/openfolder.svg"),
         children: [
-            TreeNode("src/app.cj", "app.cj", icon: IconName.NewDocument),
+            TreeNode("src/app.cj", "app.cj", icon: IconSource("assets/icons/newdocument.svg")),
             TreeNode("src/util", "util", children: [TreeNode("src/util/io.cj", "io.cj")])
         ]
     )
@@ -43,7 +43,7 @@ main(): Unit {
 
 | 成员 | 说明 |
 |---|---|
-| [`init(id: String, label: String, children!: Array<TreeNode> = [], icon!: ?IconName = None)`](#init) | 以标识与标签构造节点，子节点与图标可选。 |
+| [`init(id: String, label: String, children!: Array<TreeNode> = [], icon!: ?IconSource = None)`](#init) | 以标识与标签构造节点，子节点与图标可选。 |
 
 **字段**
 
@@ -61,7 +61,7 @@ main(): Unit {
 以标识与标签构造节点，子节点与图标可选。
 
 ```cangjie
-public init(id: String, label: String, children!: Array<TreeNode> = [], icon!: ?IconName = None)
+public init(id: String, label: String, children!: Array<TreeNode> = [], icon!: ?IconSource = None)
 ```
 
 **参数**
@@ -69,7 +69,7 @@ public init(id: String, label: String, children!: Array<TreeNode> = [], icon!: ?
 - `id`: `String` — 全树唯一的稳定标识；文件路径、数据主键都是合适的选择。
 - `label`: `String` — 行内显示的文本。
 - `children!`: `Array<TreeNode>` — 子节点，按数组顺序展示；默认 `[]` 即叶子节点。
-- `icon!`: `?IconName` — 标签前的图标（sdl `IconName`，语义权威：sdl 模块文档）；默认 `None` 不画图标。
+- `icon!`: `?IconSource` — 标签前的图标（cui.media 的用户媒体来源）；默认 `None` 不画图标。
 
 ## 字段
 
@@ -94,7 +94,7 @@ public let label: String
 标签前的可选图标。`None` 时行内容直接从标签开始。
 
 ```cangjie
-public let icon: ?IconName
+public let icon: ?IconSource
 ```
 
 ### children

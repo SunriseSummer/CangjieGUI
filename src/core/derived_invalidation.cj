@@ -97,29 +97,23 @@ func connectInvalidations(
             cancels.add(factory.subscribe(callback))
         }
     } catch (connectFailure: Exception) {
-        match (closeInvalidations(cancels.toArray())) {
-            case Some(closeFailure) => throw IllegalStateException(
-                "Derived invalidation subscription failed (${connectFailure.message}) and rollback also failed (${closeFailure.message})")
-            case None => throw connectFailure
-        }
+        throw rollbackUiFailure(connectFailure, {=> closeInvalidations(cancels.toArray())})
     }
     cancels.toArray()
 }
 
 func closeInvalidations(cancels: Array<() -> Unit>): ?Exception {
-    var firstFailure: ?Exception = None
+    var failures: ?UiFailureCollector = None
     var index = cancels.size - 1
     while (index >= 0) {
         try {
             cancels[index]()
         } catch (error: Exception) {
-            if (firstFailure.isNone()) {
-                firstFailure = Some(error)
-            }
+            failures = appendUiFailure(failures, error)
         }
         index -= 1
     }
-    firstFailure
+    collectedUiFailure(failures)
 }
 
 private func subscribeObservableInvalidation<T>(source: Observable<T>, callback: () -> Unit): () -> Unit {

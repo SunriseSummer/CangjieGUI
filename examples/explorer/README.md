@@ -64,3 +64,9 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot explorer.bmp"
 ```
+
+## 练习与验收
+
+进入深层目录后点击中间路径段，确认路径、列表和选择同步。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

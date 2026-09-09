@@ -14,9 +14,9 @@ public class Overlay
 
 ## 说明
 
-浮层按栈管理：登记顺序即 z 顺序，事件自顶向下走栈、绘制自底向顶落笔，因此对话框内打开的弹出层浮在对话框之上、也先看到事件。控件在其 `draw` 期间调用 [`UiContext`](UiContext.md) 的 [`setOverlay`](UiContext.md#setoverlay) 登记浮层，打开多久就登记多久；宿主在每帧开始时清空浮层栈，控件停止登记（关闭）即移除了自己的浮层。
+浮层按登记顺序叠放，事件从顶层向下派发，绘制从底层向上执行。内建控件在布局阶段调用 [`setOverlay`](UiContext.md#setoverlay)，先登记对话框，再布局并登记其中的弹出面板，因此嵌套面板位于对话框上方。宿主在布局阶段重建登记；干净的保留布局可复用登记片段，无需重新执行整棵树。
 
-`owner` 用于跨帧识别登记者（组件树每帧重建）：同 `owner` 重复登记原位替换、保持 z 位置，关闭中的控件用 [`removeOverlay`](UiContext.md#removeoverlay) 精确移除自己的登记。`owner` 为空串的浮层无法被替换或单独移除，只随每帧清空一起消失。
+`owner` 用于跨构建识别登记者：同 `owner` 重复登记会原位替换并保持叠放位置，关闭中的控件用 [`removeOverlay`](UiContext.md#removeoverlay) 精确移除自己的登记。空 `owner` 只能追加，不能据此替换或单独移除；自定义交互浮层应提供稳定的非空标识。
 
 与之对照，提示（[`Tooltip`](Tooltip.md)）是更简单的只绘制浮层，不参与事件派发。
 
@@ -63,7 +63,7 @@ public init(handleEvent!: (UiContext, UiEvent) -> Bool, render!: (UiContext) -> 
 **参数**
 
 - `handleEvent!`: `(UiContext, UiEvent) -> Bool` — 浮层收到事件时调用，返回是否消费。返回 `false` 让事件落往下一层浮层，全部浮层都未消费时才轮到组件树；模态对话框对一切返回 `true`，事件因此永远不会穿透到背后的树。
-- `render!`: `(UiContext) -> Unit` — 每帧在树绘制之后调用，绘制浮层内容；绘制期间登记的新浮层会在同一帧内画在其上。
+- `render!`: `(UiContext) -> Unit` — 需要绘制时，在主树之后调用，绘制浮层内容。应把交互登记放在布局阶段，使输入与画面使用同一组浮层。
 - `owner!`: `String` — 跨帧识别登记者的标识；默认空串（不可替换、不可单独移除）。
 
 ## 另请参阅

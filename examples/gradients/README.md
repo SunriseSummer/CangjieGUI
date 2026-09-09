@@ -6,7 +6,7 @@
 ## 演示要点
 
 - `gradientBackground(Gradient, radius)`：两色线性渐变圆角填充；`Gradient(start, end, vertical)` 选方向，`reversed()` 反转
-- 渐变复用与实填相同的缓存网格、逐顶点着色，不额外增加三角剖分，故与实填同等廉价（零性能负担、零对既有实填的影响）
+- 渐变复用与实填相同的缓存网格、逐顶点着色，不额外增加三角剖分，故与实填同等廉价；实际成本仍取决于图形数量与后端
 - 大预览随 Stepper（换预设）与 Switch（换方向）实时更新；样本墙固定展示 6 组现代渐变预设
 - 预设解析、渐变合成、方向标签都是纯函数，便于单测
 
@@ -49,3 +49,9 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot gradients.bmp"
 ```
+
+## 练习与验收
+
+反转颜色或方向，确认布局尺寸保持。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

@@ -20,7 +20,7 @@ DAMAGE_INCREMENTAL = FIXTURE_OUTPUT / "retained-damage.bmp"
 DAMAGE_FULL = FIXTURE_OUTPUT / "retained-full.bmp"
 DAMAGE_SOURCE_INCREMENTAL = FIXTURE / "retained-damage.bmp"
 DAMAGE_SOURCE_FULL = FIXTURE / "retained-full.bmp"
-SCENARIOS = ("retained-damage", "automatic-partial", "automatic-fallback", "lifecycle")
+SCENARIOS = ("retained-damage", "automatic-partial", "automatic-fallback", "lifecycle", "font-layout", "text-editing", "editor-style", "editor-quality", "emoji-paste", "emoji-alignment", "startup", "commercial", "scrolling", "failure-recovery", "numeric-recovery", "rich-text-breaks", "image-static")
 
 
 def run_stage(command, timeout):
@@ -121,7 +121,7 @@ def main(argv=None):
             })
             if args.repeat > 1:
                 print(f"[{'OK' if run_ok else 'FAIL'}] desktop-lifecycle run {index + 1}/{args.repeat} "
-                      f"{run_seconds:7.2f}s")
+                      f"{run_seconds:7.2f}s", flush=True)
             if not run_ok:
                 break
     if not runs:

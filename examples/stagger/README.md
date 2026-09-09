@@ -69,3 +69,9 @@ cjpm run --run-args "--snapshot stagger.bmp"
 
 首帧即静止（默认已入场），故快照稳定；要拍到瀑布中段，可临时把初始 `shown` 设为 false、用 `FrameHandler`
 在首帧翻转，并调长时长/步进让快照帧落在中途。
+
+## 练习与验收
+
+更换步进档位再重播，确认每行延迟和整组耗时一致。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

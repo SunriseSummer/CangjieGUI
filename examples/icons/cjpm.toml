@@ -1,0 +1,14 @@
+[package]
+  cjc-version = "1.0.5"
+  name = "cui_icons"
+  description = "Application-owned icon artwork: optical sizes, density variants, templates and accessible controls."
+  version = "1.0.0"
+  target-dir = ""
+  output-type = "executable"
+  compile-option = "-O2"
+  override-compile-option = ""
+  link-option = ""
+  package-configuration = {}
+
+[dependencies]
+cui = { path = "../.." }

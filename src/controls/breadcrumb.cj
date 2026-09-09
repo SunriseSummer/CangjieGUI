@@ -81,9 +81,10 @@ public class Breadcrumb <: Widget {
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
         match (event) {
-            case UiEvent.MouseMove(x, y) => if (clickableIndexAt(x, y) >= 0) {
-                ctx.claimHover(id, CursorShape.Interactive)
-            }
+            case UiEvent.MouseMove(x, y) =>
+                if (clickableIndexAt(x, y) >= 0) {
+                    ctx.claimHover(id, CursorShape.Interactive)
+                }
             case UiEvent.MouseDown(MouseButton.Left, x, y) =>
                 let hit = clickableIndexAt(x, y)
                 if (hit >= 0) {
@@ -131,8 +132,8 @@ public class Breadcrumb <: Widget {
     }
 
     private func drawCrumbText(ctx: UiContext, r: Rect, text: String, color: Color): Unit {
-        let ty = r.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
-        ctx.renderer.text(text, r.x + BC_HPAD, ty, color, pointSize: FontSizes.CONTROL)
+        let ty = r.centerY() - ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.CONTROL)) / 2.0
+        ctx.text(text, r.x + BC_HPAD, ty, color, pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
     }
 
     private func drawSeparator(ctx: UiContext, box: Rect): Unit {
@@ -149,7 +150,7 @@ public class Breadcrumb <: Widget {
         } else {
             segments[idx]
         }
-        ctx.renderer.textWidth(label, pointSize: FontSizes.CONTROL) + 2.0 * BC_HPAD
+        ctx.textWidth(label, pointSize: ctx.textSize(fallback: FontSizes.CONTROL)) + 2.0 * BC_HPAD
     }
 }
 

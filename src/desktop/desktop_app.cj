@@ -1,10 +1,10 @@
 package cui.desktop
 
 import std.collection.ArrayList
-import std.collection.concurrent.ConcurrentLinkedQueue
 import std.env.getCommandLine
 import std.sync.Mutex
-import sdl.{FrameInfo, Key, MouseButton, Rect, RenderPass, SdlWindow, UiEvent, UiEventRecord, WindowSpec, SdlException}
+import sdl.{Fonts, FrameInfo, Key, MouseButton, Rect, RenderPass, SdlWindow, UiEvent, UiEventRecord, WindowSpec,
+    SdlException}
 import sdl.input.{Cursor, SystemCursor}
 import sdl.dialogs.FileDialogOptions
 import sdl.dialogs.FileDialogRequest
@@ -14,7 +14,7 @@ import sdl.system.ApplicationMetadata
 import sdl.system.SdlHintSetting
 import sdl.system.SdlHints
 import cui.core.{AccessibilityAdapter, CursorShape, FrameSchedule, FrameScheduler, RetainedFrameDamage,
-    RetainedGraphDiagnostics, StateStore, Theme, UiContext, Widget, broadcastEvent, buildRoot,
+    RetainedGraphDiagnostics, StateStore, Theme, UiContext, UiFailureCollector, Widget, broadcastEvent, buildRoot,
     collectRootLayoutStateReads, collectRootPaintStateReads, commitSemanticsForStore, dispatchEventRecord,
     dispatchFrameSubscribers, drawTooltip, frameSubscriberCount, retainedGraphDiagnostics, takeRetainedFrameDamage,
     enableAutomaticComposition, useFullRetainedExecution, useIncrementalRetainedExecution, withFrameScheduler}
@@ -83,7 +83,8 @@ public class DesktopApp {
     private let resources = ArrayList<Resource>()
     private let stateStore = StateStore()
     private let scheduler = FrameScheduler()
-    private let postedActions = ConcurrentLinkedQueue<() -> Unit>()
+    private let postedActions: DesktopPostQueue
+    private let closeCoordinator = CloseCoordinator()
     private let lifecycleLock = Mutex()
     private var lifecycle = DesktopAppLifecycle.Ready
     private let waitedEvents = ArrayList<UiEventRecord>()
@@ -108,8 +109,10 @@ public class DesktopApp {
         frameDelay!: UInt32 = UInt32(16),
         fontScale!: Float32 = 1.0,
         metadata!: ?AppMetadata = None,
-        hints!: Array<SdlHintSetting> = []
+        hints!: Array<SdlHintSetting> = [],
+        maxPendingPosts!: Int64 = 4096
     ) {
+        this.postedActions = DesktopPostQueue(maxPendingPosts)
         this.window = configuredWindow(spec, metadata, hints)
         this.ctx = UiContext(window.renderer, theme)
         this.accessibility = DesktopAccessibilityHub(window)
@@ -118,6 +121,7 @@ public class DesktopApp {
         this.frameDelay = frameDelay
         this.vsync = spec.vsync
         this.snapshotPath = snapshotArgument()
+        scheduler.assertOwnerThread()
         enableAutomaticComposition(stateStore)
         let forceFullRetained = fullRetainedExecutionEnabled()
         if (forceFullRetained) {
@@ -214,18 +218,31 @@ public class DesktopApp {
     }
 
     /**
-     * Queues an action from any thread for execution on the UI thread. Returns false after shutdown
-     * or when SDL rejects the wake event; while running, bounded event waits still drain queued work.
+     * Queues an action from any thread. False means it was not queued (capacity reached or stopped).
+     * A wake failure does not revoke admission: bounded event waits still drain accepted work.
      */
     public func post(action: () -> Unit): Bool {
-        var accepted = false
-        synchronized(lifecycleLock) {
-            match (lifecycle) {
-                case DesktopAppLifecycle.Stopped => ()
-                case _ => accepted = postedActions.add(action)
-            }
+        let (accepted, needsWake) = postedActions.add(action)
+        if (needsWake && !window.wake()) {
+            postedActions.noteWakeFailure()
         }
-        accepted && window.wake()
+        accepted
+    }
+
+    /** Thread-safe queue diagnostics, including capacity refusals and native wake failures. */
+    public func postStats(): DesktopPostStats {
+        postedActions.stats()
+    }
+
+    /** Installs a UI-thread asynchronous close confirmation; None restores immediate acceptance. */
+    public func setCloseRequestHandler(handler: ?(CloseRequest) -> Unit): Unit {
+        ensureUiAccess("set the close request handler")
+        closeCoordinator.setHandler(handler)
+    }
+
+    /** Requests normal closing through the installed confirmation handler. */
+    public func requestClose(): Unit {
+        closeCoordinator.request({=> ensureUiAccess("resolve a close request")}, {=> ctx.requestClose()})
     }
 
     /** Drops all local values created by `rememberState` before the next rebuild. */
@@ -265,26 +282,19 @@ public class DesktopApp {
      */
     public func run(body: () -> Unit): Unit {
         beginRun()
-        // The finally block keeps shutdown deterministic even when a widget throws out of
-        // the frame loop: managed resources close in reverse order, then the window.
+        let failures = UiFailureCollector()
         try {
-            withFrameScheduler(scheduler, {=> runLoop(body)})
+            failures.run({=> withFrameScheduler(scheduler, {=> runLoop(body)})})
         } finally {
-            markStoppedAndDiscardPosts()
-            try {
-                closeManagedResources()
-            } finally {
-                try {
-                    accessibility.close()
-                } finally {
-                    try {
-                        stateStore.clear()
-                    } finally {
-                        window.close()
-                    }
-                }
-            }
+            // Every stage runs even after another stage fails. A fatal Error still propagates;
+            // recoverable Exceptions are reported together after ownership has been released.
+            failures.run({=> markStoppedAndDiscardPosts()})
+            failures.run({=> closeManagedResources()})
+            failures.run({=> accessibility.close()})
+            failures.run({=> stateStore.clear()})
+            failures.run({=> window.close()})
         }
+        failures.raiseIfAny()
     }
 
     private func runLoop(body: () -> Unit): Unit { // cjcheck-ignore: long-function # one visible frame transaction; helpers own waiting and stabilization details
@@ -298,6 +308,8 @@ public class DesktopApp {
         var schedule = FrameSchedule(immediate: true, deadlineMs: None)
         var renderedWidth: Int32 = -1
         var renderedHeight: Int32 = -1
+        var lastStable: ?StableLayout = None
+        var renderedFontRevision = Fonts.revision()
         while (!ctx.shouldClose) {
             let frame = nextFrame(previousTick)
             previousTick = frame.elapsedMs
@@ -317,11 +329,26 @@ public class DesktopApp {
             let stateGen = scheduler.generation
             let forced = snapshotPath.isSome() || profiler.isSome()
             let timerTriggered = schedule.isDue(frame.elapsedMs)
-            let stateTriggered = stateGen != lastRenderedGen
+            let stateTriggered = stateGen != lastRenderedGen || renderedFontRevision != Fonts.revision()
             let resized = viewportW != renderedWidth || viewportH != renderedHeight
             let mustRender = timerTriggered || !events.isEmpty() || stateTriggered || resized || forced
 
-            if (mustRender) {
+            var caretRendered = false
+            if (mustRender && canRepaintCaret(schedule, frame.elapsedMs,
+                !stateTriggered && events.isEmpty() && !resized && !forced)) {
+                if (let Some(previous) <- lastStable) {
+                    if (let Some(region) <- schedule.caretRegion()) {
+                        frames += 1
+                        let _ = draw(previous.widget, RetainedFrameDamage.Region(region), caretOnly: true) // cjcheck-ignore: ignore-result # phase timings are consumed only by the profiler, which excludes this idle fast path
+                        schedule = ctx.takeFrameSchedule()
+                        caretRendered = true
+                    }
+                }
+            }
+
+            if (mustRender && !caretRendered) {
+                // Measure and route input on the same raster grid as the upcoming render pass.
+                ctx.renderer.prepareTextLayout(Float32(viewportW), Float32(viewportH))
                 match (profiler) {
                     case Some(_) => ctx.renderer.resetTextMeasureCount()
                     case None => ()
@@ -339,6 +366,8 @@ public class DesktopApp {
                 let semanticsNs = frameProfileTimestamp(profiler) - semanticsStart
                 frames += 1
                 lastRenderedGen = stable.generation // writes made during draw intentionally schedule the next frame
+                lastStable = Some(stable)
+                renderedFontRevision = Fonts.revision()
                 let allowPartialDamage = retainedDamageEnabled && stateTriggered && events.isEmpty() && !timerTriggered &&
                     !resized && snapshotPath.isNone() && frameSubscriberCount(stateStore) == 0 && !ctx.hasOverlay() &&
                     ctx.hoverId.isEmpty() && ctx.focusId.isEmpty() && ctx.dragId.isEmpty() && ctx.pressedId.isEmpty()
@@ -364,6 +393,15 @@ public class DesktopApp {
             }
             waitForWork(schedule, frame.elapsedMs, scheduler.generation != lastRenderedGen)
         }
+    }
+
+    private func canRepaintCaret(schedule: FrameSchedule, now: UInt64, quiet: Bool): Bool {
+        // Same stable tree and document, no input/state/other timers, callbacks or overlays.
+        // Persistent-target support is checked by draw(); unsupported backends repaint normally.
+        retainedDamageEnabled && quiet && schedule.isCaretOnlyDue(now) && !ctx.hasSceneFrameRequest() &&
+            ctx.textWindowActive() && frameSubscriberCount(stateStore) == 0 && !ctx.hasOverlay() && ctx
+            .dragId
+            .isEmpty() && ctx.pressedId.isEmpty()
     }
 
     private func dispatchInputEvent(widget: Widget, record: UiEventRecord): UInt64 {
@@ -426,15 +464,15 @@ public class DesktopApp {
         collectRootLayoutStateReads(stateStore, {
             => widget.layout(ctx, Rect(0.0, 0.0, Float32(viewportW), Float32(viewportH)))
         })
+        ctx.settleModalFocus()
         let layoutEnd = frameProfileTimestamp(profiler)
         LayoutAttempt(widget, layoutStart - buildStart, layoutEnd - layoutStart, startGeneration, scheduler.generation)
     }
 
     private func drainPostedActions(): Unit {
-        var next = postedActions.remove()
-        while (let Some(action) <- next) {
-            action()
-            next = postedActions.remove()
+        // Reentrant producers cannot keep one frame inside this loop indefinitely.
+        if (postedActions.drain(256)) {
+            ctx.requestFrame()
         }
     }
 
@@ -543,8 +581,8 @@ public class DesktopApp {
 
     private func handleWindowEvent(event: UiEvent): Bool {
         match (event) {
-            case UiEvent.Quit => ctx.requestClose()
-            case UiEvent.WindowCloseRequested => ctx.requestClose()
+            case UiEvent.Quit => requestClose()
+            case UiEvent.WindowCloseRequested => requestClose()
             case UiEvent.WindowResized(_, _) =>
                 // The SDL wrapper already refreshed while decoding; query once more so custom
                 // injected events preserve the same authoritative-size contract.
@@ -557,7 +595,10 @@ public class DesktopApp {
             case UiEvent.RenderTargetsReset => scheduler.invalidate()
             case UiEvent.RenderDeviceReset => scheduler.invalidate()
             case UiEvent.RenderDeviceLost => scheduler.invalidate()
-            case UiEvent.WindowFocusLost => ctx.cancelTransientInput()
+            case UiEvent.WindowFocusLost =>
+                ctx.cancelTransientInput();
+                ctx.setTextWindowActive(value: false)
+            case UiEvent.WindowFocusGained => ctx.setTextWindowActive(value: true)
             case _ => return false
         }
         true
@@ -572,25 +613,34 @@ public class DesktopApp {
     // supersample resolve, present) for the profiler. The timestamps are a handful of clock reads —
     // negligible against a frame — so they run unconditionally and only the profiler, when enabled,
     // records them.
-    private func draw(widget: Widget, damage: RetainedFrameDamage): (UInt64, UInt64, UInt64, UInt64) {
+    private func draw(widget: Widget, damage: RetainedFrameDamage, caretOnly!: Bool = false): (UInt64, UInt64, UInt64,
+        UInt64) {
         let t0 = frameProfileTimestamp(profiler)
         let (pass, activeDamage) = beginFramePass(damage)
         // Report the backend decision, not merely the framework's damage plan. A renderer
         // may safely fall back to a full frame when its persistent target is unavailable.
         lastPartialDamage = activeDamage.isSome()
         ctx.setRetainedDamage(activeDamage)
+        ctx.setCaretOnlyPaint(value: caretOnly && activeDamage.isSome())
         let t1 = frameProfileTimestamp(profiler)
         var t2 = t1
         try {
             drawFrameContents(widget)
             t2 = frameProfileTimestamp(profiler)
         } finally {
+            ctx.setCaretOnlyPaint(value: false)
             ctx.setRetainedDamage(None)
             pass.close()
         }
         let t3 = frameProfileTimestamp(profiler)
         maybeSnapshot()
         ctx.renderer.present()
+        if (frames == UInt64(1) && !ctx.shouldClose) {
+            // Window creation, font initialization and first layout happen off screen.
+            // Present before showing so the compositor never sees an unfinished backbuffer.
+            window.show()
+            ctx.requestFrame() // redraw after native show/DPI/expose changes, even on an otherwise idle UI
+        }
         let t4 = frameProfileTimestamp(profiler)
         (t1 - t0, t2 - t1, t3 - t2, t4 - t3)
     }
@@ -602,7 +652,7 @@ public class DesktopApp {
                     .renderer
                     .beginRenderPassDamage(Float32(window.width), Float32(window.height), ctx.theme.bg, rect)
                 (pass, if (pass.damagePreserved) {
-                        Some(rect)
+                        Some(ctx.renderer.currentClip().getOrDefault({=> rect}))
                     } else {
                         None
                     })
@@ -615,7 +665,7 @@ public class DesktopApp {
     private func drawFrameContents(widget: Widget): Unit {
         ctx.clearTooltip()
         ctx.clearTextInputAnchor()
-        collectRootPaintStateReads(stateStore, {=> widget.draw(ctx)})
+        ctx.trackResourceReads {collectRootPaintStateReads(stateStore, {=> widget.draw(ctx)})}
         if (!ctx.hasOverlay()) {
             drawTooltip(ctx, Float32(window.width), Float32(window.height))
         }
@@ -790,6 +840,7 @@ public class DesktopApp {
 
     /* Throws `IllegalStateException` when the public one-run lifecycle contract is violated. */
     private func beginRun(): Unit {
+        ensureUiAccess("run")
         var accepted = false
         synchronized(lifecycleLock) {
             match (lifecycle) {
@@ -824,36 +875,28 @@ public class DesktopApp {
 
     private func markStoppedAndDiscardPosts(): Unit {
         synchronized(lifecycleLock) {
+            postedActions.stop()
             lifecycle = DesktopAppLifecycle.Stopped
         }
-        var pending = postedActions.remove()
-        while (pending.isSome()) {
-            pending = postedActions.remove()
-        }
+        closeCoordinator.stop()
+        ctx.resetModalFocus()
     }
 }
 
 internal func closeResourcesInReverse(resources: ArrayList<Resource>): Unit {
-    var firstFailure: ?Exception = None
-    var i = resources.size - 1
-    while (i >= 0) {
-        try {
-            if (!resources[i].isClosed()) {
-                resources[i].close()
+    let failures = UiFailureCollector()
+    var index = resources.size - 1
+    while (index >= 0) {
+        let resource = resources[index]
+        failures.run({
+            => if (!resource.isClosed()) {
+                resource.close()
             }
-        } catch (e: Exception) {
-            match (firstFailure) {
-                case None => firstFailure = Some(e)
-                case Some(_) => ()
-            }
-        }
-        i -= 1
+        })
+        index -= 1
     }
     resources.clear()
-    match (firstFailure) {
-        case Some(e) => throw e
-        case None => ()
-    }
+    failures.raiseIfAny()
 }
 
 internal func eventWaitTimeout(schedule: FrameSchedule, now: UInt64): Int32 {
@@ -938,5 +981,5 @@ private func configuredWindow(spec: WindowSpec, metadata: ?AppMetadata, hints: A
         case None => ()
     }
     SdlHints.apply(hints)
-    SdlWindow(spec)
+    SdlWindow(spec, hidden: true)
 }

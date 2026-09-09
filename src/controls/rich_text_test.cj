@@ -1,6 +1,8 @@
 package cui.controls
 
-import sdl.{Color, FontStyle, FrameInfo, IconName, Key, MouseButton, Rect, Renderer, Size, UiEvent}
+import cui.media.IconSource
+
+import sdl.{Color, FontStyle, FrameInfo, Key, MouseButton, Rect, Renderer, Size, UiEvent}
 import cui.core.{State, Theme, UiContext}
 
 private func richTextTestContext(): UiContext {
@@ -84,7 +86,7 @@ func richTextWrapsTextAtRuneBoundaries(): Unit {
 @Test
 func richTextFlowsIconsInlineWithText(): Unit {
     // icon(16) then "hi"(20): icon at 0, text after icon+gap at x=19, all on one line.
-    let layout = runLayout([RichSpan.icon(IconName.Save), RichSpan.text("hi")], 100.0, 20.0, 16.0, 3.0,
+    let layout = runLayout([RichSpan.icon(IconSource("assets/icons/save.svg")), RichSpan.text("hi")], 100.0, 20.0, 16.0, 3.0,
         TEN_PX_PER_RUNE)
     @Expect(layout.items.size, 2)
     @Expect(layout.height, Float32(20.0))
@@ -95,7 +97,7 @@ func richTextFlowsIconsInlineWithText(): Unit {
 @Test
 func richTextWrapsAnIconThatOverflowsTheLine(): Unit {
     // "aaaa"(40) fills to x=40; the icon (16) would reach 56 > 50, so it wraps to the next line.
-    let layout = runLayout([RichSpan.text("aaaa"), RichSpan.icon(IconName.Save)], 50.0, 20.0, 16.0, 3.0,
+    let layout = runLayout([RichSpan.text("aaaa"), RichSpan.icon(IconSource("assets/icons/save.svg"))], 50.0, 20.0, 16.0, 3.0,
         TEN_PX_PER_RUNE)
     // Line 1 (text) is 20 tall; line 2 holds only the icon, so it is the icon's own 16 tall — 36 total.
     @Expect(layout.height, Float32(36.0))
@@ -399,7 +401,7 @@ func richTextDrawsHighlightWithoutError(): Unit {
 func richTextWidgetMeasuresAndDrawsWithoutError(): Unit {
     let ctx = richTextTestContext()
     let rich = RichText([
-        RichSpan.icon(IconName.Save),
+        RichSpan.icon(IconSource("assets/icons/save.svg")),
         RichSpan.text(" 已保存 "),
         RichSpan.muted("09:24")
     ])

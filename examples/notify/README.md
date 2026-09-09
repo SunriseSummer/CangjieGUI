@@ -64,3 +64,9 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot notify.bmp"
 ```
+
+## 练习与验收
+
+连续发出多条通知，检查堆叠、停留与退出动画。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

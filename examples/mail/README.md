@@ -38,3 +38,9 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot mail.bmp"
 ```
+
+## 练习与验收
+
+归档当前邮件直至为空，确认选择顺延和未读计数正确。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

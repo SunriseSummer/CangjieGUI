@@ -50,7 +50,7 @@ main(): Unit {
 | 成员 | 说明 |
 |---|---|
 | [`key(value: String)`](#key) | 设置显式的焦点与按下状态标识并返回自身，便于链式声明。 |
-| [`measure(ctx: UiContext, available: Size)`](#measure) | 宽为标签文本宽加 34 逻辑像素（勾选框与间距），高固定 38，宽不超过可用宽。 |
+| [`measure(ctx: UiContext, available: Size)`](#measure) | 宽为标签文本宽加 34 逻辑像素（勾选框与间距），高度为 `max(38, 有效文字行高 + 12)`，宽不超过可用宽。 |
 | [`layout(_: UiContext, rect: Rect)`](#layout) | 记录分配到的框架。 |
 | [`draw(ctx: UiContext)`](#draw) | 画勾选框、按弹簧动画缩放的强调色填充与标签文本；键盘聚焦时画焦点环。 |
 | [`handle(ctx: UiContext, event: UiEvent)`](#handle) | 框内按下并抬起翻转绑定值；聚焦时 Enter/Space 同效。 |
@@ -93,7 +93,7 @@ public func key(value: String): Checkbox
 
 ### measure
 
-宽为标签文本宽加 34 逻辑像素（勾选框与间距），高固定 38，宽不超过可用宽。
+宽为标签文本宽加 34 逻辑像素（勾选框与间距），高度为 `max(38, 有效文字行高 + 12)`，宽不超过可用宽。
 
 ```cangjie
 public func measure(ctx: UiContext, available: Size): Size
@@ -111,7 +111,7 @@ public func measure(ctx: UiContext, available: Size): Size
 记录分配到的框架。
 
 ```cangjie
-public func layout(_: UiContext, rect: Rect): Unit
+public func layout(ctx: UiContext, rect: Rect): Unit
 ```
 
 **参数**

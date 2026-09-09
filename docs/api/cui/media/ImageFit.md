@@ -79,3 +79,11 @@ main(): Unit {
 ## 另请参阅
 
 - [`ImageView`](ImageView.md) — 消费本枚举的图像组件。
+
+### Original
+
+保持解码像素大小，超出部分按 imageAlignment 裁剪，不放大或缩小。
+
+### ScaleDown
+
+在 Original 与 Contain 中选择不放大的显示尺寸，适合小图标和低分辨率素材。

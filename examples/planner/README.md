@@ -31,7 +31,7 @@
 ```cangjie
 Keyed("planner.quick_note") {
     let note = rememberState<String>("text") {"会后确认空状态与键盘路径"}
-    TextField("planner.quick_note.field", note).fillWidth()
+    TextField(note, key: "planner.quick_note.field").fillWidth()
 }
 ```
 
@@ -73,3 +73,19 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot planner.bmp"
 ```
+
+## 滚动边界回归
+
+```powershell
+cjpm test --no-progress --show-all-output
+```
+
+`scroll_render_test.cj` 使用实际页面、原生窗口与 GPU 渲染，模拟导航点击和滚轮到底。矩阵覆盖两个页面、760／1120 vp 宽度、直接／2 倍超采样、小数布局，以及增量／完整模式，共 16 组。测试检查最后一张卡片底线的实际像素、再次滚动到底不改变画面，并要求 8 对增量／完整截图逐字节一致。BMP 保存在本例 `target` 下，日志输出目录。
+
+两页无需添加补偿空白；底边框问题由 CangjieSDL 的小数裁剪修复解决。
+
+## 练习与验收
+
+修改局部状态后切换页面，区分保留的模型状态与卸载后重建的行内状态。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

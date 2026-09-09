@@ -7,7 +7,8 @@
  */
 package cui_explorer
 
-import cui.{CursorShape, FontSizes, IconName, MouseButton, Rect, Size, UiContext, UiEvent, Widget, drawIcon, emit}
+import cui.{CursorShape, FontSizes, IconSource, MouseButton, Rect, Size, UiContext, UiEvent, Widget}
+import cui.{paintIcon, emit}
 
 /** 行高与列几何（逻辑像素），条目行与列头行共用。 */
 let ENTRY_ROW_H: Float32 = 34.0
@@ -64,16 +65,16 @@ class EntryRow <: Widget {
             ctx.renderer.fillRoundedRect(frame, ctx.theme.smallRadius, ctx.theme.fieldActive)
         }
         let icon = if (node.isDir) {
-            IconName.OpenFolder
+            IconSource("assets/icons/folder.svg")
         } else {
-            IconName.NewDocument
+            IconSource("assets/icons/document.svg")
         }
         let iconColor = if (node.isDir) {
             EXPLORER_FOLDER
         } else {
             EXPLORER_MUTED
         }
-        drawIcon(ctx.renderer, icon,
+        paintIcon(ctx, icon,
             Rect(frame.x + ENTRY_PAD_X, frame.centerY() - ENTRY_ICON_SIZE / 2.0, ENTRY_ICON_SIZE, ENTRY_ICON_SIZE),
             iconColor)
         let textY = frame.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
@@ -92,8 +93,9 @@ class EntryRow <: Widget {
             formatSize(node.sizeBytes)
         }
         let sizeW = ctx.renderer.textWidth(sizeText, pointSize: FontSizes.CONTROL)
-        ctx.renderer.text(sizeText, sizeColumnRight(frame) - sizeW, textY, ctx.theme.mutedText,
-            pointSize: FontSizes.CONTROL)
+        ctx
+            .renderer
+            .text(sizeText, sizeColumnRight(frame) - sizeW, textY, ctx.theme.mutedText, pointSize: FontSizes.CONTROL)
     }
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {

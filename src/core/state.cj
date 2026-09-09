@@ -90,8 +90,8 @@ public interface Bindable<T> <: Observable<T> {
  * inside one outer transaction each State reports only its first previous and final committed value.
  * An explicit mutation policy also suppresses the whole transaction when those endpoints are
  * equivalent, so intermediate excursions cannot create a redundant notification or frame.
- * Every active observer is offered a change even if an earlier callback fails; the first failure is
- * rethrown after delivery so framework invalidation listeners cannot be starved by business code.
+ * Every active observer is offered a change even if an earlier callback fails; failures are
+ * reported after delivery so framework invalidation listeners cannot be starved by business code.
  * Scheduler transactions extend that guarantee across State sources and deferred derived observers.
  * A State is thread-confined: after it enters an application, reads, writes, observation changes,
  * and transforms must remain on that UI thread; workers publish results through DesktopApp.post.
@@ -292,15 +292,15 @@ public class State<T> <: Bindable<T> {
         // visible to a nested, later assignment; removals become tombstones until the outer walk
         // finishes, so every active walk keeps stable indices without copying the listener array.
         let limit = listeners.size
-        var firstFailure: ?Exception = None
+        var failures: ?UiFailureCollector = None
         notificationDepth += 1
         try {
             var index: Int64 = 0
             while (index < limit) {
                 let listener = listeners[index]
                 let failure = invokeListener(listener, previous, current)
-                if (firstFailure.isNone()) {
-                    firstFailure = failure
+                if (let Some(error) <- failure) {
+                    failures = appendUiFailure(failures, error)
                 }
                 index += 1
             }
@@ -310,8 +310,8 @@ public class State<T> <: Bindable<T> {
                 compactListeners()
             }
         }
-        match (firstFailure) {
-            case Some(error) => throw error
+        match (failures) {
+            case Some(errors) => errors.raiseIfAny()
             case None => ()
         }
     }

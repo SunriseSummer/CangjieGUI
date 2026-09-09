@@ -7,13 +7,13 @@
  */
 package cui_calculator
 
-import cui.{Button, ButtonRole, Color, FontSizes, HStack, Icon, IconName, Label, LengthUnits, Panel, SegmentedControl,
-    Spacer, SurfaceStyle, TextAlign, VStack}
+import cui.{Button, ButtonRole, Color, FontSizes, HStack, Icon, IconSource, Label, LengthUnits, Panel}
+import cui.{SegmentedControl, Spacer, SurfaceStyle, TextAlign, VStack}
 
 func calculatorView(model: CalcModel): Unit {
     VStack {
         HStack {
-            Icon(IconName.Calculator).foregroundColor(Color.rgb(106, 168, 255))
+            Icon(IconSource("assets/icons/calculator.svg")).foregroundColor(Color.rgb(106, 168, 255))
             Label("计算器").fontSize(FontSizes.TITLE)
             Spacer()
             SegmentedControl(["标准", "科学"], model.mode)

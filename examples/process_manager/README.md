@@ -63,7 +63,7 @@ String.fromUtf8(bytes)   // 非法字节抛异常 → 转成可读的中文提�
 ```cangjie
 this.processRows = this.output.map<Array<Array<String>>>({text => parseProcessRows(text)})
 
-Table("process.table", processColumns(), model.processRows.value, model.selectedRow).flex()
+Table(processColumns(), model.processRows.value, model.selectedRow).flex()
 ```
 
 点击 PID 或“内存 (KB)”列头即可按数值排序（找出占用最高的进程），选中行以原始行索引存储、排序后
@@ -78,7 +78,7 @@ this.refreshAge = derive(this.nowTick, this.refreshedTick,
     {now, done => refreshAgeText(now, done)})
 ```
 
-`FrameInfo.elapsedMs` 是程序启动至今的绝对毫秒，直接除以 1000 显示会随运行时间
+`FrameInfo.elapsedMs` 是 SDL 时钟的绝对毫秒值，直接除以 1000 显示会随运行时间
 无限增大，这是早期版本的一个真实缺陷。
 
 ## 运行
@@ -93,3 +93,9 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot pm.bmp"
 ```
+
+## 练习与验收
+
+在测试中让后台请求失败，确认忙碌状态复位且错误可见。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

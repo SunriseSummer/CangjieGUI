@@ -106,9 +106,9 @@ func boundedResourceCacheRecalculatesBytesAfterSaturatedEntryLeaves(): Unit {
 @Test
 func boundedResourceCacheBoundsCachedFailuresByEntryCount(): Unit {
     let cache = probeCache(2, UInt64(1000))
-    cache.put("missing-a", None, UInt64(140))
-    cache.put("missing-b", None, UInt64(140))
-    cache.put("missing-c", None, UInt64(140))
+    cache.put("missing-a", Option<CacheProbe>.None, UInt64(140))
+    cache.put("missing-b", Option<CacheProbe>.None, UInt64(140))
+    cache.put("missing-c", Option<CacheProbe>.None, UInt64(140))
 
     @Expect(cache.lookup("missing-a").isNone())
     let retainedFailure = cache.lookup("missing-c")
@@ -116,4 +116,40 @@ func boundedResourceCacheBoundsCachedFailuresByEntryCount(): Unit {
     @Expect(retainedFailure.getOrThrow().cached.isNone()) // lookup above proves the entry exists
     @Expect(cache.size(), Int64(2))
     @Expect(cache.evictionCount(), UInt64(1))
+}
+
+@Test
+func boundedResourceCacheNeverEvictsTheNewAdmissionAfterSecondChances(): Unit {
+    let cache = probeCache(2, UInt64(100))
+    let first = CacheProbe()
+    let second = CacheProbe()
+    let admitted = CacheProbe()
+    cache.put("first", Some(first), UInt64(40))
+    let firstEntry = cache.lookup("first").getOrThrow()
+    cache.put("second", Some(second), UInt64(40))
+    let secondEntry = cache.lookup("second").getOrThrow()
+    firstEntry.recentlyUsed = true
+    secondEntry.recentlyUsed = true
+    cache.put("admitted", Some(admitted), UInt64(40))
+    @Expect(cache.lookup("admitted").isSome())
+    @Expect(!admitted.closed)
+    @Expect(cache.size(), Int64(2))
+    @Expect(cache.evictionCount(), UInt64(1))
+    @Expect(first.closed != second.closed)
+    cache.clear()
+}
+
+@Test
+func boundedResourceCacheClearDetachesExternallyRetainedEntries(): Unit {
+    let cache = probeCache(3, UInt64(100))
+    cache.put("first", Some(CacheProbe()), UInt64(20))
+    cache.put("middle", Some(CacheProbe()), UInt64(20))
+    let retained = cache.lookup("middle").getOrThrow()
+    cache.put("last", Some(CacheProbe()), UInt64(20))
+    @Expect(retained.previous.isSome())
+    @Expect(retained.next.isSome())
+    cache.clear()
+    @Expect(!retained.active)
+    @Expect(retained.previous.isNone())
+    @Expect(retained.next.isNone())
 }

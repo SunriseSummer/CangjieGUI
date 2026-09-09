@@ -202,23 +202,13 @@ protected func buildRoot(body: () -> Unit, stateStore: StateStore): Widget {
         let root = try {
             buildAutomaticRootChild(body, stateStore)
         } catch (error: Exception) {
-            let rollbackFailure = stateStore.cancelBuild()
-            match (rollbackFailure) {
-                case Some(cleanup) => throw IllegalStateException(
-                    "UI build failed (${error.message}) and effect rollback cleanup also failed (${cleanup.message})")
-                case None => throw error
-            }
+            throw rollbackUiFailure(error, {=> stateStore.cancelBuild()})
         }
         stateStore.finishBuildBody()
         let cleanupFailure = try {
             stateStore.finishBuild()
         } catch (error: Exception) {
-            let rollbackFailure = stateStore.cancelBuild()
-            match (rollbackFailure) {
-                case Some(cleanup) => throw IllegalStateException(
-                    "UI commit failed (${error.message}) and effect rollback cleanup also failed (${cleanup.message})")
-                case None => throw error
-            }
+            throw rollbackUiFailure(error, {=> stateStore.cancelBuild()})
         }
         match (cleanupFailure) {
             case Some(error) => throw error

@@ -9,8 +9,8 @@
  */
 package cui_explorer
 
-import cui.{Breadcrumb, CrossAxisAlignment, Divider, FontSizes, HStack, IconButton, IconName, Label, LengthUnits,
-    Panel, ScrollView, Spacer, VStack}
+import cui.{Breadcrumb, CrossAxisAlignment, Divider, FontSizes, HStack, IconButton, IconSource, Label}
+import cui.{LengthUnits, Panel, ScrollView, Spacer, VStack}
 
 func explorerView(model: ExplorerModel): Unit {
     VStack {
@@ -37,7 +37,8 @@ func header(): Unit {
 func toolbar(model: ExplorerModel): Unit {
     Panel {
         HStack {
-            IconButton(IconName.ChevronLeft, label: "上级", onClick: {=> model.goUp()}).enabled(model.canGoUp())
+            IconButton(IconSource("assets/icons/chevron-left.svg"), label: "上级", onClick: {=> model.goUp()}).enabled(
+                model.canGoUp())
             Breadcrumb(model.segments(), onSelect: {i => model.navigateTo(i)}, maxItems: 4)
             Spacer()
         }.spacing(10.vp).crossAxisAlignment(CrossAxisAlignment.Center)
@@ -73,10 +74,12 @@ private func activate(model: ExplorerModel, entry: FsNode): Unit {
 func statusBar(model: ExplorerModel): Unit {
     HStack {
         Label("${model.entries().size} 个项目（${model.folderCount()} 个文件夹、${model.fileCount()} 个文件）")
-            .muted().fontSize(FontSizes.CAPTION)
+            .muted()
+            .fontSize(FontSizes.CAPTION)
         Spacer()
         match (model.selectedFile()) {
-            case Some(file) => Label("已选择：${file.name}（${formatSize(file.sizeBytes)}）").muted()
+            case Some(file) => Label("已选择：${file.name}（${formatSize(file.sizeBytes)}）")
+                .muted()
                 .fontSize(FontSizes.CAPTION)
             case None => ()
         }

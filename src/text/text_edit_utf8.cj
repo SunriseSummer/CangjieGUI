@@ -1,5 +1,7 @@
 package cui.text
 
+import std.unicode.UnicodeRuneExtension
+
 private let UTF8_CONTINUATION_LOW: UInt8 = UInt8(128)
 private let UTF8_CONTINUATION_HIGH: UInt8 = UInt8(192)
 private let NEWLINE_BYTE: UInt8 = UInt8(10)
@@ -9,13 +11,24 @@ private let SPACE_BYTE: UInt8 = UInt8(32)
 private let UNDERSCORE_BYTE: UInt8 = UInt8(95)
 
 // Character class of the rune beginning at `index`, used to grow a double-click selection:
-// 0 word (ASCII alphanumeric, underscore, or any non-ASCII rune such as CJK), 1 whitespace,
-// 2 other (ASCII punctuation and symbols). Reading the leading byte is enough — a multi-byte
-// rune is always a non-ASCII "word" character here, and ASCII bytes classify directly.
+// 0 letters/numbers/underscore, 1 whitespace, 2 punctuation/symbols. This is a
+// word-run editing convention, not dictionary-based segmentation for CJK or Thai.
+// Decode only one rune so scanning a long Unicode word never copies growing suffixes.
 internal func charClassAt(text: String, index: Int64): Int64 {
     let byte = text[index]
     if (byte >= UTF8_CONTINUATION_LOW) {
-        return 0
+        let rune = match (text[index..nextTextBoundary(text, index)].runes().next()) {
+            case Some(value) => value
+            case None => throw IllegalStateException("Non-empty UTF-8 character has no rune")
+        }
+        if (rune.isWhiteSpace()) {
+            return 1
+        }
+        return if (rune.isLetter() || rune.isNumber()) {
+            0
+        } else {
+            2
+        }
     }
     if (isAsciiWordByte(byte)) {
         return 0
@@ -29,8 +42,9 @@ internal func charClassAt(text: String, index: Int64): Int64 {
 private func isAsciiWordByte(byte: UInt8): Bool {
     (byte >= UInt8(48) && byte <= UInt8(57)) || // 0-9
         (byte >= UInt8(65) && byte <= UInt8(90)) || // A-Z
-        (byte >= UInt8(97) && byte <= UInt8(122)) || // a-z
-        byte == UNDERSCORE_BYTE
+        (byte >= UInt8(97) &&
+        byte <= UInt8(122)) || // a-z
+            byte == UNDERSCORE_BYTE
 }
 
 internal func normalizedTextCursor(text: String, cursor: Int64): Int64 {
@@ -39,6 +53,9 @@ internal func normalizedTextCursor(text: String, cursor: Int64): Int64 {
         if (!isUtf8Continuation(text[current])) {
             break
         }
+        current -= 1
+    }
+    if (current > 0 && current < text.size && text[current] == NEWLINE_BYTE && text[current - 1] == CR_BYTE) {
         current -= 1
     }
     current
@@ -56,6 +73,9 @@ internal func previousTextBoundary(text: String, cursor: Int64): Int64 {
         }
         current -= 1
     }
+    if (current > 0 && text[current] == NEWLINE_BYTE && text[current - 1] == CR_BYTE) {
+        current -= 1
+    }
     current
 }
 
@@ -63,6 +83,9 @@ internal func nextTextBoundary(text: String, cursor: Int64): Int64 {
     var current = normalizedTextCursor(text, cursor)
     if (current >= text.size) {
         return text.size
+    }
+    if (text[current] == CR_BYTE && current + 1 < text.size && text[current + 1] == NEWLINE_BYTE) {
+        return current + 2
     }
     current += 1
     while (current < text.size) {
@@ -78,7 +101,7 @@ internal func lineStartBeforeOrAt(text: String, cursor: Int64): Int64 {
     var current = normalizedTextCursor(text, cursor)
     while (current > 0) {
         let previous = previousTextBoundary(text, current)
-        if (text[previous] == NEWLINE_BYTE) {
+        if (text[previous] == NEWLINE_BYTE || text[previous] == CR_BYTE) {
             return current
         }
         current = previous
@@ -88,51 +111,7 @@ internal func lineStartBeforeOrAt(text: String, cursor: Int64): Int64 {
 
 internal func lineEndAfterOrAt(text: String, cursor: Int64): Int64 {
     var current = normalizedTextCursor(text, cursor)
-    while (current < text.size && text[current] != NEWLINE_BYTE) {
-        current = nextTextBoundary(text, current)
-    }
-    current
-}
-
-internal func textCursorLineIndex(text: String, cursor: Int64): Int64 {
-    let target = normalizedTextCursor(text, cursor)
-    var line: Int64 = 0
-    var current: Int64 = 0
-    while (current < target) {
-        if (text[current] == NEWLINE_BYTE) {
-            line += 1
-        }
-        current = nextTextBoundary(text, current)
-    }
-    line
-}
-
-internal func advanceTextCursorByBytes(
-    text: String,
-    start: Int64,
-    columnBytes: Int64,
-    limit: Int64
-): Int64 {
-    let target = start + max(Int64(0), columnBytes)
-    var current = normalizedTextCursor(text, start)
-    let end = normalizedTextCursor(text, limit)
-    while (current < end && current < target) {
-        let next = nextTextBoundary(text, current)
-        if (next > target) {
-            return current
-        }
-        current = next
-    }
-    current
-}
-
-internal func startOfTextLine(text: String, lineIndex: Int64): Int64 {
-    var line: Int64 = 0
-    var current: Int64 = 0
-    while (line < lineIndex && current < text.size) {
-        if (text[current] == NEWLINE_BYTE) {
-            line += 1
-        }
+    while (current < text.size && text[current] != NEWLINE_BYTE && text[current] != CR_BYTE) {
         current = nextTextBoundary(text, current)
     }
     current

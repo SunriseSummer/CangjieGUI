@@ -73,3 +73,9 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot palette.bmp"
 ```
+
+## 练习与验收
+
+增加一条带英文别名的命令，验证中文、别名、方向键和回车路径。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

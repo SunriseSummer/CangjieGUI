@@ -57,3 +57,9 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot highlight.bmp"
 ```
+
+## 练习与验收
+
+加入中文、ASCII 大小写和组合字符，说明匹配采用码点而非语言分词。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

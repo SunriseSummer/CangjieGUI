@@ -708,6 +708,15 @@ func semantics(properties: Semantics, key!: String): Widget
 
 **返回值** `Widget` — 包装后的新节点，供继续链式调用。
 
+## 数值字重与变量轴
+
+独立设置时保留其它继承样式。
+
+```cangjie
+func fontWeight(value: FontWeight): Widget
+func fontVariations(value: FontVariations): Widget
+```
+
 ## 另请参阅
 
 - [emit](functions.md#emit) — 构造函数登记子组件的声明收集机制。
@@ -715,3 +724,11 @@ func semantics(properties: Semantics, key!: String): Widget
 - [EventListener](EventListener.md) — `onEvent` 使用的分相事件传播包装。
 - [State](State.md) — 跨帧存活的状态容器。
 - [Flexible](Flexible.md) — 弹性协议的包装容器。
+
+### textStyle
+
+```cangjie
+func textStyle(value: TextStyle): Widget
+```
+
+为整个子树设置继承字体、字号和样式，覆盖所有控件阶段及其浮层回调。嵌套样式只覆盖已设置字段，控件/富文本片段的显式设置优先。

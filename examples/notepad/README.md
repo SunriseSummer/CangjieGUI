@@ -1,78 +1,72 @@
 # notepad：记事本
 
-一个中文记事本，演示桌面应用的完整外围能力：异步文件对话框、应用内确认条、剪贴板、
-文件拖放、快捷键，以及由文本状态派生的统计栏。
+青绿主题的文件编辑示例。页头提供主要动作“保存文件”，纸面内部使用紧凑文件工具栏，
+正文和编辑命令分区；文件名、修改状态与字节统计随文档更新。实际读写 UTF-8 文件。
 
 ## 演示要点
 
-- 文件对话框的“发起请求、帧内轮询”异步模式，事件循环永不阻塞
-- “新建”确认为何不用系统弹窗，而是状态驱动的应用内确认条
-- `map` 派生文档统计（“| N 行 | M 字节 | UTF-8”），状态栏与内容始终同步
-- 长路径在状态栏中用 `Flexible` 与自动省略号安全展示
-- `EventHandler` 从 `UiContext.eventModifiers()` 读取事件时刻快照并分发文件级 Ctrl/Cmd 快捷键；
-  `Ctrl+A/C/X/V` 下放给聚焦的 `TextArea`，由框架内建的多行选区
-  剪贴板处理（选区复制与剪切、光标处粘贴、全选），工具栏“复制”按钮则显式复制全文
-- `Ctrl+Z` 撤销、`Ctrl+Y`/`Ctrl+Shift+Z` 重做：由 `TextArea` 内建的时间合并撤销历史提供，
-  连续键入整组回退，无需应用维护任何编辑历史
-- 工具栏图标按钮用 `Tooltip` 包裹：悬停停留后显示动作说明与快捷键（如“保存 · Ctrl+S”）
+- `TextArea` 负责选区、光标、输入法、剪贴板与撤销；工具栏粘贴调用同一个编辑器的 `paste()`。
+- “复制全文”明确复制整个缓冲区；键盘复制／剪切只处理当前选区。
+- `dirty` 从正文与最近成功保存／载入的副本派生。修改后再撤回原文，状态自动恢复干净。
+- 有未保存修改时，新建先展示应用内确认条；干净文档可直接新建。
+- 对话框只在请求未结束时注册帧订阅，并约每 50 ms 请求一次检查；空闲时无对话框轮询。
+- 文件名从路径提取，完整路径由 `Tooltip` 展示；状态文案用 `Flexible`，避免挤压统计。
 
 ## 文件结构
 
 | 文件 | 职责 |
 |---|---|
-| [main.cj](src/main.cj) | 入口 |
-| [model.cj](src/model.cj) | `NotepadModel`：缓冲区、路径、只读开关、确认条开关、派生统计 |
-| [views.cj](src/views.cj) | 工具栏、确认条、编辑区、状态栏 |
-| [dialogs.cj](src/dialogs.cj) | 打开/保存对话框的发起与逐帧轮询 |
-| [file_actions.cj](src/file_actions.cj) | 新建/保存/加载与拖放落盘 |
-| [clipboard_actions.cj](src/clipboard_actions.cj) | 复制/粘贴 |
-| [shortcuts.cj](src/shortcuts.cj) | 文件级快捷键（Ctrl+N/O/S）；Ctrl+A/C/X/V 交由编辑区自身选区剪贴板处理 |
-| [theme.cj](src/theme.cj) | 主题、元数据、SDL 提示与确认条警示表面 |
+| [main.cj](src/main.cj) | 桌面窗口、偏好目录与运行入口 |
+| [model.cj](src/model.cj) | 正文、选区、文件路径、修改状态与派生统计 |
+| [views.cj](src/views.cj) | 页头、工具栏、确认条、纸面与状态栏 |
+| [dialogs.cj](src/dialogs.cj) | 异步对话框请求、按需订阅与结果处理 |
+| [file_actions.cj](src/file_actions.cj) | 新建、保存、载入与拖放文件处理 |
+| [clipboard_actions.cj](src/clipboard_actions.cj) | 显式复制全文 |
+| [shortcuts.cj](src/shortcuts.cj) | 文件级快捷键；编辑快捷键交给 TextArea |
+| [theme.cj](src/theme.cj) | 主题、表面、应用元数据与 SDL 提示 |
 
 ## 关键实现
 
-### 应用内确认条（不阻塞事件循环）
-
-系统 `showMessageBox` 是同步调用，弹出期间整个窗口停止刷新，与本应用“对话框帧内轮询”
-的并发模型冲突。“新建”改为置起一个状态，由视图渲染警示条完成交互：
+### 编辑命令保留历史
 
 ```cangjie
-func newFile(model: NotepadModel): Unit {
-    if (model.body.value.isEmpty()) { ... 直接新建 ... }
-    model.confirmingNew.value = true      // 只是亮出确认条
-}
+let editor = TextArea(model.body, key: "notepad-document",
+    cursor: model.bodyCursor, anchor: model.bodyAnchor, editable: !model.readOnly.value)
+Button("粘贴", {=> editor.paste(); ()}).enabled(!model.readOnly.value)
 ```
 
-视图中 `if (model.confirmingNew.value)` 渲染一条警示 Panel，“丢弃并新建”（Danger 角色）
-与“取消”分别调用 `confirmDiscardAndNew` 与 `cancelNewFile`。
+粘贴使用当前选区，可通过 Ctrl+Z 撤销。外部加载或新建属于文档替换，需同步设置光标、锚点与滚动位置；
+不要用手工拼接字符串实现工具栏粘贴，否则会绕过编辑命令与历史。
 
-### 异步文件对话框
+### 按需处理对话框
 
-`app.openFileDialog()` 返回 `FileDialogRequest`；`dialogs.cj` 把未完成的请求存入模型，
-每帧轮询 `isDone()`，完成后读取结果并清除，期间界面完全可交互。
+`subscribeNotepadDialogs(model)` 在同一构建作用域内检查请求状态。只有存在请求时才调用
+`subscribeFrame`，通过 `FileDialogRequest.result()` 处理待完成、取消、失败与选中文件。
+结果处理后清除请求，下一次构建移除订阅。文档控件不放进条件创建的 `FrameHandler`，
+因此打开对话框不会改变正文子树身份。
 
-### 派生统计栏
+### 保存状态与失败路径
 
-```cangjie
-this.stats = this.body.map<String>({text => ... 行数与字节数 ...})
-```
+写入成功后才更新路径并调用 `markSaved()`，同时收起已失效的新建确认；写入／读取失败保留正文、旧路径和修改标记。
+首次保存使用应用偏好目录中的默认路径，“另存为”允许选择位置。只读约束限制正文编辑，
+不阻止应用载入或切换文档。本例的新建确认不等同于完整的多文档防丢失流程；
+系统关闭确认的教学示例见 [editor](../editor/README.md)。
 
-编辑任何字符，状态栏的“| N 行 | M 字节 | UTF-8”随下一帧自动更新，无需手工同步。
-
-### 长路径不挤压统计
-
-状态栏右侧路径 Label 包在 `Flexible` 中：独占剩余宽度、超宽自动省略号，
-行数、字节数、编码标签始终可见。
-
-## 运行
+## 运行与验证
 
 ```powershell
 cd examples/notepad
+cjpm test
 cjpm run
-```
-
-支持视觉回归快照：
-
-```powershell
 cjpm run --run-args "--snapshot notepad.bmp"
 ```
+
+文件快捷键：Ctrl/Cmd+N 新建、O 打开、S 保存、Shift+S 另存为；修饰键读取事件时刻快照。
+编辑区使用标准选择、复制、剪切、粘贴和撤销／重做快捷键。
+自动化回归覆盖文件往返、失败后保留修改、回到原文后恢复干净状态、新建确认、路径提取及空闲订阅数。
+
+## 练习与验收
+
+打开并修改一个测试文件，另存后重新读取，验证正文一致。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

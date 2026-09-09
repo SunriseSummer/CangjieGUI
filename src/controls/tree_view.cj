@@ -1,10 +1,12 @@
 package cui.controls
 
+import cui.media.{IconSource, paintIcon}
 import std.collection.{ArrayList, HashSet}
-import sdl.{FontSizes, IconName, Key, MouseButton, Pen, Rect, Size, UiEvent, drawIcon}
-import cui.core.{Bindable, CUI_SMALL_H, CursorShape, ScrollBar, maxScrollOffset, State, UiContext, Widget, requireControlId,
-    claimHoverIfInside, clampScrollOffset, drawSurface, drawVerticalScrollBar, emit, focusableControlIdentity,
-    localState, scrollLineIndex, scrollLineRemainder, scrollOffsetAfterWheel}
+import sdl.{FontSizes, Key, MouseButton, Pen, Rect, Size, UiEvent}
+import cui.core.{Bindable, CUI_SMALL_H, CursorShape, ScrollBar, maxScrollOffset, State, UiContext}
+import cui.core.{Widget, requireControlId, claimHoverIfInside, clampScrollOffset, drawSurface}
+import cui.core.{drawVerticalScrollBar, emit, focusableControlIdentity, localState, scrollLineIndex}
+import cui.core.{scrollLineRemainder, scrollByWheel}
 
 // Logical pixels of indentation added per depth level.
 private let TREE_INDENT: Float32 = 16.0
@@ -19,18 +21,18 @@ private let TREE_ICON_SIZE: Float32 = 16.0
  * them, so a duplicate id would make two nodes toggle and select as one.
  *
  * ```
- * TreeNode("src", "src", icon: IconName.OpenFolder, children: [
- *     TreeNode("src/main", "main.cj", icon: IconName.NewDocument)
+ * TreeNode("src", "src", icon: IconSource("assets/icons/openfolder.svg"), children: [
+ *     TreeNode("src/main", "main.cj", icon: IconSource("assets/icons/newdocument.svg"))
  * ])
  * ```
  */
 public class TreeNode {
     public let id: String
     public let label: String
-    public let icon: ?IconName
+    public let icon: ?IconSource
     public let children: Array<TreeNode>
 
-    public init(id: String, label: String, children!: Array<TreeNode> = [], icon!: ?IconName = None) {
+    public init(id: String, label: String, children!: Array<TreeNode> = [], icon!: ?IconSource = None) {
         this.id = id
         this.label = label
         this.children = children
@@ -44,12 +46,12 @@ public class TreeNode {
 struct TreeRow {
     let id: String
     let label: String
-    let icon: ?IconName
+    let icon: ?IconSource
     let depth: Int64
     let hasChildren: Bool
     let expanded: Bool
 
-    init(id: String, label: String, icon: ?IconName, depth: Int64, hasChildren: Bool, expanded: Bool) {
+    init(id: String, label: String, icon: ?IconSource, depth: Int64, hasChildren: Bool, expanded: Bool) {
         this.id = id
         this.label = label
         this.icon = icon
@@ -87,6 +89,7 @@ public class TreeView <: Widget {
     // The visible rows for this frame, flattened from the roots and the retained expansion set.
     private let rows: Array<TreeRow>
     private var frame = Rect.zero()
+    private var rowHeight: Float32 = CUI_SMALL_H
 
     public init(
         roots: Array<TreeNode>,
@@ -128,16 +131,18 @@ public class TreeView <: Widget {
         this
     }
 
-    public func measure(_: UiContext, available: Size): Size {
+    public func measure(ctx: UiContext, available: Size): Size {
+        rowHeight = ctx.textRowHeight()
         Size(available.w, available.h)
     }
 
-    public func layout(_: UiContext, rect: Rect): Unit {
+    public func layout(ctx: UiContext, rect: Rect): Unit {
+        rowHeight = ctx.textRowHeight()
         frame = rect
     }
 
     public func draw(ctx: UiContext): Unit {
-        let content = treeContentHeight(rows)
+        let content = treeContentHeight(rows, rowHeight: rowHeight)
         let viewport = treeViewport(frame)
         // Clamp on change only: draw runs every frame and the offset may be externally owned.
         let clamped = clampScrollOffset(scrollStateValue.value, content, viewport.h)
@@ -153,11 +158,11 @@ public class TreeView <: Widget {
         drawSurface(ctx, frame, ctx.theme.fieldSurface(active: ctx.showFocusRing(controlId)))
 
         ctx.renderer.pushClip(viewport)
-        var i = scrollLineIndex(scrollStateValue.value)
-        var y = viewport.y - scrollLineRemainder(scrollStateValue.value)
+        var i = scrollLineIndex(scrollStateValue.value, rowHeight: rowHeight)
+        var y = viewport.y - scrollLineRemainder(scrollStateValue.value, rowHeight: rowHeight)
         while (i < rows.size && y < viewport.bottom()) {
-            drawRow(ctx, rows[i], Rect(viewport.x, y, viewport.w, CUI_SMALL_H))
-            y += CUI_SMALL_H
+            drawRow(ctx, rows[i], Rect(viewport.x, y, viewport.w, rowHeight))
+            y += rowHeight
             i += 1
         }
         ctx.renderer.popClip()
@@ -166,7 +171,7 @@ public class TreeView <: Widget {
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
         claimHoverIfInside(ctx, event, frame, controlId, CursorShape.Interactive)
-        let content = treeContentHeight(rows)
+        let content = treeContentHeight(rows, rowHeight: rowHeight)
         let viewportH = treeViewport(frame).h
         match (event) {
             case UiEvent.MouseDown(MouseButton.Left, x, y) =>
@@ -177,7 +182,7 @@ public class TreeView <: Widget {
                     ctx.focus(controlId)
                     let viewport = treeViewport(frame)
                     if (viewport.contains(x, y)) {
-                        let idx = Int64((y - viewport.y + scrollStateValue.value) / CUI_SMALL_H)
+                        let idx = Int64((y - viewport.y + scrollStateValue.value) / rowHeight)
                         if (idx >= 0 && idx < rows.size) {
                             pressRow(idx, viewport.x, x)
                         }
@@ -191,8 +196,7 @@ public class TreeView <: Widget {
             case UiEvent.MouseWheel(_, wheelY, pointerX, pointerY) =>
                 // Content that fits leaves the wheel to an enclosing scroller (no dead zone).
                 if (frame.contains(pointerX, pointerY) && maxScrollOffset(content, viewportH) > 0.0) {
-                    scrollStateValue.value = scrollOffsetAfterWheel(scrollStateValue.value, wheelY, content, viewportH)
-                    return true
+                    return scrollByWheel(scrollStateValue, wheelY, content, viewportH)
                 }
             case UiEvent.KeyDown(Key.Up, _) => return moveSelection(ctx, -1)
             case UiEvent.KeyDown(Key.Down, _) => return moveSelection(ctx, 1)
@@ -337,15 +341,15 @@ public class TreeView <: Widget {
             return
         }
         let viewportH = treeViewport(frame).h
-        let rowTop = Float32(index) * CUI_SMALL_H
-        let rowBottom = rowTop + CUI_SMALL_H
+        let rowTop = Float32(index) * rowHeight
+        let rowBottom = rowTop + rowHeight
         var offset = scrollStateValue.value
         if (rowTop < offset) {
             offset = rowTop
         } else if (rowBottom > offset + viewportH) {
             offset = rowBottom - viewportH
         }
-        scrollStateValue.value = clampScrollOffset(offset, treeContentHeight(rows), viewportH)
+        scrollStateValue.value = clampScrollOffset(offset, treeContentHeight(rows, rowHeight: rowHeight), viewportH)
     }
 
     private func clampRowIndex(index: Int64): Int64 {
@@ -391,18 +395,19 @@ public class TreeView <: Widget {
         }
         let disclosureX = rect.x + 6.0 + Float32(row.depth) * TREE_INDENT
         if (row.hasChildren) {
-            drawTwisty(ctx, disclosureX + TREE_TWISTY_W / 2.0, rect.centerY(), Pen(width: 1.6, color: textColor), expanded: row.expanded)
+            drawTwisty(ctx, disclosureX + TREE_TWISTY_W / 2.0, rect.centerY(), Pen(width: 1.6, color: textColor),
+                expanded: row.expanded)
         }
         var contentX = disclosureX + TREE_TWISTY_W
         match (row.icon) {
             case Some(icon) =>
-                drawIcon(ctx.renderer, icon,
-                    Rect(contentX, rect.centerY() - TREE_ICON_SIZE / 2.0, TREE_ICON_SIZE, TREE_ICON_SIZE), textColor)
+                paintIcon(ctx, icon, Rect(contentX, rect.centerY() - TREE_ICON_SIZE / 2.0, TREE_ICON_SIZE,
+                    TREE_ICON_SIZE), textColor)
                 contentX += TREE_ICON_SIZE + 6.0
             case None => ()
         }
-        let textY = rect.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.BODY) / 2.0
-        ctx.renderer.text(row.label, contentX, textY, textColor, pointSize: FontSizes.BODY)
+        let textY = rect.centerY() - ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.BODY)) / 2.0
+        ctx.text(row.label, contentX, textY, textColor, pointSize: ctx.textSize(fallback: FontSizes.BODY))
     }
 }
 
@@ -422,8 +427,8 @@ private func treeViewport(frame: Rect): Rect {
     Rect(frame.x + 4.0, frame.y + 6.0, max(0.0, frame.w - 12.0), max(0.0, frame.h - 12.0))
 }
 
-private func treeContentHeight(rows: Array<TreeRow>): Float32 {
-    Float32(rows.size) * CUI_SMALL_H
+private func treeContentHeight(rows: Array<TreeRow>, rowHeight!: Float32 = CUI_SMALL_H): Float32 {
+    Float32(rows.size) * rowHeight
 }
 
 // Builds the initial expansion set from ids; also reused by tree_view_test.

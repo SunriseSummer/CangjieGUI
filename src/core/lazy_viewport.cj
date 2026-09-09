@@ -1,5 +1,6 @@
 package cui.core
 
+import sdl.UiEvent
 import std.collection.HashMap
 
 internal let LAZY_DEFAULT_OVERSCAN_PIXELS: Float32 = 144.0
@@ -388,4 +389,18 @@ internal func lazyRememberAnchor(
     memory.anchorKey = key(index)
     memory.anchorIndex = index
     memory.anchorWithinItem = max(0.0, scroll - itemTop(index))
+}
+
+// Both wheel-first dispatch and ordinary pointer/key dispatch use the same topmost-first
+// materialized item order. Virtual viewports share this policy across all three axes/models.
+internal func dispatchLazyVisibleItems(items: Array<(Int64, Widget)>, ctx: UiContext, event: UiEvent): Bool {
+    var index = items.size - 1
+    while (index >= 0) {
+        let (_, widget) = items[index]
+        if (widget.handle(ctx, event)) {
+            return true
+        }
+        index -= 1
+    }
+    false
 }

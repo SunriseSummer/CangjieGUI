@@ -10,7 +10,7 @@
   组件，按人取色、白色首字居中），对方名字置于气泡上方，自己的消息不显示名字
 - 与上一条间隔达到 10 分钟时，该条上方插入居中的时间分隔条锚定时间线——分隔条、名字行都叠进该条的预估高度
 - `LazyList` 变高虚拟化：行偏移是各高度的累加和、可见窗口由二分定位，只构建可见行；`heightOf` 只需 O(1)
-- 正文用 `maxLines(lines)` 封顶：估算恒不小于实绘，故气泡绝不超高裁切；短消息短气泡、长消息高气泡
+- 正文用 `maxLines(lines)` 封顶：按示例的固定字号和行高预算限制正文；更换字体或宽度后须重新验收；短消息短气泡、长消息高气泡
 - 回车或点“发送”追加消息并把滚动置到底部（`LazyList` 会把超出的偏移钳到底），最新消息始终可见；
   回车在应用根部以 `EventHandler` 拦截，焦点在输入框或按钮上都能发送
 
@@ -37,11 +37,11 @@ this.lines = estimateLines(text) // 字符数 / 每行容量，钳到 [1, MAX_LI
 // 可选段（时间分隔条、他人消息的名字行）也叠进预估，虚拟化照常工作
 let textBlock = max(BUBBLE_MIN_TEXT_H, Float32(this.lines) * TEXT_LINE_H)
 this.height = sepH + nameH + textBlock + BUBBLE_PAD * 2.0 + ROW_GAP
-// 渲染：Label(text).maxLines(lines) —— 正文封顶到 lines 行，故实绘恒不高于预估
+// 渲染：Label(text).maxLines(lines) —— 正文封顶到 lines 行，仍须按目标字体与宽度验证实际高度
 ```
 
 各段预算都取实绘下限（如 Label 单行最小高 28、名字行 28 + 间距 4），正文按行数封顶，二者相互保证：
-估算永不小于实绘，气泡不会被行裁掉，短文本至多留一点余白。
+这些预算只针对示例当前字体与布局；字体放大或宽度变化时需重新测量，或使用 `LazyList.measured`。
 
 ### 发送即滚到底部
 
@@ -66,3 +66,9 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot chat.bmp"
 ```
+
+## 练习与验收
+
+加入长中文与 Emoji 消息，检查当前字体和窗口宽度下的行高估算。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

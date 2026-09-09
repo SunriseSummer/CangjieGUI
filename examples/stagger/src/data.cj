@@ -6,16 +6,16 @@
  */
 package cui_stagger
 
-import cui.{Color, IconName}
+import cui.{Color, IconSource}
 
 // 一行卡片：图标、图标色、标题、说明。
 struct Item {
-    let icon: IconName
+    let icon: IconSource
     let iconColor: Color
     let title: String
     let detail: String
 
-    init(icon: IconName, iconColor: Color, title: String, detail: String) {
+    init(icon: IconSource, iconColor: Color, title: String, detail: String) {
         this.icon = icon
         this.iconColor = iconColor
         this.title = title
@@ -26,14 +26,13 @@ struct Item {
 let ICON_OK = Color.rgb(52, 199, 120)
 let ICON_RUN = Color.rgb(96, 165, 250)
 let ICON_WAIT = Color.rgb(230, 168, 70)
-
 let ITEMS: Array<Item> = [
-    Item(IconName.NewDocument, ICON_OK, "拉取变更", "已同步 12 个提交"),
-    Item(IconName.Process, ICON_RUN, "编译框架", "cui + sdl，零告警"),
-    Item(IconName.Refresh, ICON_RUN, "运行测试", "375 项全部通过"),
-    Item(IconName.Save, ICON_OK, "生成快照", "42 个示例已渲染"),
-    Item(IconName.Calendar, ICON_WAIT, "等待审阅", "指派给 周珩"),
-    Item(IconName.Copy, ICON_WAIT, "准备发布", "版本 v0.4.0")
+    Item(IconSource("assets/icons/document.svg"), ICON_OK, "拉取变更", "已同步 12 个提交"),
+    Item(IconSource("assets/icons/process.svg"), ICON_RUN, "编译框架", "cui + sdl，零告警"),
+    Item(IconSource("assets/icons/refresh.svg"), ICON_RUN, "运行测试", "375 项全部通过"),
+    Item(IconSource("assets/icons/save.svg"), ICON_OK, "生成快照", "42 个示例已渲染"),
+    Item(IconSource("assets/icons/calendar.svg"), ICON_WAIT, "等待审阅", "指派给 周珩"),
+    Item(IconSource("assets/icons/copy.svg"), ICON_WAIT, "准备发布", "版本 v0.4.0")
 ]
 
 // 每行入场的缓动时长（ms）。

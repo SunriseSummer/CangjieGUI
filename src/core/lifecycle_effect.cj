@@ -138,7 +138,8 @@ func stageLifecycleEffectsInScope(store: StateStore, scope: StateMountScope): Un
 
 /* Installs prepared effects after structural ownership commits; cleanup failures are delayed. */
 func commitLifecycleEffectBuild(store: StateStore): ?Exception {
-    var firstFailure = retryFailedLifecycleCleanups(store)
+    var failures: ?UiFailureCollector = None
+    failures = mergeUiFailure(failures, retryFailedLifecycleCleanups(store))
     for (pending in store.pendingLifecycleEffects) {
         match (pending.prepared) {
             case Some(resource) =>
@@ -147,14 +148,14 @@ func commitLifecycleEffectBuild(store: StateStore): ?Exception {
                     LifecycleEffectRecord(pending.revision, resource)
                 )
                 match (previous) {
-                    case Some(record) => firstFailure = keepFirstFailure(
-                        firstFailure,
+                    case Some(record) => failures = mergeUiFailure(
+                        failures,
                         closeLifecycleResource(store, record.resource)
                     )
                     case None => ()
                 }
-            case None => firstFailure = keepFirstFailure(
-                firstFailure,
+            case None => failures = mergeUiFailure(
+                failures,
                 Some(IllegalStateException("Lifecycle effect '${pending.path}' was not prepared"))
             )
         }
@@ -162,8 +163,8 @@ func commitLifecycleEffectBuild(store: StateStore): ?Exception {
     for (path in store.lifecycleEffectRemovals) {
         if (!hasPendingLifecycleEffect(store, path)) {
             match (store.lifecycleEffects.remove(path)) {
-                case Some(record) => firstFailure = keepFirstFailure(
-                    firstFailure,
+                case Some(record) => failures = mergeUiFailure(
+                    failures,
                     closeLifecycleResource(store, record.resource)
                 )
                 case None => ()
@@ -171,16 +172,16 @@ func commitLifecycleEffectBuild(store: StateStore): ?Exception {
         }
     }
     clearLifecycleEffectTransaction(store)
-    firstFailure
+    collectedUiFailure(failures)
 }
 
 func cancelLifecycleEffectBuild(store: StateStore): ?Exception {
-    var firstFailure: ?Exception = None
+    var failures: ?UiFailureCollector = None
     var i = store.pendingLifecycleEffects.size - 1
     while (i >= 0) {
         match (store.pendingLifecycleEffects[i].prepared) {
-            case Some(resource) => firstFailure = keepFirstFailure(
-                firstFailure,
+            case Some(resource) => failures = mergeUiFailure(
+                failures,
                 closeLifecycleResource(store, resource)
             )
             case None => ()
@@ -188,12 +189,13 @@ func cancelLifecycleEffectBuild(store: StateStore): ?Exception {
         i -= 1
     }
     clearLifecycleEffectTransaction(store)
-    firstFailure
+    collectedUiFailure(failures)
 }
 
 func clearLifecycleEffects(store: StateStore): ?Exception {
-    var firstFailure = retryFailedLifecycleCleanups(store)
-    firstFailure = keepFirstFailure(firstFailure, closeLifecycleEffectsInScope(store, store.rootMountScope))
+    var failures: ?UiFailureCollector = None
+    failures = mergeUiFailure(failures, retryFailedLifecycleCleanups(store))
+    failures = mergeUiFailure(failures, closeLifecycleEffectsInScope(store, store.rootMountScope))
     // Defensive cleanup for an ownership inconsistency: never leak an effect merely because its
     // scope key was damaged. Normal paths empty the map in the hierarchy walk above.
     let leftovers = ArrayList<String>()
@@ -202,26 +204,26 @@ func clearLifecycleEffects(store: StateStore): ?Exception {
     }
     for (path in leftovers) {
         match (store.lifecycleEffects.remove(path)) {
-            case Some(record) => firstFailure = keepFirstFailure(
-                firstFailure,
+            case Some(record) => failures = mergeUiFailure(
+                failures,
                 closeLifecycleResource(store, record.resource)
             )
             case None => ()
         }
     }
     clearLifecycleEffectTransaction(store)
-    firstFailure
+    collectedUiFailure(failures)
 }
 
 private func closeLifecycleEffectsInScope(store: StateStore, scope: StateMountScope): ?Exception {
-    var firstFailure: ?Exception = None
+    var failures: ?UiFailureCollector = None
     match (scope.committedOwnership()) {
         case Some(ownership) =>
             var automaticIndex = ownership.automaticKeys.size - 1
             while (automaticIndex >= 0) {
                 match (store.automaticEntries.get(ownership.automaticKeys[automaticIndex])) {
-                    case Some(record) => firstFailure = keepFirstFailure(
-                        firstFailure,
+                    case Some(record) => failures = mergeUiFailure(
+                        failures,
                         closeLifecycleEffectsInScope(store, record.mountScope)
                     )
                     case None => ()
@@ -231,8 +233,8 @@ private func closeLifecycleEffectsInScope(store: StateStore, scope: StateMountSc
             var retainedIndex = ownership.retainedKeys.size - 1
             while (retainedIndex >= 0) {
                 match (store.retainedEntries.get(ownership.retainedKeys[retainedIndex])) {
-                    case Some(record) => firstFailure = keepFirstFailure(
-                        firstFailure,
+                    case Some(record) => failures = mergeUiFailure(
+                        failures,
                         closeLifecycleEffectsInScope(store, record.mountScope)
                     )
                     case None => ()
@@ -242,8 +244,8 @@ private func closeLifecycleEffectsInScope(store: StateStore, scope: StateMountSc
             var effectIndex = ownership.effectKeys.size - 1
             while (effectIndex >= 0) {
                 match (store.lifecycleEffects.remove(ownership.effectKeys[effectIndex])) {
-                    case Some(record) => firstFailure = keepFirstFailure(
-                        firstFailure,
+                    case Some(record) => failures = mergeUiFailure(
+                        failures,
                         closeLifecycleResource(store, record.resource)
                     )
                     case None => ()
@@ -252,7 +254,7 @@ private func closeLifecycleEffectsInScope(store: StateStore, scope: StateMountSc
             }
         case None => ()
     }
-    firstFailure
+    collectedUiFailure(failures)
 }
 
 private func closeLifecycleResource(store: StateStore, resource: Resource): ?Exception {
@@ -262,7 +264,7 @@ private func closeLifecycleResource(store: StateStore, resource: Resource): ?Exc
         }
         None
     } catch (error: Exception) {
-        if (!resource.isClosed() && !containsLifecycleResource(store.failedLifecycleCleanups, resource)) {
+        if (!containsLifecycleResource(store.failedLifecycleCleanups, resource)) {
             store.failedLifecycleCleanups.add(resource)
         }
         Some(error)
@@ -275,11 +277,11 @@ private func retryFailedLifecycleCleanups(store: StateStore): ?Exception {
     }
     let retrying = store.failedLifecycleCleanups.toArray()
     store.failedLifecycleCleanups.clear()
-    var firstFailure: ?Exception = None
+    var failures: ?UiFailureCollector = None
     for (resource in retrying) {
-        firstFailure = keepFirstFailure(firstFailure, closeLifecycleResource(store, resource))
+        failures = mergeUiFailure(failures, closeLifecycleResource(store, resource))
     }
-    firstFailure
+    collectedUiFailure(failures)
 }
 
 private func containsLifecycleResource(resources: ArrayList<Resource>, candidate: Resource): Bool {
@@ -299,13 +301,6 @@ private func hasPendingLifecycleEffect(store: StateStore, path: String): Bool {
         }
     }
     false
-}
-
-private func keepFirstFailure(current: ?Exception, candidate: ?Exception): ?Exception {
-    match (current) {
-        case Some(_) => current
-        case None => candidate
-    }
 }
 
 private func clearLifecycleEffectTransaction(store: StateStore): Unit {

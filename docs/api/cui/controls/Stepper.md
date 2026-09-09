@@ -53,7 +53,7 @@ main(): Unit {
 |---|---|
 | [`range(lower: Int64, upper: Int64)`](#range) | 设置闭区间范围并立即限制当前值。 |
 | [`step(value: Int64)`](#step) | 设置正数步长。 |
-| [`measure(ctx: UiContext, available: Size)`](#measure) | 返回自适应当前数字的宽度（值区下限 40，加两个 36 宽按钮）与 38 逻辑像素高。 |
+| [`measure(ctx: UiContext, available: Size)`](#measure) | 返回自适应当前数字的宽度（值区下限 40，加两个 36 宽按钮），高度为 `max(38, 有效文字行高 + 12)` 逻辑像素。 |
 | [`layout(_: UiContext, rect: Rect)`](#layout) | 记录控件框架。 |
 | [`draw(ctx: UiContext)`](#draw) | 绘制字段面与 −、当前值、+ 三个区。 |
 | [`handle(ctx: UiContext, event: UiEvent)`](#handle) | 点击 −/+ 区步进并夺焦；聚焦后 ←/↓ 减、→/↑ 增，步进饱和于 `Int64` 极值并夹回范围。 |
@@ -91,7 +91,7 @@ public init(
 
 ### range
 
-设置闭区间范围并立即限制当前值。两端传反时自动互换；仅在限制改变值时写回绑定，避免每帧重建时的无效通知。
+设置闭区间范围并立即限制当前值。两端传反时自动互换；仅在限制改变值时写回绑定，避免重新构建时的无效通知。
 
 ```cangjie
 public func range(lower: Int64, upper: Int64): Stepper
@@ -124,7 +124,7 @@ public func step(value: Int64): Stepper
 
 ### measure
 
-返回自适应当前数字的宽度（值区下限 40，加两个 36 宽按钮）与 38 逻辑像素高。[`Widget`](../core/Widget.md) 协议方法。
+返回自适应当前数字的宽度（值区下限 40，加两个 36 宽按钮），高度为 `max(38, 有效文字行高 + 12)` 逻辑像素。[`Widget`](../core/Widget.md) 协议方法。
 
 ```cangjie
 public func measure(ctx: UiContext, available: Size): Size

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build pinned SDL3/SDL3_ttf sources into a target-platform shared runtime prefix."""
+"""Build pinned SDL3/SDL3_ttf/SDL3_image sources into a target-platform shared runtime prefix."""
 
 import argparse
 import hashlib
@@ -40,6 +40,7 @@ def validate_source(root, family):
     expected_header = {
         "sdl": root / "include" / "SDL3" / "SDL.h",
         "sdl_ttf": root / "include" / "SDL3_ttf" / "SDL_ttf.h",
+        "sdl_image": root / "include" / "SDL3_image" / "SDL_image.h",
     }[family]
     if not (root / "CMakeLists.txt").is_file() or not expected_header.is_file():
         raise BootstrapError(f"invalid {family} source root: {root}")
@@ -47,7 +48,7 @@ def validate_source(root, family):
 
 
 def configure_commands(cmake, sdl_source, sdl_ttf_source, build_root, prefix, jobs,
-                       generator="Ninja", dependency_prefixes=()):
+                       generator="Ninja", dependency_prefixes=(), image_source=None):
     sdl_build = build_root / "sdl"
     ttf_build = build_root / "sdl_ttf"
     common = [
@@ -57,7 +58,7 @@ def configure_commands(cmake, sdl_source, sdl_ttf_source, build_root, prefix, jo
         "-DCMAKE_INSTALL_LIBDIR=lib",
     ]
     cmake_prefix_path = ";".join(str(path) for path in (prefix, *dependency_prefixes))
-    return [
+    commands = [
         [cmake, "-S", str(sdl_source), "-B", str(sdl_build), *common,
          "-DSDL_SHARED=ON", "-DSDL_STATIC=OFF", "-DSDL_TEST_LIBRARY=OFF",
          "-DSDL_TESTS=OFF", "-DSDL_EXAMPLES=OFF"],
@@ -70,6 +71,19 @@ def configure_commands(cmake, sdl_source, sdl_ttf_source, build_root, prefix, jo
         [cmake, "--build", str(ttf_build), "--config", "Release", "--parallel", str(jobs)],
         [cmake, "--install", str(ttf_build), "--config", "Release"],
     ]
+    if image_source is not None:
+        image_build = build_root / "sdl_image"
+        commands.extend([
+            [cmake, "-S", str(image_source), "-B", str(image_build), *common,
+             f"-DCMAKE_PREFIX_PATH={cmake_prefix_path}", "-DBUILD_SHARED_LIBS=ON",
+             "-DSDLIMAGE_INSTALL=ON", "-DSDLIMAGE_STRICT=ON", "-DSDLIMAGE_VENDORED=OFF",
+             "-DSDLIMAGE_SAMPLES=OFF", "-DSDLIMAGE_TESTS=OFF", "-DSDLIMAGE_BACKEND_STB=ON",
+             "-DSDLIMAGE_BACKEND_IMAGEIO=OFF", "-DSDLIMAGE_PNG_LIBPNG=OFF",
+             "-DSDLIMAGE_AVIF=OFF", "-DSDLIMAGE_JXL=OFF", "-DSDLIMAGE_TIF=OFF", "-DSDLIMAGE_WEBP=OFF"],
+            [cmake, "--build", str(image_build), "--config", "Release", "--parallel", str(jobs)],
+            [cmake, "--install", str(image_build), "--config", "Release"],
+        ])
+    return commands
 
 
 def run_plan(commands, cwd, timeout, runner=run_command):
@@ -108,7 +122,7 @@ def file_record(path):
 
 def runtime_inventory(prefix, system):
     result = {}
-    for family in ("sdl", "ttf"):
+    for family in ("sdl", "ttf", "image"):
         files = family_files(prefix, family, system)
         if not files:
             raise BootstrapError(f"built prefix has no {family} shared runtime for {system}: {prefix}")
@@ -118,7 +132,7 @@ def runtime_inventory(prefix, system):
 
 def build(profile, sdl_source, sdl_ttf_source, build_root, prefix, cmake="cmake",
           jobs=2, timeout=900, generator="Ninja", dependency_prefixes=(),
-          runner=run_command, host_profile=None):
+          runner=run_command, host_profile=None, image_source=None):
     if profile not in SUPPORTED_BUILD_PROFILES:
         raise BootstrapError(f"SDL source build is unsupported for profile: {profile}")
     actual_profile = host_profile or current_profile()
@@ -131,6 +145,9 @@ def build(profile, sdl_source, sdl_ttf_source, build_root, prefix, cmake="cmake"
         raise BootstrapError("Ninja executable is unavailable")
     sdl_source = validate_source(sdl_source, "sdl")
     sdl_ttf_source = validate_source(sdl_ttf_source, "sdl_ttf")
+    if image_source is None:
+        raise BootstrapError("SDL_image source is required for the static image runtime")
+    image_source = validate_source(image_source, "sdl_image")
     dependency_prefixes = tuple(Path(path).resolve() for path in dependency_prefixes)
     missing_prefixes = [path for path in dependency_prefixes if not path.is_dir()]
     if missing_prefixes:
@@ -140,14 +157,14 @@ def build(profile, sdl_source, sdl_ttf_source, build_root, prefix, cmake="cmake"
     prefix.mkdir(parents=True, exist_ok=True)
     commands = configure_commands(
         cmake, sdl_source, sdl_ttf_source, build_root, prefix, jobs,
-        generator=generator, dependency_prefixes=dependency_prefixes)
+        generator=generator, dependency_prefixes=dependency_prefixes, image_source=image_source)
     results = run_plan(commands, ROOT, timeout, runner=runner)
     return {
         "schemaVersion": 1,
         "generatedAt": utc_timestamp(),
         "profile": profile,
         "hostProfile": actual_profile,
-        "sources": {"sdl": str(sdl_source), "sdlTtf": str(sdl_ttf_source)},
+        "sources": {"sdl": str(sdl_source), "sdlTtf": str(sdl_ttf_source), "sdlImage": str(image_source)},
         "buildRoot": str(build_root.resolve()),
         "prefix": str(prefix.resolve()),
         "generator": generator,
@@ -162,6 +179,7 @@ def parse_args(argv=None):
     parser.add_argument("--profile", choices=sorted(SUPPORTED_BUILD_PROFILES), required=True)
     parser.add_argument("--sdl-source", type=Path, required=True)
     parser.add_argument("--sdl-ttf-source", type=Path, required=True)
+    parser.add_argument("--sdl-image-source", type=Path, required=True)
     parser.add_argument("--build-root", type=Path)
     parser.add_argument("--prefix", type=Path)
     parser.add_argument("--cmake", default="cmake")
@@ -186,7 +204,8 @@ def main(argv=None):
         result = build(
             args.profile, args.sdl_source, args.sdl_ttf_source, build_root, prefix,
             cmake=args.cmake, jobs=args.jobs, timeout=args.timeout,
-            generator=args.generator, dependency_prefixes=args.dependency_prefixes or ())
+            generator=args.generator, dependency_prefixes=args.dependency_prefixes or (),
+            image_source=args.sdl_image_source)
         write_json(report, result)
     except (BootstrapError, OSError) as error:
         print(f"SDL runtime build failed: {error}", file=sys.stderr)

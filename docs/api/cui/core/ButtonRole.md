@@ -4,7 +4,7 @@
 
 位于 `cui.core` 包的公开枚举
 
-按钮的语义角色：常规、主要或危险，决定主题为按钮生成的表面配色。[`Button`](Button.md) 与 [`IconButton`](IconButton.md) 的 `role` 参数接受它，[`Theme.buttonSurface`](Theme.md#buttonsurface) 把它翻译成实际的填充、边框与阴影。
+按钮的语义角色：常规、主要或危险，决定主题为按钮生成的表面配色。[`Button`](Button.md) 与 [`IconButton`](../media/IconButton.md) 的 `role` 参数接受它，[`Theme.buttonSurface`](Theme.md#buttonsurface) 把它翻译成实际的填充、边框与阴影。
 
 ## 声明
 
@@ -45,5 +45,5 @@ main(): Unit {
 ## 另请参阅
 
 - [Button](Button.md) — 构造参数与 `role` 方法接受本类型。
-- [IconButton](IconButton.md) — 图标按钮的同名角色配置。
+- [IconButton](../media/IconButton.md) — 图标按钮的同名角色配置。
 - [Theme.buttonSurface](Theme.md#buttonsurface) — 把角色翻译成表面样式。

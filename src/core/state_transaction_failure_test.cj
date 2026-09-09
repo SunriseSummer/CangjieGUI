@@ -126,7 +126,7 @@ func deferredDerivedFailureDoesNotStarveLaterDerivedObserver(): Unit {
 }
 
 @Test
-func transactionReportsFirstFailureAfterDrainingLaterFailures(): Unit {
+func transactionPreservesAllFailuresAfterDrainingLaterNotifications(): Unit {
     let scheduler = FrameScheduler()
     let first = State<Int64>(0)
     let second = State<Int64>(0)
@@ -148,8 +148,10 @@ func transactionReportsFirstFailureAfterDrainingLaterFailures(): Unit {
                             tail.value = 1
                     }
                 )
-            } catch (error: IllegalStateException) {
-                probe.recordFailure(error)
+            } catch (error: UiAggregateException) {
+                probe.recordFailure(error.primary)
+                @Expect(error.failures.size, Int64(2))
+                @Expect(error.failures[1].message, "second failure")
             }
         }
     )

@@ -23,3 +23,9 @@
 ```powershell
 cjpm run
 ```
+
+## 练习与验收
+
+增加作品数量并改变列数，检查行高与可见项目布局。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

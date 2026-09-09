@@ -1,6 +1,6 @@
 package cui.core
 
-import sdl.{Rect, Size, UiEvent}
+import sdl.{MouseButton, Rect, Size, UiEvent}
 
 /**
  * A vertically scrolling list of variable-height rows that materializes only the rows near the viewport
@@ -421,13 +421,19 @@ public class LazyList <: Widget {
                 }
                 return false
             case UiEvent.MouseWheel(_, wheelY, pointerX, pointerY) =>
-                // Content that fits leaves the wheel to an enclosing scroller (no dead zone).
-                if (spatialClip.contains(pointerX, pointerY) && maxScrollOffset(content, viewportH) > 0.0) {
-                    scrollStateValue.value = scrollOffsetAfterWheel(scrollStateValue.value, wheelY, content, viewportH)
+                if (!spatialClip.contains(pointerX, pointerY)) {
+                    return false
+                }
+                if (dispatchLazyVisibleItems(visibleItems, ctx, event)) {
                     return true
                 }
-            case UiEvent.MouseDown(_, x, y) =>
-                if (scrollBar.press(ctx, frame, scrollStateValue, content, viewportH, x, y)) {
+                return scrollByWheel(scrollStateValue, wheelY, content, viewportH)
+            case UiEvent.MouseDown(button, x, y) =>
+                let primary = match (button) {
+                    case MouseButton.Left => true;
+                    case _ => false
+                }
+                if (primary && scrollBar.press(ctx, frame, scrollStateValue, content, viewportH, x, y)) {
                     return true
                 }
                 if (!spatialClip.contains(x, y)) {
@@ -446,15 +452,7 @@ public class LazyList <: Widget {
                 }
             case _ => ()
         }
-        var i = visibleItems.size - 1
-        while (i >= 0) {
-            let (_, widget) = visibleItems[i]
-            if (widget.handle(ctx, event)) {
-                return true
-            }
-            i -= 1
-        }
-        false
+        dispatchLazyVisibleItems(visibleItems, ctx, event)
     }
 
     public func isFlexible(): Bool {

@@ -23,6 +23,7 @@ from pathlib import Path
 from cui_dev.common.paths import DEV_TARGET_ROOT, FIXTURES_ROOT, REPOSITORY_ROOT
 from cui_dev.common.process import run_command
 from cui_dev.e2e.desktop_lifecycle import PASS_MARKER, SCENARIOS
+from cui_dev.release.provenance import validate_source_pair, worktree_provenance
 from cui_dev.snapshots.images import diff_images
 
 
@@ -75,6 +76,7 @@ def family_files(root, family, system):
         ("bounds", "windows"): ("libboundscheck.dll",),
         ("sdl", "windows"): ("SDL3.dll",),
         ("ttf", "windows"): ("SDL3_ttf.dll",),
+        ("image", "windows"): ("SDL3_image.dll",),
         ("uia", "windows"): ("cui_uia.dll",),
     }
     exact = names.get((family, system))
@@ -88,6 +90,7 @@ def family_files(root, family, system):
             "bounds": "libboundscheck.so",
             "sdl": "libSDL3.so",
             "ttf": "libSDL3_ttf.so",
+            "image": "libSDL3_image.so",
         }
         prefix = prefixes.get(family)
         return sorted(path for path in candidates if prefix and path.name.startswith(prefix))
@@ -95,8 +98,9 @@ def family_files(root, family, system):
         predicates = {
             "cangjie": lambda name: name.startswith("libcangjie-runtime") and name.endswith(".dylib"),
             "bounds": lambda name: name.startswith("libboundscheck") and name.endswith(".dylib"),
-            "sdl": lambda name: name.startswith("libSDL3") and "_ttf" not in name and name.endswith(".dylib"),
+            "sdl": lambda name: name.startswith("libSDL3") and "_" not in name and name.endswith(".dylib"),
             "ttf": lambda name: name.startswith("libSDL3_ttf") and name.endswith(".dylib"),
+            "image": lambda name: name.startswith("libSDL3_image") and name.endswith(".dylib"),
         }
         predicate = predicates.get(family)
         return sorted(path for path in candidates if predicate and predicate(path.name))
@@ -104,7 +108,7 @@ def family_files(root, family, system):
 
 
 def required_runtime_families(system):
-    families = ("cangjie", "bounds", "sdl", "ttf")
+    families = ("cangjie", "bounds", "sdl", "ttf", "image")
     return families + (("uia",) if system == "windows" else ())
 
 
@@ -114,6 +118,7 @@ def resolve_runtime_files(system, sdk_root, sdl_runtime, uia_root):
         "bounds": sdk_root / "runtime" / "lib",
         "sdl": sdl_runtime,
         "ttf": sdl_runtime,
+        "image": sdl_runtime,
         "uia": uia_root,
     }
     result = {}
@@ -139,9 +144,17 @@ def copy_unique(source, destination, seen):
 
 def direct_environment(bundle, system):
     environment = os.environ.copy()
-    variable = {"windows": "PATH", "linux": "LD_LIBRARY_PATH", "macos": "DYLD_LIBRARY_PATH"}[system]
-    current = environment.get(variable, "")
-    environment[variable] = str(bundle) + (os.pathsep + current if current else "")
+    # A release gate must not let an installed SDK or another checkout supply missing libraries.
+    for name in ("CANGJIE_HOME", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH", "DYLD_FALLBACK_LIBRARY_PATH",
+                 "LD_PRELOAD", "DYLD_INSERT_LIBRARIES"):
+        environment.pop(name, None)
+    if system == "windows":
+        windows = Path(environment.get("SystemRoot", r"C:\Windows"))
+        environment["PATH"] = os.pathsep.join((str(bundle), str(windows / "System32"), str(windows)))
+    else:
+        environment["PATH"] = "/usr/bin:/bin"
+        variable = "LD_LIBRARY_PATH" if system == "linux" else "DYLD_LIBRARY_PATH"
+        environment[variable] = str(bundle)
     return environment
 
 
@@ -200,12 +213,13 @@ def main(argv=None):
     system, architecture = normalized_platform()
     profile = f"{system}-{architecture}"
     report = {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "profile": profile,
         "host": {"system": platform.system(), "release": platform.release(),
                  "machine": platform.machine(), "python": platform.python_version()},
         "toolchain": None,
+        "sources": [],
         "builds": [],
         "bundle": {"files": []},
         "scenarios": [],
@@ -231,6 +245,8 @@ def main(argv=None):
         if not compiler["ok"] or args.expected_sdk not in compiler["log"]:
             raise BundleError(f"cjc does not report required SDK {args.expected_sdk}")
 
+        validate_source_pair(ROOT, FIXTURE, SDL_ROOT)
+        report["sources"] = [worktree_provenance(ROOT), worktree_provenance(SDL_ROOT)]
         if system == "windows":
             native = run_stage([
                 "powershell", "-ExecutionPolicy", "Bypass", "-File",
@@ -290,6 +306,9 @@ def main(argv=None):
             if pixels != 0:
                 raise BundleError(f"clean-bundle retained/full screenshots differ at {pixels} pixels")
 
+        after = [worktree_provenance(ROOT), worktree_provenance(SDL_ROOT)]
+        if [source["sha256"] for source in after] != [source["sha256"] for source in report["sources"]]:
+            raise BundleError("source worktrees changed while the release candidate was being verified")
         report["capabilities"].update({
             "realWindow": True,
             "textRaster": True,

@@ -6,10 +6,10 @@
 ## 演示要点
 
 - 星期表头与日格共享同一套七列 `flex` 节奏，保证逐行严格对齐
-- 年与月是两个 `State`，箭头改写状态后整个网格随下一帧自动重建
+- 年与月是两个 `State`，箭头改写状态后相关声明在本帧稳定化时重新构建
 - `derive` 派生标题：仅在年或月变化时才重新拼接字符串
 - 无 label 的成对 `IconButton` 依靠构建期唯一身份各自响应，无需手写 `.id`
-- 用 `Surface` 逐像素生成 BMP 徽标并交给 `ImageView` 展示：`ImageView` 逐帧内联声明即可，
+- 用 `Surface` 逐像素生成 PNG 徽标并交给 `ImageView` 展示：`ImageView` 逐帧内联声明即可，
   解码纹理由按路径键控的共享缓存持有，无需提升实例或 `manage`
 
 ## 文件结构
@@ -20,7 +20,7 @@
 | [model.cj](src/model.cj) | `CalendarModel`：年/月/选中日状态、派生标题、月份进退与周行展开算法 |
 | [views.cj](src/views.cj) | 视图：标题栏、月历页、日程页 |
 | [theme.cj](src/theme.cj) | 紫色主题与“今天”高亮、日程卡片表面 |
-| [badge.cj](src/badge.cj) | 徽标像素绘制与 BMP 落盘 |
+| [badge.cj](src/badge.cj) | 徽标像素绘制与 PNG 保存 |
 
 ## 关键实现
 
@@ -29,16 +29,7 @@
 表头的七个 `Label` 和每周的七个日格都以 `.flex()` 参与等权分配，空白格用
 `Spacer().flex()` 占位，因此首尾两周与表头始终逐列对齐：
 
-```cangjie
-func dayCell(model: CalendarModel, day: Int64): Unit {
-    if (day == 0) {
-        Spacer().flex()   // 占位保持列节奏
-        return
-    }
-    ...
-    let _ = button.flex()
-}
-```
+完整分支见 [dayCell](src/views.cj)：月外格用 `Spacer().flex()` 占位，有效日期用同权重按钮。
 
 ### 派生标题
 
@@ -54,17 +45,12 @@ this.title = derive(this.year, this.month, {y, m => "${y} 年 ${MONTH_NAMES[m - 
 `shiftMonth` 用循环处理任意跨度的跨年进退位，并把选中日夹紧到目标月的实际天数内
 （例如从 3 月 31 日切到 4 月会落在 4 月 30 日）：
 
-```cangjie
-while (nextMonth < 1) { nextMonth += 12; nextYear -= 1 }
-while (nextMonth > 12) { nextMonth -= 12; nextYear += 1 }
-selected.value = min(selected.value, Int64(Time.daysInMonth(...)))
-```
+月份与选中日的更新见 [CalendarModel.shiftMonth](src/model.cj)。
 
 ### 成对箭头按钮的身份
 
 左右箭头都是无 label 的 `IconButton`。框架按声明顺序为它们生成互不相同的构建期身份，
-因此后声明的按钮不会吞掉先声明按钮的松开事件；这也是早期版本左箭头无法响应的根因，
-现在无需任何额外代码。
+两者分别设置“上个月”“下个月”的无障碍名称；动态重排按钮时应使用稳定 key。
 
 ### 周行展开算法
 
@@ -83,3 +69,11 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot calendar.bmp"
 ```
+
+月份切换按钮使用 `cui.symbols.chevron_left` 与 `cui.symbols.chevron_right`，无需两枚外部 SVG；标题徽标在启动时生成 `cui-calendar-badge.png`，并以 `.size(40.vp, 30.vp).decodeSize(120, 90)` 展示。
+
+## 练习与验收
+
+从 31 日切到较短月份，确认选中日被限制在有效范围。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

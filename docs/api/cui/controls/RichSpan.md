@@ -14,7 +14,7 @@ public struct RichSpan
 
 ## 说明
 
-`RichSpan` 是纯值：每个链式方法都返回应用该配置后的新片段，原值不变，可放心复用与组合。未调用 `fontSize` 的片段继承宿主 [`RichText`](RichText.md) 的基准字号；同一行内不同字号的片段相互居中，行高随最高者增长。
+`RichSpan` 是纯值：每个链式方法都返回应用该配置后的新片段，原值不变，可放心复用与组合。未调用 `fontSize` 的片段继承宿主 [`RichText`](RichText.md) 的基准字号；同一行内不同字号的文字按主字体基线对齐，行高随基线上/下范围增长。
 
 [`highlight`](#highlight) 在片段身后垫一块 `<mark>` 式圆角底色，恰好覆盖片段的各个绘制盒——相邻两个各自加高亮的片段会在接缝处各自倒圆角，应当连成一体的标记要写进同一个片段。[`onTap`](#ontap) 把片段变成可点击链接：指针悬停变交互形状、可经 Tab 聚焦，命中与激活由宿主 `RichText` 处理。
 
@@ -48,13 +48,13 @@ main(): Unit {
 |---|---|
 | [`static text(text: String, color!: ?Color = None)`](#text) | 一段按默认文本色（或显式 `color`）绘制的文本片段。 |
 | [`static muted(text: String)`](#muted) | 一段按主题次要（弱化）文本色绘制的文本片段。 |
-| [`static icon(icon: IconName, color!: ?Color = None)`](#icon) | 一枚随行高取尺寸的行内图标，可选着色。 |
+| [`static icon(icon: IconSource, color!: ?Color = None)`](#icon) | 一枚随行高取尺寸的行内图标，可选着色。 |
 | [`bold(value!: Bool = true)`](#bold) | 本片段以粗体绘制（或把粗体设为 `value`）。 |
 | [`italic(value!: Bool = true)`](#italic) | 本片段以斜体绘制（或把斜体设为 `value`）。 |
 | [`underline(value!: Bool = true)`](#underline) | 本片段加下划线（或把下划线设为 `value`）。 |
 | [`strikethrough(value!: Bool = true)`](#strikethrough) | 本片段加删除线（或把删除线设为 `value`）。 |
 | [`fontStyle(value: FontStyle)`](#fontstyle) | 整体替换本片段的文本样式。 |
-| [`fontFamily(name: String)`](#fontfamily) | 本片段改用已注册的应用字体绘制。 |
+| [`fontFamily(name: String)`](#fontfamily) | 本片段按应用注册名、系统族名或 FontRole 字体角色选择字体。 |
 | [`fontSize(...)`](#fontsize) | 本片段以自有字号绘制，覆盖宿主 `RichText` 的基准字号。 |
 | [`onTap(action: () -> Unit)`](#ontap) | 把本片段变成可点击链接：点中即运行 `action`，指针悬停变为交互形状。 |
 | [`highlight(background: Color)`](#highlight) | 在本片段身后垫一块 `<mark>` 式圆角高亮底，画在文字或图标之下。 |
@@ -92,15 +92,15 @@ public static func muted(text: String): RichSpan
 
 ### icon
 
-一枚随行高取尺寸的行内图标，可选着色。图标与文字同行排布、相互居中。
+一枚随行高取尺寸的行内图标，可选着色。图标按行内基线区域放置。
 
 ```cangjie
-public static func icon(icon: IconName, color!: ?Color = None): RichSpan
+public static func icon(icon: IconSource, color!: ?Color = None): RichSpan
 ```
 
 **参数**
 
-- `icon`: `IconName` — 内置矢量图标名。
+- `icon`: `IconSource` — 应用提供的文件／内存图标来源，携带原色或模板着色意图。
 - `color!`: `?Color` — 显式颜色；默认 `None` 用主题文本色。
 
 **返回值** `RichSpan` — 新的图标片段。
@@ -177,7 +177,7 @@ public func fontStyle(value: FontStyle): RichSpan
 
 ### fontFamily
 
-本片段改用已注册的应用字体绘制。字体须先经 `Fonts.register`（sdl 模块）注册。
+本片段按应用注册名、系统族名或 FontRole 字体角色选择字体。应用字体由 Fonts.register／registerFamily 注册；可发现的系统族名与角色无需预先注册。
 
 ```cangjie
 public func fontFamily(name: String): RichSpan
@@ -185,7 +185,7 @@ public func fontFamily(name: String): RichSpan
 
 **参数**
 
-- `name`: `String` — 注册时使用的字体名。
+- `name`: `String` — 应用注册名、系统字体族名或 FontRole 角色值。
 
 **返回值** `RichSpan` — 应用该配置后的新片段，原值不变。
 
@@ -234,6 +234,15 @@ public func highlight(background: Color): RichSpan
 - `background`: `Color` — 高亮底色。
 
 **返回值** `RichSpan` — 应用该配置后的新片段，原值不变。
+
+## 数值字重与变量轴
+
+独立设置时保留其它继承样式。
+
+```cangjie
+public func fontWeight(value: FontWeight): RichSpan
+public func fontVariations(value: FontVariations): RichSpan
+```
 
 ## 另请参阅
 

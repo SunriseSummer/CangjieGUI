@@ -113,7 +113,7 @@ public class ContextMenu <: Widget {
         match (event) {
             case UiEvent.MouseDown(MouseButton.Left, x, y) =>
                 if (menu.contains(x, y)) {
-                    runItem(ctx, menuItemIndexAt(menu, y))
+                    runItem(ctx, menuItemIndexAt(menu, y, rowHeight: ctx.textRowHeight()))
                 } else {
                     close(ctx)
                 }
@@ -126,7 +126,7 @@ public class ContextMenu <: Widget {
                     // The popup floats over arbitrary content; claim the default cursor so a control
                     // beneath it (a text field, a divider) cannot set its shape through the menu.
                     ctx.claimHover(overlayOwner, CursorShape.Default)
-                    let index = menuItemIndexAt(menu, y)
+                    let index = menuItemIndexAt(menu, y, rowHeight: ctx.textRowHeight())
                     if (index >= 0 && index < items.size && items[index].isSelectable()) {
                         highlight.value = index
                     }
@@ -165,7 +165,7 @@ public class ContextMenu <: Widget {
 
     private func menuRect(ctx: UiContext): Rect {
         let width = menuPreferredWidth(ctx, items)
-        let height = menuContentHeight(items)
+        let height = menuContentHeight(items, rowHeight: ctx.textRowHeight())
         var x = menuX.value
         var y = menuY.value
         if (x + width > ctx.viewportWidth) {

@@ -1,12 +1,12 @@
 /*
- * 用 Surface 逐像素生成标题栏左侧的日历徽标，并存为 BMP 供 ImageView 加载。
+ * 用 Surface 逐像素生成标题栏左侧的日历徽标，并存为 PNG 供 ImageView 加载。
  * 以远高于显示尺寸的分辨率绘制（192×144，约为 40×30 vp 显示尺寸的数倍），ImageView 下采样后边缘更锐利。
  */
 package cui_calendar
 
 import cui.{Color, Surface}
 
-let CALENDAR_BADGE = "cui-calendar-badge.bmp"
+let CALENDAR_BADGE = "cui-calendar-badge.png"
 
 struct PixelRect {
     let x: Int32
@@ -37,7 +37,7 @@ func writeCalendarBadge(): Unit {
         drawBadgeCell(surface, 0, 1, cell)
         drawBadgeCell(surface, 1, 1, cell)
         drawBadgeCell(surface, 2, 1, cell)
-        surface.saveBmp(CALENDAR_BADGE)
+        surface.savePng(CALENDAR_BADGE)
     }
 }
 

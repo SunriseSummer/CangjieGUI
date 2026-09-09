@@ -1,71 +1,12 @@
 package cui.controls
 
 import sdl.{Color, FontSizes, Key, MouseButton, Pen, Rect, Size, UiEvent}
-import cui.core.{clampItemIndex, Bindable, CUI_SMALL_H, ScrollBar, State, UiContext, Widget, resolveControlKey, clampScrollOffset, maxScrollOffset, drawSurface,
-    drawVerticalScrollBar, emit, localState, registerFocusable, scrollLineIndex, scrollLineRemainder,
-    scrollOffsetAfterWheel}
+import cui.core.{clampItemIndex, Bindable, CUI_SMALL_H, ScrollBar, State, UiContext, Widget, resolveControlKey,
+    clampScrollOffset, maxScrollOffset, drawSurface, drawVerticalScrollBar, emit, localState, registerFocusable,
+    scrollLineIndex, scrollLineRemainder, scrollByWheel}
 
 private let TABLE_HEADER_H: Float32 = 32.0
 private let TABLE_CELL_PAD: Float32 = 10.0
-
-/*
- * One column of a `Table`: a header title, a fixed pixel width, and whether its cells hold
- * numbers. Numeric columns are right-aligned and sort by numeric value rather than lexically.
- *
- * `cell` optionally replaces the text rendering with a custom painter — progress bars, colour
- * chips, badges. It receives the original row index, the cell's string value, and the cell
- * rectangle, and owns those pixels (the table has already painted the row background/selection
- * and clips the painter to the cell). Sorting still uses the string value under the column's
- * `numeric` rule, so what a cell shows and what it sorts by stay decoupled: "87%" can render as
- * a bar yet sort as 87. Painters draw only — cells receive no events; the row click still
- * selects, like every other cell.
- */
-public class TableColumn {
-    let title: String
-    let width: Float32
-    let numeric: Bool
-    let cell: ?(UiContext, Int64, String, Rect) -> Unit
-
-    public init(
-        title: String,
-        width: Float32,
-        numeric!: Bool = false,
-        cell!: ?(UiContext, Int64, String, Rect) -> Unit = None
-    ) {
-        this.title = title
-        this.width = width
-        this.numeric = numeric
-        this.cell = cell
-    }
-}
-
-/*
- * A typed column for `Table.of`: header, width, numeric flag, and a `value` extractor that produces
- * the cell string from a row of type `T` (used for both display and sorting, under the numeric rule).
- * `cell` optionally paints the cell instead of drawing the string, exactly as `TableColumn.cell` —
- * so a value can sort as a number yet render as a bar, with the source data staying typed.
- */
-public class DataColumn<T> {
-    let title: String
-    let width: Float32
-    let numeric: Bool
-    let value: (T) -> String
-    let cell: ?(UiContext, Int64, String, Rect) -> Unit
-
-    public init(
-        title: String,
-        width: Float32,
-        numeric!: Bool = false,
-        cell!: ?(UiContext, Int64, String, Rect) -> Unit = None,
-        value!: (T) -> String
-    ) {
-        this.title = title
-        this.width = width
-        this.numeric = numeric
-        this.value = value
-        this.cell = cell
-    }
-}
 
 /*
  * A multi-column, sortable data table. Rows are `Array<String>` cells indexed by column. The
@@ -98,9 +39,10 @@ public class Table <: Widget {
     // per-frame rebuild so a stable table is not re-sorted every frame. See displayOrder.
     private let sortCache: TableSortCache
     private var frame = Rect.zero()
+    private var rowHeight: Float32 = CUI_SMALL_H
+    private var headerHeight: Float32 = TABLE_HEADER_H
 
-    public init(columns: Array<TableColumn>, rows: Array<Array<String>>, selected: Bindable<Int64>,
-        key!: ?String = None) {
+    public init(columns: Array<TableColumn>, rows: Array<Array<String>>, selected: Bindable<Int64>, key!: ?String = None) {
         let ident = resolveControlKey(key, "Table")
         this.id = ident
         this.columns = columns
@@ -149,12 +91,29 @@ public class Table <: Widget {
         Table(tableColumns, rows, selected, key: key)
     }
 
-    public func measure(_: UiContext, available: Size): Size {
+    public func measure(ctx: UiContext, available: Size): Size {
+        rowHeight = ctx.textRowHeight()
+        headerHeight = ctx.textRowHeight(minHeight: TABLE_HEADER_H)
         Size(available.w, available.h)
     }
 
-    public func layout(_: UiContext, rect: Rect): Unit {
+    public func layout(ctx: UiContext, rect: Rect): Unit {
+        rowHeight = ctx.textRowHeight()
+        headerHeight = ctx.textRowHeight(minHeight: TABLE_HEADER_H)
         frame = rect
+        let body = bodyRect()
+        let clamped = clampScrollOffset(scrollOffset.value, contentHeight(), body.h)
+        if (clamped != scrollOffset.value) {
+            scrollOffset.value = clamped
+        }
+        // Resolve viewport state during layout, before the frame is committed for painting.
+        if (selected.value != lastRevealed.value) {
+            let pos = displayPositionOf(displayOrder(), selected.value)
+            if (pos >= 0) {
+                revealPosition(pos)
+            }
+            lastRevealed.value = selected.value
+        }
     }
 
     public func isFlexible(): Bool {
@@ -165,16 +124,6 @@ public class Table <: Widget {
         let order = displayOrder()
         drawSurface(ctx, frame, ctx.theme.fieldSurface(active: ctx.showFocusRing(id)))
         let body = bodyRect()
-        scrollOffset.value = clampScrollOffset(scrollOffset.value, contentHeight(), body.h)
-        // Reveal the selection when it changed since last frame — including an app setting it
-        // directly (e.g. a "find row" action) rather than through this table's own keys.
-        if (selected.value != lastRevealed.value) {
-            let pos = displayPositionOf(order, selected.value)
-            if (pos >= 0) {
-                revealPosition(pos)
-            }
-            lastRevealed.value = selected.value
-        }
         drawBody(ctx, order, body)
         drawHeader(ctx)
         drawVerticalScrollBar(ctx, body, scrollOffset.value, contentHeight(), body.h, active: scrollBar.dragging(ctx))
@@ -202,7 +151,7 @@ public class Table <: Widget {
                     ctx.focus(id)
                     if (body.contains(x, y)) {
                         let order = displayOrder()
-                        let d = Int64((y - body.y + scrollOffset.value) / CUI_SMALL_H)
+                        let d = Int64((y - body.y + scrollOffset.value) / rowHeight)
                         if (d >= 0 && d < order.size) {
                             selected.value = order[d]
                         }
@@ -216,8 +165,7 @@ public class Table <: Widget {
             case UiEvent.MouseWheel(_, wheelY, pointerX, pointerY) =>
                 // Content that fits leaves the wheel to an enclosing scroller (no dead zone).
                 if (body.contains(pointerX, pointerY) && maxScrollOffset(contentH, body.h) > 0.0) {
-                    scrollOffset.value = scrollOffsetAfterWheel(scrollOffset.value, wheelY, contentH, body.h)
-                    return true
+                    return scrollByWheel(scrollOffset, wheelY, contentH, body.h)
                 }
             case UiEvent.KeyDown(Key.Up, _) => return moveSelection(ctx, -1)
             case UiEvent.KeyDown(Key.Down, _) => return moveSelection(ctx, 1)
@@ -235,15 +183,15 @@ public class Table <: Widget {
     // --- geometry ---
 
     private func headerRect(): Rect {
-        Rect(frame.x, frame.y, frame.w, min(TABLE_HEADER_H, frame.h))
+        Rect(frame.x, frame.y, frame.w, min(headerHeight, frame.h))
     }
 
     private func bodyRect(): Rect {
-        Rect(frame.x, frame.y + TABLE_HEADER_H, frame.w, max(0.0, frame.h - TABLE_HEADER_H))
+        Rect(frame.x, frame.y + headerHeight, frame.w, max(0.0, frame.h - headerHeight))
     }
 
     private func contentHeight(): Float32 {
-        Float32(rows.size) * CUI_SMALL_H
+        Float32(rows.size) * rowHeight
     }
 
     private func columnX(index: Int64): Float32 {
@@ -274,12 +222,15 @@ public class Table <: Widget {
         let header = headerRect()
         ctx.renderer.fill(header, ctx.theme.panelEdge.withAlpha(36))
         ctx.renderer.pushClip(header)
-        var i = 0
-        while (i < columns.size) {
-            drawHeaderCell(ctx, columns[i], i, Rect(columnX(i), header.y, columns[i].width, header.h))
-            i += 1
+        try {
+            var i = 0
+            while (i < columns.size) {
+                drawHeaderCell(ctx, columns[i], i, Rect(columnX(i), header.y, columns[i].width, header.h))
+                i += 1
+            }
+        } finally {
+            ctx.renderer.popClip()
         }
-        ctx.renderer.popClip()
         ctx.renderer.fill(Rect(header.x, header.bottom() - 1.0, header.w, 1.0), ctx.theme.panelEdge)
     }
 
@@ -290,8 +241,8 @@ public class Table <: Widget {
         } else {
             ctx.theme.mutedText
         }
-        let ty = cell.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CAPTION) / 2.0
-        ctx.renderer.text(col.title, cell.x + TABLE_CELL_PAD, ty, color, pointSize: FontSizes.CAPTION)
+        let ty = cell.centerY() - ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.CAPTION)) / 2.0
+        ctx.text(col.title, cell.x + TABLE_CELL_PAD, ty, color, pointSize: ctx.textSize(fallback: FontSizes.CAPTION))
         if (sorted) {
             drawSortArrow(ctx, Rect(cell.right() - 16.0, cell.y, 12.0, cell.h), sortAsc.value)
         }
@@ -314,14 +265,17 @@ public class Table <: Widget {
 
     private func drawBody(ctx: UiContext, order: Array<Int64>, body: Rect): Unit {
         ctx.renderer.pushClip(body)
-        var d = scrollLineIndex(scrollOffset.value)
-        var y = body.y - scrollLineRemainder(scrollOffset.value)
-        while (d < order.size && y < body.bottom()) {
-            drawRow(ctx, order[d], d, Rect(body.x, y, body.w, CUI_SMALL_H))
-            y += CUI_SMALL_H
-            d += 1
+        try {
+            var d = scrollLineIndex(scrollOffset.value, rowHeight: rowHeight)
+            var y = body.y - scrollLineRemainder(scrollOffset.value, rowHeight: rowHeight)
+            while (d < order.size && y < body.bottom()) {
+                drawRow(ctx, order[d], d, Rect(body.x, y, body.w, rowHeight))
+                y += rowHeight
+                d += 1
+            }
+        } finally {
+            ctx.renderer.popClip()
         }
-        ctx.renderer.popClip()
     }
 
     private func drawRow(ctx: UiContext, rowIndex: Int64, displayPos: Int64, rowRect: Rect): Unit {
@@ -340,19 +294,23 @@ public class Table <: Widget {
 
     private func drawCell(ctx: UiContext, rowIndex: Int64, text: String, col: TableColumn, cell: Rect): Unit {
         ctx.renderer.pushClip(cell)
-        match (col.cell) {
-            case Some(paint) => paint(ctx, rowIndex, text, cell)
-            case None =>
-                let ty = cell.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.BODY) / 2.0
-                if (col.numeric) {
-                    let tw = ctx.renderer.textWidth(text, pointSize: FontSizes.BODY)
-                    ctx.renderer.text(text, cell.right() - TABLE_CELL_PAD - tw, ty, ctx.theme.text,
-                        pointSize: FontSizes.BODY)
-                } else {
-                    ctx.renderer.text(text, cell.x + TABLE_CELL_PAD, ty, ctx.theme.text, pointSize: FontSizes.BODY)
-                }
+        try {
+            match (col.cell) {
+                case Some(paint) => paint(ctx, rowIndex, text, cell)
+                case None =>
+                    let ty = cell.centerY() - ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.BODY)) / 2.0
+                    if (col.numeric) {
+                        let tw = ctx.textWidth(text, pointSize: ctx.textSize(fallback: FontSizes.BODY))
+                        ctx.text(text, cell.right() - TABLE_CELL_PAD - tw, ty, ctx.theme.text,
+                            pointSize: ctx.textSize(fallback: FontSizes.BODY))
+                    } else {
+                        ctx.text(text, cell.x + TABLE_CELL_PAD, ty, ctx.theme.text,
+                            pointSize: ctx.textSize(fallback: FontSizes.BODY))
+                    }
+            }
+        } finally {
+            ctx.renderer.popClip()
         }
-        ctx.renderer.popClip()
     }
 
     // --- selection & sorting ---
@@ -396,15 +354,18 @@ public class Table <: Widget {
     // Scrolls the given display position's row band minimally into view.
     private func revealPosition(pos: Int64): Unit {
         let body = bodyRect()
-        let rowTop = Float32(pos) * CUI_SMALL_H
-        let rowBottom = rowTop + CUI_SMALL_H
+        let rowTop = Float32(pos) * rowHeight
+        let rowBottom = rowTop + rowHeight
         var scroll = scrollOffset.value
         if (rowTop < scroll) {
             scroll = rowTop
         } else if (rowBottom > scroll + body.h) {
             scroll = rowBottom - body.h
         }
-        scrollOffset.value = clampScrollOffset(scroll, contentHeight(), body.h)
+        let clamped = clampScrollOffset(scroll, contentHeight(), body.h)
+        if (clamped != scrollOffset.value) {
+            scrollOffset.value = clamped
+        }
     }
 
     // The display position of a selected row, or -1 when nothing valid is selected — so the next
@@ -447,8 +408,8 @@ public class Table <: Widget {
         // sort nor (for numeric columns) the number parsing runs. On a miss, the parse and the
         // O(n log n) stable sort run over these cells and the result is cached.
         let cells = Array<String>(n, {i => cellAt(i, col)})
-        if (sortCache.valid && sortCache.col == col && sortCache.asc == ascending &&
-            stringKeysEqual(sortCache.cells, cells)) {
+        if (sortCache.valid && sortCache.col == col && sortCache.asc == ascending && stringKeysEqual(sortCache.cells,
+            cells)) {
             return sortCache.order
         }
         let order = if (columns[col].numeric) {

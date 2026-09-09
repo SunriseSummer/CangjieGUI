@@ -28,6 +28,7 @@ private class LifecycleObservation {
 
 private class AutomaticDamageObservation {
     var partialSeen = false
+    var published = false
 }
 
 private enum DamageExpectation {
@@ -131,12 +132,14 @@ private class AutomaticDamageCloseProbe <: Widget {
     private let app: DesktopApp
     private let observation: AutomaticDamageObservation
     private let close: Bool
+    private let publishUpdate: () -> Unit
     private var frame = Rect.zero()
 
-    init(app: DesktopApp, observation: AutomaticDamageObservation, close: Bool) {
+    init(app: DesktopApp, observation: AutomaticDamageObservation, close: Bool, publishUpdate: () -> Unit) {
         this.app = app
         this.observation = observation
         this.close = close
+        this.publishUpdate = publishUpdate
         emit(this)
     }
 
@@ -159,6 +162,13 @@ private class AutomaticDamageCloseProbe <: Widget {
         if (close) {
             observation.partialSeen = app.lastFrameUsedPartialDamage()
             ctx.requestClose()
+        } else if (!observation.published && !onlyWindowHidden()) {
+            // Queue the update after the first visible frame; showing the initial hidden
+            // window legitimately generates expose/focus events that require a full repaint.
+            observation.published = true
+            if (!app.post(publishUpdate)) {
+                throw IllegalStateException("startup update rejected")
+            }
         }
     }
 
@@ -181,6 +191,44 @@ main(args: Array<String>): Int64 {
         runAutomaticDamageScenario(1, DamageExpectation.Full)
     } else if (scenario == "lifecycle") {
         runLifecycleScenario()
+    } else if (scenario == "font-layout") {
+        if (verifyFontLayout()) {
+            pass()
+        } else {
+            fail("layout and draw used different font metrics")
+        }
+    } else if (scenario == "image-static") {
+        if (verifyStaticImages()) { pass() } else { fail("static image decoding, styling or pixel verification failed") }
+    } else if (scenario == "rich-text-breaks") {
+        if (verifyRichTextBreaks()) { pass() } else { fail("rich text breaks, pixels or link hit boxes failed") }
+    } else if (scenario == "text-editing") {
+        if (verifyTextEditing()) {
+            pass()
+        } else {
+            fail("native text editing geometry or commands failed")
+        }
+    } else if (scenario == "editor-style") {
+        if (verifyEditorStyle()) { pass() } else { fail("editor style, emoji pixels, wrapping or IME commands failed") }
+    } else if (scenario == "editor-quality") {
+        if (verifyEditorQuality()) { pass() } else { fail("editor selection bounds or idle caret rendering failed") }
+    } else if (scenario == "emoji-paste") {
+        if (verifyEmojiPaste()) { pass() } else { fail("emoji paste, independent pixels, cluster hit testing or history failed") }
+    } else if (scenario == "emoji-alignment") {
+        if (verifyEmojiAlignment()) { pass() } else { fail("emoji baseline alignment or independent pixels failed") }
+    } else if (scenario == "failure-recovery") {
+        if (verifyFailureRecovery()) { pass() } else { fail("failure aggregation, cleanup or input recovery failed") }
+    } else if (scenario == "numeric-recovery") {
+        if (verifyNumericRecovery()) { pass() } else { fail("non-finite layout or clip range recovery failed") }
+    } else if (scenario == "scrolling") {
+        if (verifyScrolling()) { pass() } else { fail("nested scrolling or pointer routing failed") }
+    } else if (scenario == "commercial") {
+        if (verifyCommercialLifecycle()) { pass() } else { fail("post fairness, thread ownership or close decisions failed") }
+    } else if (scenario == "startup") {
+        if (verifyStartup()) {
+            pass()
+        } else {
+            fail("window became visible before a complete first frame")
+        }
     } else {
         fail("unknown isolated scenario '${scenario}'")
     }
@@ -259,20 +307,13 @@ private func verifyDesktopAutomaticDamage(supersample: Int32, expected: DamageEx
         WindowSpec("CUI automatic damage E2E", DAMAGE_VIEW_WIDTH, DAMAGE_VIEW_HEIGHT, vsync: false,
             supersample: supersample))
     app.run {
-        mountEffect(
-            "publish-update",
-            {
-                =>
-                    let update = spawn {=> app.post({=> changed.value = 1})}
-                    EffectCleanup({=> let _ = update.get()})
-            }
-        )
         HStack {
             Panel(flexible: false) {
                 VStack {
                     for (index in 0..AUTOMATIC_COMPLEXITY_ROWS) {
                         Panel(flexible: false) {
-                            AutomaticDamageCloseProbe(app, observation, index == 0 && changed.value == 1)
+                            AutomaticDamageCloseProbe(app, observation, index == 0 && changed.value == 1,
+                                {=> changed.value = 1})
                         }
                     }
                 }.spacing(0.0)

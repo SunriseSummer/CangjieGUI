@@ -3,6 +3,7 @@
 
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from cui_dev.release import verify_bundle as bundle
@@ -34,10 +35,13 @@ class ReleaseBundleTests(unittest.TestCase):
             root = Path(temporary)
             (root / "libSDL3.0.dylib").write_bytes(b"sdl")
             (root / "libSDL3_ttf.0.dylib").write_bytes(b"ttf")
+            (root / "libSDL3_image.0.dylib").write_bytes(b"image")
             self.assertEqual([path.name for path in bundle.family_files(root, "sdl", "macos")],
                              ["libSDL3.0.dylib"])
             self.assertEqual([path.name for path in bundle.family_files(root, "ttf", "macos")],
                              ["libSDL3_ttf.0.dylib"])
+            self.assertEqual([path.name for path in bundle.family_files(root, "image", "macos")],
+                             ["libSDL3_image.0.dylib"])
 
     def test_missing_runtime_family_fails_closed(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -74,6 +78,20 @@ class ReleaseBundleTests(unittest.TestCase):
             root = Path(temporary)
             environment = bundle.direct_environment(root, "linux")
             self.assertEqual(environment["LD_LIBRARY_PATH"].split(bundle.os.pathsep)[0], str(root))
+
+    def test_direct_environment_cannot_resolve_libraries_from_the_development_tree(self):
+        with patch.dict(bundle.os.environ, {
+            "PATH": "development-bin", "LD_LIBRARY_PATH": "development-lib",
+            "DYLD_LIBRARY_PATH": "development-dylib", "DYLD_FALLBACK_LIBRARY_PATH": "fallback-dev",
+            "LD_PRELOAD": "inject.so", "DYLD_INSERT_LIBRARIES": "inject.dylib", "CANGJIE_HOME": "dev-sdk",
+        }):
+            for system in ("windows", "linux", "macos"):
+                environment = bundle.direct_environment(Path("release-bundle"), system)
+                for name in ("PATH", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH", "DYLD_FALLBACK_LIBRARY_PATH"):
+                    self.assertNotIn("development", environment.get(name, ""))
+                    self.assertNotIn("fallback-dev", environment.get(name, ""))
+                for name in ("CANGJIE_HOME", "LD_PRELOAD", "DYLD_INSERT_LIBRARIES"):
+                    self.assertNotIn(name, environment)
 
     def test_expected_profile_argument_is_preserved(self):
         args = bundle.parse_args(["--expected-profile", "macos-arm64"])

@@ -4,7 +4,25 @@
  */
 package cui_notepad
 
-import cui.{AppMetadata, AppMetadataType, Color, SdlHint, SdlHintSetting, SurfaceStyle, Theme}
+import cui.{AppMetadata, AppMetadataType, Color, LengthUnits, SdlHint, SdlHintSetting, SurfaceStyle, Theme}
+
+// Application typography and repeated layout values; the view only composes these roles.
+let NOTEPAD_TITLE = 22.fp
+let NOTEPAD_DOCUMENT_TITLE = 15.fp
+let NOTEPAD_CAPTION = 11.fp
+let NOTEPAD_COMMAND = 12.fp
+let NOTEPAD_PRIMARY = 13.fp
+let NOTEPAD_LINE_HEIGHT = 28.fp
+let NOTEPAD_ICON = 24.vp
+let NOTEPAD_GAP = 12.vp
+let NOTEPAD_PAGE_INSET = 20.vp
+let NOTEPAD_CARD_INSET = 16.vp
+let NOTEPAD_SECTION_GAP = 14.vp
+let NOTEPAD_ACCENT = Color.rgb(34, 132, 127)
+
+func notepadPaper(): SurfaceStyle {
+    SurfaceStyle(Color.rgb(255, 255, 255), borderWidth: 0.0)
+}
 
 func notepadMetadata(): AppMetadata {
     var metadata = AppMetadata(
@@ -35,23 +53,25 @@ func notepadTheme(): Theme {
         accent: Color.rgb(34, 132, 127),
         accentText: Color.rgb(255, 255, 255),
         danger: Color.rgb(196, 59, 76),
-        field: Color.rgb(250, 252, 253),
+        field: Color.rgb(227, 236, 239),
         fieldActive: Color.rgb(229, 245, 243),
         panelRaised: Color.rgb(255, 255, 255),
         accentSoft: Color.rgb(214, 241, 238),
-        shadow: Color.rgba(11, 31, 45, 26),
+        shadow: Color.rgba(0, 0, 0, 0),
         radius: 16.0,
-        controlRadius: 11.0
+        smallRadius: 3.0,
+        controlRadius: 6.0,
+        borderWidth: 0.0
     )
 }
 
 func toolbarSurface(): SurfaceStyle {
     SurfaceStyle(
         Color.rgb(255, 255, 255),
-        border: Color.rgb(205, 218, 226),
+        border: Color.rgb(220, 230, 235),
         radius: 16.0,
         borderWidth: 1.0,
-        shadow: Color.rgba(20, 44, 56, 24),
+        shadow: Color.rgba(20, 44, 56, 12),
         shadowOffsetY: 2.0
     )
 }

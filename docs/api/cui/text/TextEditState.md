@@ -14,7 +14,7 @@ public class TextEditState
 
 ## 说明
 
-选择区是 `anchor` 与 `cursor` 之间的跨度；两者重合即无选择，编辑严格按普通光标行为走。全部偏移是 UTF-8 字节偏移，操作前都会规范到字符边界（[`normalizeCursor`](#normalizecursor) 每帧运行、只在需要时写回）。`move*` 系列折叠选择（有选择时落到行进方向的近端），`extend*` 系列保留锚点——按住 Shift 的语义。垂直移动保列（按字节列近似）。
+选择区是 `anchor` 与 `cursor` 之间的跨度；两者重合即无选择，编辑严格按普通光标行为走。全部偏移是 UTF-8 字节偏移，操作前都会规范到扩展字素边界（[`normalizeCursor`](#normalizecursor) 每帧运行、只在需要时写回）。`move*` 系列折叠选择（有选择时落到行进方向的近端），`extend*` 系列保留锚点——按住 Shift 的语义。模型的垂直移动按字素列计数；TextArea 在此基础上使用实际字体的像素列导航。
 
 ## 示例
 
@@ -61,7 +61,7 @@ main(): Unit {
 
 | 成员 | 说明 |
 |---|---|
-| [`normalizeCursor()`](#normalizecursor) | 把光标与锚点规范到字符边界（只在需要时写回，避免每帧空通知）。 |
+| [`normalizeCursor()`](#normalizecursor) | 把光标与锚点规范到扩展字素边界（只在需要时写回，避免每帧空通知）。 |
 | [`hasSelection()`](#hasselection) | 是否选中了非空范围。 |
 | [`selectionStart()`](#selectionstart) | 选择区低端字节偏移（无选择时即光标）。 |
 | [`selectionEnd()`](#selectionend) | 选择区高端字节偏移（无选择时即光标）。 |
@@ -76,7 +76,7 @@ main(): Unit {
 | 成员 | 说明 |
 |---|---|
 | [`deleteSelection()`](#deleteselection) | 删除选中范围（如有），返回文本是否变化。 |
-| [`insert(...)`](#insert) | 先删选择区再在光标处插入。 |
+| [`insert(...)`](#insert) | 以一次文本赋值替换选区或插入。 |
 | [`backspace()`](#backspace) | 删选择区，否则删光标前一个字符。 |
 | [`deleteForward()`](#deleteforward) | 删选择区，否则删光标后一个字符。 |
 
@@ -84,8 +84,8 @@ main(): Unit {
 
 | 成员 | 说明 |
 |---|---|
-| [`moveLeft()`](#moveleft) / [`moveRight()`](#moveright) | 左移一个字符边界；有选择时折叠到选择低端。 |
-| [`extendLeft()`](#extendleft) / [`extendRight()`](#extendright) | 保留锚点左扩展一个字符边界（Shift+Left）。 |
+| [`moveLeft()`](#moveleft) / [`moveRight()`](#moveright) | 左移一个扩展字素边界；有选择时折叠到选择低端。 |
+| [`extendLeft()`](#extendleft) / [`extendRight()`](#extendright) | 保留锚点左扩展一个扩展字素边界（Shift+Left）。 |
 | [`moveToStart()`](#movetostart) / [`moveToEnd()`](#movetoend) | 跳到文本开头并折叠选择。 |
 | [`extendToStart()`](#extendtostart) / [`extendToEnd()`](#extendtoend) | 保留锚点扩展到文本开头。 |
 | [`moveToLineStart()`](#movetolinestart) / [`moveToLineEnd()`](#movetolineend) | 跳到行首并折叠选择。 |
@@ -145,7 +145,7 @@ public let anchor: State<Int64>
 
 ### normalizeCursor
 
-把光标与锚点规范到字符边界（只在需要时写回，避免每帧空通知）。
+把光标与锚点规范到扩展字素边界（只在需要时写回，避免每帧空通知）。
 
 ```cangjie
 public func normalizeCursor(): Unit
@@ -221,7 +221,7 @@ public func selectLineAt(position: Int64): Unit
 
 **参数**
 
-- `position`: `Int64` — 目标字节偏移；越界值先规范到有效的字符边界。
+- `position`: `Int64` — 目标字节偏移；越界值先规范到有效的扩展字素边界。
 
 ### clearSelection
 
@@ -243,7 +243,7 @@ public func deleteSelection(): Bool
 
 ### insert
 
-先删选择区再在光标处插入。光标与锚点落到插入内容之后。
+以一次文本赋值替换选区或插入。光标与锚点落到插入内容之后。
 
 ```cangjie
 public func insert(value: String): Unit
@@ -271,7 +271,7 @@ public func deleteForward(): Unit
 
 ### moveLeft
 
-左移一个字符边界；有选择时折叠到选择低端。
+左移一个扩展字素边界；有选择时折叠到选择低端。
 
 ```cangjie
 public func moveLeft(): Unit
@@ -279,7 +279,7 @@ public func moveLeft(): Unit
 
 ### moveRight
 
-右移一个字符边界；有选择时折叠到选择高端。
+右移一个扩展字素边界；有选择时折叠到选择高端。
 
 ```cangjie
 public func moveRight(): Unit
@@ -287,7 +287,7 @@ public func moveRight(): Unit
 
 ### extendLeft
 
-保留锚点左扩展一个字符边界（Shift+Left）。
+保留锚点左扩展一个扩展字素边界（Shift+Left）。
 
 ```cangjie
 public func extendLeft(): Unit
@@ -295,7 +295,7 @@ public func extendLeft(): Unit
 
 ### extendRight
 
-保留锚点右扩展一个字符边界（Shift+Right）。
+保留锚点右扩展一个扩展字素边界（Shift+Right）。
 
 ```cangjie
 public func extendRight(): Unit
@@ -407,7 +407,7 @@ public func moveTo(position: Int64): Unit
 
 **参数**
 
-- `position`: `Int64` — 目标字节偏移；先规范到字符边界。
+- `position`: `Int64` — 目标字节偏移；先规范到扩展字素边界。
 
 ### extendTo
 
@@ -420,6 +420,21 @@ public func extendTo(position: Int64): Unit
 **参数**
 
 - `position`: `Int64` — 光标要移到的目标字节偏移；锚点保持不变。
+
+## 字素与词段
+
+移动、扩展、删除和选区规范化共享 Unicode 17.0.0 的扩展字素规则；组合字符、emoji ZWJ／肤色／旗帜、韩文及 CRLF 不会被拆成部分字符。Backspace 和 Delete 在所有平台均按完整字素删除。外部偏移向前吸附；插入或删除导致相邻字素合并时，光标移到合并字素后的有效边界。
+
+```cangjie
+public func moveWordLeft(): Unit
+public func moveWordRight(): Unit
+public func extendWordLeft(): Unit
+public func extendWordRight(): Unit
+public func deleteWordBackward(): Unit
+public func deleteWordForward(): Unit
+```
+
+词段按字母／数字／下划线、空白、符号分类，不提供中文／泰文词典分词。低层 TextEditState 不维护剪贴板或撤销历史；应用工具栏应使用 TextField／TextArea 的公开命令。参见 [文本编辑指南](../../../guide/how-to/text-editing.md)。
 
 ## 另请参阅
 

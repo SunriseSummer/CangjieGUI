@@ -8,8 +8,8 @@
  */
 package cui_process_manager
 
-import cui.{ButtonRole, FontSizes, ForEach, HStack, IconButton, IconName, Label, LengthUnits, Panel, ProgressBar,
-    Spacer, TabView, Table, TableColumn, VStack}
+import cui.{ButtonRole, FontSizes, ForEach, HStack, IconButton, IconSource, Label, LengthUnits, Panel}
+import cui.{ProgressBar, Spacer, TabView, Table, TableColumn, VStack}
 
 func processView(model: ProcessModel, worker: RefreshWorker, facts: Array<SystemFact>): Unit {
     VStack {
@@ -25,14 +25,12 @@ func processView(model: ProcessModel, worker: RefreshWorker, facts: Array<System
 func toolbar(model: ProcessModel, worker: RefreshWorker): Unit {
     Panel {
         HStack {
-            IconButton(IconName.Refresh) {
+            IconButton(IconSource("assets/icons/refresh.svg")) {
                 => worker.request()
             }.label("刷新").role(ButtonRole.Primary)
             Label(statusText(model, worker)).muted()
             Spacer()
-            Label("每 ${Refresh.INTERVAL_MS / Refresh.MS_PER_SECOND} 秒自动刷新")
-                .muted()
-                .fontSize(FontSizes.CAPTION)
+            Label("每 ${Refresh.INTERVAL_MS / Refresh.MS_PER_SECOND} 秒自动刷新").muted().fontSize(FontSizes.CAPTION)
         }
     }.contentPadding(10.vp).hug()
 }

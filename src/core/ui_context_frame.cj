@@ -5,13 +5,37 @@ import sdl.Rect
 // Frame scheduling and retained-paint coordination are kept together because a frame request made
 // during command recording must invalidate every active recording scope.
 extend UiContext {
+    /** Brackets shell-driven paint resource observations, including the root outside retained boundaries. */
+    protected func trackResourceReads<T>(body: () -> T): T {
+        resourceReadDepth += 1
+        try {
+            body()
+        } finally {
+            resourceReadDepth -= 1
+        }
+    }
+
+    /** Tracks external resource invalidation only during host painting or retained command recording. */
+    protected func observeResource<T>(resource: Observable<T>): Unit {
+        if (resourceReadDepth > 0) {
+            let _ = resource.get() // cjcheck-ignore: ignore-result # the read registers a retained paint dependency
+        }
+    }
+
+    /** Whether the current host paint or retained recording collects resource dependencies. */
+    protected func tracksResourceReads(): Bool {
+        resourceReadDepth > 0
+    }
+
     func trackRetainedPaint<T>(body: () -> T): (T, ?String) {
         retainedPaintDynamicReasons.add(None)
+        resourceReadDepth += 1
         try {
             let result = body()
             let reason = retainedPaintDynamicReasons[retainedPaintDynamicReasons.size - 1]
             (result, reason)
         } finally {
+            resourceReadDepth -= 1
             retainedPaintDynamicReasons.remove(at: retainedPaintDynamicReasons.size - 1)
         }
     }
@@ -57,11 +81,49 @@ extend UiContext {
         }
     }
 
+    /** Specialized editor damage; does not authorize skipping other input/state/timer work. */
+    protected func requestCaretFrameAt(elapsedMs: UInt64, rect: Rect): Unit {
+        if (rect.w <= 0.0 || rect.h <= 0.0 || rect.x.isNaN() || rect.y.isNaN() || rect.w.isNaN() || rect.h.isNaN() ||
+            rect.x.isInf() || rect.y.isInf() || rect.w.isInf() || rect.h.isInf()) {
+            return
+        }
+        markRetainedPaintDynamic("caret deadline requested during paint")
+        caretDeadlineMs = match (caretDeadlineMs) {
+            case Some(time) => Some(min(time, elapsedMs));
+            case None => Some(elapsedMs)
+        }
+        caretDamage = match (caretDamage) {
+            case Some(previous) => Some(unionRect(previous, rect));
+            case None => Some(rect)
+        }
+    }
+
+    protected func setCaretOnlyPaint(value!: Bool): Unit {
+        caretOnlyPaint = value
+    }
+    protected func isCaretOnlyPaint(): Bool {
+        caretOnlyPaint
+    }
+    protected func caretPaintIntersects(rect: Rect): Bool {
+        !caretOnlyPaint || retainedPaintIntersects(rect)
+    }
+    protected func textWindowActive(): Bool {
+        textWindowActiveValue
+    }
+    protected func setTextWindowActive(value!: Bool): Unit {
+        textWindowActiveValue = value
+    }
+    protected func hasSceneFrameRequest(): Bool {
+        immediateFrameRequested || frameDeadlineMs.isSome()
+    }
+
     /** Reads and clears all frame requests made since the preceding take. */
     protected func takeFrameSchedule(): FrameSchedule {
-        let schedule = FrameSchedule(immediate: immediateFrameRequested, deadlineMs: frameDeadlineMs)
+        let schedule = FrameSchedule(immediateFrameRequested, frameDeadlineMs, caretDeadlineMs, caretDamage)
         immediateFrameRequested = false
         frameDeadlineMs = None
+        caretDeadlineMs = None
+        caretDamage = None
         schedule
     }
 
@@ -69,6 +131,9 @@ extend UiContext {
     protected func clearFrameSchedule(): Unit {
         immediateFrameRequested = false
         frameDeadlineMs = None
+        caretDeadlineMs = None
+        caretDamage = None
+        caretOnlyPaint = false
     }
 
     /** Compatibility helper for custom shells that only distinguish pending versus idle. */

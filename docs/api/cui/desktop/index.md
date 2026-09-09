@@ -25,3 +25,8 @@ import cui.desktop.*
 |---|---|
 | [`AccessibilityFailureSource`](AccessibilityFailureSource.md) | 无障碍失败来源。 |
 | [`AccessibilityFailureOperation`](AccessibilityFailureOperation.md) | 无障碍失败发生的边界操作。 |
+
+| 新增类型 | 说明 |
+|---|---|
+| [CloseRequest](CloseRequest.md) | 可接受或取消的未决关闭请求。 |
+| [DesktopPostStats](DesktopPostStats.md) | 后台动作队列的只读诊断快照。 |

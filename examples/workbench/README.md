@@ -65,3 +65,9 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot workbench.bmp"
 ```
+
+## 练习与验收
+
+新增一份文档并编辑标题，确认大纲更新且分栏比例保持。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

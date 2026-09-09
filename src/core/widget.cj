@@ -1,5 +1,6 @@
 package cui.core
 
+import sdl.{FontWeight, FontVariations}
 import sdl.{Color, Rect, Size, SurfaceStyle, UiEvent}
 
 protected let CUI_CONTROL_H: Float32 = 38.0
@@ -98,6 +99,21 @@ public interface Widget {
             case Some(id) => [id]
             case None => []
         }
+    }
+
+    /** Applies variable-font design coordinates to this widget subtree. */
+    func fontVariations(value: FontVariations): Widget {
+        textStyle(TextStyle(fontVariations: value))
+    }
+
+    /** Applies a numeric font weight to this widget subtree. */
+    func fontWeight(value: FontWeight): Widget {
+        textStyle(TextStyle(fontWeight: value))
+    }
+
+    /** Applies inherited font family, fp size and style to this widget subtree in every phase. */
+    func textStyle(value: TextStyle): Widget {
+        applyModifier(this, WidgetModifier.Typography(value))
     }
 
     /** Constrains this widget to an exact width, e.g. `.width(160.vp)`. */
@@ -430,57 +446,6 @@ protected func layoutDetachedIfNeeded(widget: Widget, ctx: UiContext): Unit {
     if (widget.needsDetachedLayout()) {
         widget.layout(ctx, Rect.zero())
     }
-}
-
-/** A layout direction: stacks lay out along one axis; stretch rules are asked per axis. */
-public enum Axis {
-    | Horizontal
-    | Vertical
-}
-
-/** A button's visual intent, mapped by the theme to a fill/border set (see `buttonSurface`). */
-public enum ButtonRole {
-    | Normal
-    | Primary
-    | Danger
-}
-
-/** Horizontal text alignment within a label's frame, in reading direction. */
-public enum TextAlign {
-    | Leading
-    | Center
-    | Trailing
-}
-
-/** Controls how a stack positions children along its main axis. */
-public enum MainAxisAlignment {
-    | Start
-    | Center
-    | End
-    | SpaceBetween
-    | SpaceAround
-    | SpaceEvenly
-}
-
-/** Controls how a stack positions children across its main axis. */
-public enum CrossAxisAlignment {
-    | Start
-    | Center
-    | End
-    | Stretch
-}
-
-/** A two-dimensional alignment used by overlay-style containers. */
-public enum Alignment {
-    | TopLeading
-    | Top
-    | TopTrailing
-    | Leading
-    | Center
-    | Trailing
-    | BottomLeading
-    | Bottom
-    | BottomTrailing
 }
 
 /*

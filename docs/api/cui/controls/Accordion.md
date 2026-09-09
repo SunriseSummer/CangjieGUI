@@ -130,7 +130,7 @@ public func draw(ctx: UiContext): Unit
 
 ### handle
 
-点击标题切换其分区；聚焦标题上 Enter/Space 同效；其余事件转发给展开的正文。帧事件总是转发给全部展开正文（保持其中的动画运行）且不消费。
+点击标题切换其分区；聚焦标题上 Enter/Space 同效；其余事件转发给展开的正文。显式传入 `Frame` 时转发给全部展开正文且不消费；桌面宿主的正常帧回调使用独立订阅表。
 
 ```cangjie
 public func handle(ctx: UiContext, event: UiEvent): Bool

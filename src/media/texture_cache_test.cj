@@ -115,3 +115,17 @@ func publicImageCacheIsThreadLocalAndClearResetsStatistics(): Unit {
     @Expect(cleared.maxEntries, Int64(256))
     @Expect(cleared.maxBytes, UInt64(128 * 1024 * 1024))
 }
+
+@Test
+func imageTextureInvalidationNotifiesAfterAFailedEntryWasEvicted(): Unit {
+    let cache = ImageTextureCache(maxEntries: 1)
+    let renderer = Renderer.headless()
+    let path = "__evicted_failure__.png"
+    let _ = cache.texture(renderer, path)
+    let _ = cache.texture(renderer, "__replacement_failure__.png")
+    @Expect(cache.cachedEntry(path).isNone())
+    let before = cache.invalidation.revision
+    @Expect(!cache.invalidate(path))
+    @Expect(cache.invalidation.revision > before)
+    cache.clearEntries()
+}

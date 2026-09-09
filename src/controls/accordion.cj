@@ -143,21 +143,24 @@ public class Accordion <: Widget {
                     return true
                 }
             }
-            case UiEvent.KeyDown(Key.Enter, _) => if (toggleFocusedHeader(ctx)) {
-                return true
-            }
-            case UiEvent.KeyDown(Key.Space, _) => if (toggleFocusedHeader(ctx)) {
-                return true
-            }
+            case UiEvent.KeyDown(Key.Enter, _) =>
+                if (toggleFocusedHeader(ctx)) {
+                    return true
+                }
+            case UiEvent.KeyDown(Key.Space, _) =>
+                if (toggleFocusedHeader(ctx)) {
+                    return true
+                }
             case _ => ()
         }
         // Route remaining events to the open bodies so their controls work; reverse declaration order.
         var i = titles.size - 1
         while (i >= 0) {
             match (bodies[i]) {
-                case Some(w) => if (w.handle(ctx, event)) {
-                    return true
-                }
+                case Some(w) =>
+                    if (w.handle(ctx, event)) {
+                        return true
+                    }
                 case None => ()
             }
             i -= 1
@@ -224,12 +227,13 @@ public class Accordion <: Widget {
         if (ctx.showFocusRing(headerId)) {
             drawFocusRing(ctx, rect, ctx.theme.smallRadius)
         }
-        drawTwisty(ctx, rect.x + 16.0, rect.centerY(), Pen(width: 1.7, color: ctx.theme.mutedText), expanded: isExpanded, arm: 3.5)
-        let textY = rect.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
-        ctx.renderer.text(titles[index], rect.x + 32.0, textY, ctx.theme.text, pointSize: FontSizes.CONTROL)
+        drawTwisty(ctx, rect.x + 16.0, rect.centerY(), Pen(width: 1.7, color: ctx.theme.mutedText), expanded: isExpanded,
+            arm: 3.5)
+        let textY = rect.centerY() - ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.CONTROL)) / 2.0
+        ctx.text(titles[index], rect.x + 32.0, textY, ctx.theme.text,
+            pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
     }
 }
-
 
 // The seed expansion set: the requested indices, capped to one when `single`.
 private func seedExpanded(indices: Array<Int64>, single: Bool): HashSet<Int64> {

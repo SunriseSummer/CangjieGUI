@@ -14,7 +14,7 @@ public class UiContext
 
 ## 说明
 
-公开方法主要分为“申请”和“查询”两类：组件在 `handle`/`draw` 中申请焦点、悬停、按下或拖动状态，也可以登记浮层和提示；随后查询自己是否持有相应状态，以决定如何绘制。派发前后的重置与结果应用、每帧清空浮层、读取续帧请求等宿主侧操作是 `protected` 成员，由桌面应用对象（[`DesktopApp`](../desktop/DesktopApp.md) 或自定义宿主）在模块内调用，不属于公开 API，因此本页不列出。
+公开方法主要分为“申请”和“查询”两类：组件在事件处理中申请焦点、悬停、按下或拖动状态，布局时登记交互浮层，绘制时查询状态并报告提示和输入法锚点。桌面宿主负责事件事务、布局登记与续帧请求的结算；本页列出公开入口，应用通常不需要手工驱动这些阶段。
 
 这些交互统一使用字符串 `id` 标识控件；标识可按构建顺序自动生成，也可用显式键固定。每次指针移动只有一个控件获得悬停状态：事件从视觉最上层开始派发，第一个申请生效。焦点还区分“持有焦点”和“显示焦点环”：指针点击取得焦点时不画环，通过 Tab 或自动聚焦取得焦点时才画环，符合桌面端的 `:focus-visible` 惯例。
 
@@ -163,9 +163,22 @@ public init(renderer: Renderer, theme: Theme)
 
 返回宿主为当前 `UiEventRecord` 安装的事件时刻快照。键盘快捷键和 Shift+Tab 必须使用 `eventModifiers()`，避免事件排队到下一帧后查询全局键盘状态而得到错误结果；直接调用 widget 的纯逻辑测试默认得到空快照。
 
+```cangjie
+public func eventMetadata(): UiEventMetadata
+public func eventModifiers(): EventKeyModifiers
+```
+
 ### IME composition
 
 `setImeComposition` 保存 pre-edit 文本及 IME 选择范围，但不写入应用的 `Bindable<String>`；`TextInput` 到达时才提交。状态按聚焦控件 id 隔离，焦点变化、窗口失焦和 commit 会清理。`imeComposition` 供文本控件绘制未提交文本及下划线，`imeCandidates` 供自定义候选 UI/诊断。
+
+```cangjie
+public func setImeComposition(id: String, text: String, selectionStart: Int32, selectionLength: Int32): Unit
+public func setImeCandidates(id: String, values: Array<String>, selected: Int32, horizontal: Bool): Unit
+public func imeComposition(id: String): ?ImeComposition
+public func imeCandidates(id: String): ?ImeCandidates
+public func clearImeComposition(): Unit
+```
 
 ### paragraphCacheStats
 
@@ -216,6 +229,14 @@ public func requestClose(): Unit
 
 ```cangjie
 public func requestFrame(): Unit
+```
+
+### requestFrameAt
+
+请求不早于指定 SDL 绝对时钟毫秒值的一帧；不是相对于当前时刻的延迟。多次请求保留最早截止时间，可用 `ctx.elapsedMs + interval` 计算下一次截止时间。
+
+```cangjie
+public func requestFrameAt(elapsedMs: UInt64): Unit
 ```
 
 ### focusNext
@@ -429,7 +450,7 @@ public func dispatchOverlay(event: UiEvent): Bool
 
 ### drawActiveOverlay
 
-在树绘制之后自底向顶绘制已开浮层；自定义宿主每帧调用一次。绘制某层时新登记的浮层（对话框体内展开的下拉）在同一帧内被拾起并画在其上。
+在树绘制之后自底向顶绘制已开浮层；自定义宿主在需要绘制的帧调用一次。内建控件已在布局阶段登记嵌套浮层；此方法也能处理绘制回调追加的浮层，但自定义控件应优先在布局阶段登记，以便首次绘制前即可派发输入。
 
 ```cangjie
 public func drawActiveOverlay(): Unit
@@ -437,7 +458,7 @@ public func drawActiveOverlay(): Unit
 
 ### beginDrag
 
-把 `id` 标记为活动拖拽所有者并记录抓取点偏移。抓取点保存在上下文而非组件里：组件树每帧重建，实例字段撑不到下一帧的 MouseMove。
+把 `id` 标记为活动拖拽所有者并记录抓取点偏移。抓取点保存在上下文而非组件里：组件可能在拖拽过程中重新构建，实例字段无法保证延续同一次交互。
 
 ```cangjie
 public func beginDrag(id: String, grab!: Float32 = 0.0): Unit
@@ -648,7 +669,7 @@ public mut prop viewportHeight: Float32
 
 ### displayScale
 
-每虚拟像素对应的物理像素数，取自窗口内容缩放。默认 `1.0`，写入值至少为 `0.001`；[`resolve`](#resolve) 用它换算
+每虚拟像素对应的物理像素数，取自窗口内容缩放。默认 `1.0`，有限写入值至少为 `0.001`，NaN／正负无穷值恢复为 `1.0`；[`resolve`](#resolve) 用它换算
 `px` 长度。值变化时，依赖显示环境的测量、布局和文本缓存会自动失效；重复写入同一值不会产生额外工作。
 
 ```cangjie
@@ -657,7 +678,7 @@ public mut prop displayScale: Float32
 
 ### fontScale
 
-作用于 `fp` 长度的用户字体缩放；`1.0` 时 `fp` 与 `vp` 等值，setter 至少保留 `0.1`。调大它即放大全部以 `fp` 声明的字号，排版随无障碍设置走。值变化会自动失效依赖 UI 环境的测量与布局提交，无需应用重建 key 或手工推进 retained revision。
+作用于 `fp` 长度的用户字体缩放；`1.0` 时 `fp` 与 `vp` 等值，有限值至少保留 `0.1`，NaN／正负无穷值恢复为 `1.0`。调大它即放大全部以 `fp` 声明的字号，排版随无障碍设置走。值变化会自动失效依赖 UI 环境的测量与布局提交，无需应用重建 key 或手工推进 retained revision。
 
 ```cangjie
 public mut prop fontScale: Float32
@@ -725,6 +746,94 @@ public func registerSemantics(
     node: SemanticsNode,
     perform!: (SemanticsAction) -> Bool = {_ => false}
 ): Unit
+```
+
+## 继承文本默认值
+
+自定义控件宜使用以下上下文入口。省略 pointSize 时使用继承字号；显式 pointSize 已是逻辑像素，不会再次乘 fontScale。直接调用 Renderer 则只继承字体族，不自动应用 CUI 的字号/样式环境。
+
+### textSize
+
+解析显式 Length、继承字号或默认 fp 令牌。
+
+```cangjie
+public func textSize(fallback!: Float32 = FontSizes.BODY, override!: ?Length = None): Float32
+```
+
+### textRowHeight
+
+依据有效文字行高、最小高度和垂直 padding 计算行高。
+
+```cangjie
+public func textRowHeight(minHeight!: Float32 = CUI_SMALL_H, padding!: Float32 = 8.0): Float32
+```
+
+### effectiveFontStyle
+
+解析显式样式或继承样式。
+
+```cangjie
+public func effectiveFontStyle(style!: ?FontStyle = None): FontStyle
+```
+
+### withTextStyle
+
+同步合并样式作用域，在正常和异常退出时恢复。
+
+```cangjie
+public func withTextStyle<T>(style: TextStyle, body: () -> T): T
+```
+
+### textWidth
+
+按继承字体和字号测宽。
+
+```cangjie
+public func textWidth(text: String, pointSize!: ?Float32 = None, style!: ?FontStyle = None,
+        font!: ?String = None): Float32
+```
+
+### textHeight
+
+按继承字体和字号查询标准文字行高。
+
+```cangjie
+public func textHeight(pointSize!: ?Float32 = None, style!: ?FontStyle = None, font!: ?String = None): Float32
+```
+
+### fontMetrics
+
+按继承默认值查询主字体基线度量。
+
+```cangjie
+public func fontMetrics(pointSize!: ?Float32 = None, style!: ?FontStyle = None, font!: ?String = None): FontMetrics
+```
+
+### text
+
+按继承默认值绘制文字。
+
+```cangjie
+public func text(text: String, x: Float32, y: Float32, color: Color, pointSize!: ?Float32 = None,
+    style!: ?FontStyle = None, font!: ?String = None): Unit
+```
+
+### textCenter
+
+按相同度量将文字居中。
+
+```cangjie
+public func textCenter(text: String, rect: Rect, color: Color, pointSize!: ?Float32 = None,
+        style!: ?FontStyle = None, font!: ?String = None): Unit
+```
+
+### textMeasureSession
+
+为测量与点击命中创建使用同一有效样式的会话。
+
+```cangjie
+public func textMeasureSession(text: String, pointSize!: ?Float32 = None, style!: ?FontStyle = None,
+        font!: ?String = None): TextMeasureSession
 ```
 
 ## 另请参阅

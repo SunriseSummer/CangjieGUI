@@ -52,7 +52,7 @@ main(): Unit {
 
 | 成员 | 说明 |
 |---|---|
-| [`measure(ctx: UiContext, available: Size)`](#measure) | 返回自适应最长项的宽度（下限 120、含两侧按钮区）与 38 逻辑像素高，封顶于可用宽度。 |
+| [`measure(ctx: UiContext, available: Size)`](#measure) | 返回自适应最长项的宽度（下限 120、含两侧按钮区）与 高度为 `max(38, 有效文字行高 + 12)` 逻辑像素，封顶于可用宽度。 |
 | [`layout(_: UiContext, rect: Rect)`](#layout) | 记录控件框架。 |
 | [`draw(ctx: UiContext)`](#draw) | 绘制字段面、裁剪进中间区的当前项文本与两侧 ‹ › 按钮；空集合显示“—”。 |
 | [`handle(ctx: UiContext, event: UiEvent)`](#handle) | 点击两端按钮前后切换（回绕）、点击其余区域仅夺焦；聚焦后 ←/→ 切换。 |
@@ -82,7 +82,7 @@ public init(items: Array<String>, selected: Bindable<Int64>, key!: ?String = Non
 
 ### measure
 
-返回自适应最长项的宽度（下限 120、含两侧按钮区）与 38 逻辑像素高，封顶于可用宽度。[`Widget`](../core/Widget.md) 协议方法。
+返回自适应最长项的宽度（下限 120、含两侧按钮区）与 高度为 `max(38, 有效文字行高 + 12)` 逻辑像素，封顶于可用宽度。[`Widget`](../core/Widget.md) 协议方法。
 
 ```cangjie
 public func measure(ctx: UiContext, available: Size): Size

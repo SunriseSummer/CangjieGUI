@@ -6,24 +6,28 @@
  */
 package cui_fonts
 
-import cui.{Chip, CrossAxisAlignment, Divider, FontSizes, Fonts, HStack, Label, LengthUnits, Panel, ScrollView,
-    SegmentedControl, VStack}
+import cui.{Chip, CrossAxisAlignment, Divider, FontSizes, HStack, Label, LengthUnits, Panel, ScrollView,
+    SegmentedControl, VStack, FontStyle, TextStyle, Button, TextField, CanvasWidget, Color}
 
 func fontsView(model: FontsModel): Unit {
     ScrollView {
         VStack {
             header()
-            bookPanel(model)
-            specimenPanel(model)
+            SegmentedControl(["系统与变量字体", "字体角色与继承"], model.section, key: "font-sections")
+            if (model.section.value == 0) {
+                fontLab(model)
+            } else {
+                bookPanel(model)
+                specimenPanel(model)
+            }
         }.spacing(16.vp).padding(22.vp)
     }
 }
 
 private func header(): Unit {
     VStack {
-        Label("字体加载").fontSize(FontSizes.TITLE).bold()
-        Label("Fonts.register 从本地字体文件加载，Label.fontFamily 套用；找不到文件自动回退系统字体").muted()
-            .fontSize(FontSizes.CAPTION)
+        Label("字体实验室").fontSize(FontSizes.TITLE).bold()
+        Label("选字体、调字重、看真实结果；系统角色与子树继承另有对照页").muted().fontSize(FontSizes.CAPTION)
     }.spacing(4.vp).crossAxisAlignment(CrossAxisAlignment.Start).hug()
 }
 
@@ -54,18 +58,56 @@ private func specimenPanel(model: FontsModel): Unit {
             HStack {
                 SegmentedControl(model.labels(), model.selected, key: "font-picker").flex()
                 Chip("粗体", model.bold, key: "specimen-bold")
+                Chip("斜体", model.italic, key: "specimen-italic")
             }.spacing(10.vp).crossAxisAlignment(CrossAxisAlignment.Center).hug()
             Divider()
-            fontSpecimen(SPECIMEN, FontSizes.TITLE, model.currentFace(), model.bold.value, wrap: true)
-            Label("提示：等宽字体下数字与字母等宽对齐，衬线字体带衬脚。Georgia/Consolas 等拉丁字体不含 CJK，中文仍用系统字体。")
-                .muted().fontSize(FontSizes.CAPTION).wrap()
+            fontSpecimen(SPECIMEN, FontSizes.TITLE, model.currentFace(), model.bold.value, italic: model.italic.value,
+                wrap: true)
+            HStack {
+                TextField(model.text, key: "inherited-font-input").flex()
+                Button("示例按钮", {=> ()})
+            }
+                .hug()
+                .textStyle(
+                    TextStyle(fontFamily: model.currentFace(), fontSize: 20.fp,
+                        fontStyle: FontStyle(bold: model.bold.value, italic: model.italic.value)))
+            CanvasWidget(
+                {
+                    renderer, rect =>
+                        let inner = rect.inset(10.0)
+                        let resolved = renderer.resolveFont(font: model.currentFace(),
+                            style: FontStyle(bold: model.bold.value, italic: model.italic.value))
+                        if (!resolved.faces.isEmpty()) {
+                            let face = resolved.faces[0]
+                            let mode = if (face.synthesizedStyle.bold || face.synthesizedStyle.italic) {
+                                "含合成样式"
+                            } else {
+                                "真实字体面"
+                            }
+                            renderer.pushClip(inner)
+                            try {
+                                renderer.text("实际：${face.familyName} / ${face.styleName} · ${mode}", inner.x, inner.y,
+                                    Color.rgb(45, 65, 75), pointSize: FontSizes.CAPTION)
+                                renderer.text(face.source.path, inner.x, inner.y + 24.0, Color.rgb(90, 105, 115),
+                                    pointSize: FontSizes.CAPTION)
+                            } finally {
+                                renderer.popClip()
+                            }
+                        }
+                }
+            ).height(68.vp)
+            Label(
+                "提示：等宽字体下数字与字母等宽对齐，衬线字体带衬脚。Georgia/Consolas 等拉丁字体不含 CJK，中文仍用系统字体。")
+                .muted()
+                .fontSize(FontSizes.CAPTION)
+                .wrap()
         }.spacing(12.vp).crossAxisAlignment(CrossAxisAlignment.Start).hug()
     }.contentPadding(16.vp)
 }
 
 // 发射一个配置好的样张 Label：可选字体、可选粗体、单行截断或换行。
-private func fontSpecimen(text: String, size: Float32, family: ?String, bold: Bool, wrap!: Bool): Unit {
-    let label = Label(text).fontSize(size)
+private func fontSpecimen(text: String, size: Float32, family: ?String, bold: Bool, italic!: Bool = false, wrap!: Bool): Unit {
+    let label = Label(text).fontSize(size).fontStyle(FontStyle(bold: bold, italic: italic))
     if (wrap) {
         let _ = label.wrap()
     } else {
@@ -74,18 +116,12 @@ private func fontSpecimen(text: String, size: Float32, family: ?String, bold: Bo
     if (let Some(name) <- family) {
         let _ = label.fontFamily(name)
     }
-    if (bold) {
-        let _ = label.bold()
-    }
 }
 
 // 字体的加载状态：系统字体、已加载的文件路径，或未找到时的回退提示。
 private func faceStatus(face: TypeFace): String {
     match (face.family) {
-        case None => "系统 UI 字体"
-        case Some(name) => match (Fonts.pathFor(name)) {
-            case Some(path) => path
-            case None => "未找到字体文件，已回退系统字体"
-        }
+        case None => "继承 Fonts.setDefault 设置的应用默认字体"
+        case Some(name) => "fontFamily: ${name} · 由平台匹配实际文件"
     }
 }

@@ -60,3 +60,9 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot scheduler.bmp"
 ```
+
+## 练习与验收
+
+设置结束时间早于开始时间，确认无效提示与添加按钮一致。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

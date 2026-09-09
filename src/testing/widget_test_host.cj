@@ -231,20 +231,24 @@ public class WidgetTestHost {
 
     /** Clears retained state and shared interaction state before the next test frame. */
     public func reset(): Unit {
-        stateStore.clear()
-        scheduler.invalidate()
-        context.clearFocus()
-        context.hoverId = ""
-        context.clearDrag()
-        context.clearPress()
-        context.leftMouseDown = false
-        context.shouldClose = false
-        context.clearActiveOverlay()
-        context.resetSemantics()
-        context.clearTooltip()
-        context.clearTextInputAnchor()
-        context.clearFrameSchedule()
-        completed = None
+        try {
+            stateStore.clear()
+        } finally {
+            scheduler.invalidate()
+            context.clearFocus()
+            context.hoverId = ""
+            context.clearDrag()
+            context.clearPress()
+            context.leftMouseDown = false
+            context.shouldClose = false
+            context.clearActiveOverlay()
+            context.resetSemantics()
+            context.resetModalFocus()
+            context.clearTooltip()
+            context.clearTextInputAnchor()
+            context.clearFrameSchedule()
+            completed = None
+        }
     }
 
     /** Coalesces a group of state writes with the same scheduler used by `frame`. */
@@ -328,7 +332,7 @@ public class WidgetTestHost {
         try {
             context.clearTooltip()
             context.clearTextInputAnchor()
-            collectRootPaintStateReads(stateStore, {=> widget.draw(context)})
+            context.trackResourceReads {collectRootPaintStateReads(stateStore, {=> widget.draw(context)})}
             context.drawActiveOverlay()
         } finally {
             context.setRetainedDamage(None)
@@ -363,6 +367,7 @@ public class WidgetTestHost {
         let layoutStart = now()
         stateStore.adoptFocus(context)
         collectRootLayoutStateReads(stateStore, {=> widget.layout(context, rect)})
+        context.settleModalFocus()
         let layoutEnd = now()
         TestLayoutAttempt(widget, elapsed(buildStart, layoutStart), elapsed(layoutStart, layoutEnd), startGeneration,
             scheduler.generation)

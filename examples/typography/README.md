@@ -1,62 +1,55 @@
-# typography：字体样式排版样张
+# typography：字体样式与继承
 
-一张字体样式样张，集中演示 `Label` 的字体样式修饰符 `bold()` / `italic()` / `underline()` /
-`strikethrough()`：均由渲染层从单一系统字体经 SDL_ttf 实时合成，Latin 与 CJK 一视同仁，无需额外字体文件。
-顶部四个 `Chip` 实时切换样式，下方字号阶梯逐档以当前样式渲染；另有一张各样式的静态参考卡作对照。
+用四个开关观察粗体、斜体、下划线和删除线，并用字号阶梯和静态参考卡比较效果。继承对照卡说明**单字段覆盖与整组替换**的区别；真实粗体／斜体字体面优先，缺少时按策略合成。
 
-## 演示要点
+![样式与继承](../.images/typography.png)
 
-- `Label` 字体样式修饰符 `bold()`、`italic()`、`underline()`、`strikethrough()`，可链式叠加（如 `bold().italic()`）
-- 顶部四个 `Chip` 直接绑定模型各 `State<Bool>`（`State` 即 `Bindable<Bool>`），点选实时切换全局样式
-- 字号阶梯 Display/Title/Body/Caption 逐档以当前合成样式渲染同一中西混排示范文本，验证样式对两种脚本一致生效
-- 静态样式参考卡固定展示常规、粗体、斜体、下划线、删除线、粗斜体六种样子，不随开关变化，作为对照
-- 当前样式的中文摘要（如「粗体 · 斜体」）由样式纯函数派生，显示在页脚
-
-## 文件结构
-
-| 文件 | 职责 |
-|---|---|
-| [main.cj](src/main.cj) | 入口 |
-| [data.cj](src/data.cj) | 字号阶梯、样式参考表、样式合成与摘要（纯函数） |
-| [model.cj](src/model.cj) | `TypographyModel`：四个样式开关；当前样式与摘要派生 |
-| [views.cj](src/views.cj) | 标题、样式开关 Chip 行、实时字号阶梯、样式参考卡、页脚摘要 |
-| [theme.cj](src/theme.cj) | 编辑排版风浅色主题（暖白纸面 + 近墨文字 + 靛蓝强调） |
-
-## 关键实现
-
-### 样式由系统字体合成
-
-四种样式无需额外字体文件——渲染层对单一系统字体施加 SDL_ttf 的 `TTF_SetFontStyle`：faux 粗体加粗描边并加宽
-步进，斜体倾斜字形，下划线/删除线加线。每个（字号，样式）组合各持一个字体句柄与成形缓存，度量随样式变化
-（粗体更宽），布局、省略号与换行判定都按实绘样式计算。
-
-### 当前样式是开关的纯函数
-
-四个开关合成当前样式，视图每帧读取，切换 Chip 即重算：
+## 最常用的样式写法
 
 ```cangjie
-func composeStyle(bold: Bool, italic: Bool, underline: Bool, strikethrough: Bool): FontStyle {
-    FontStyle(bold: bold, italic: italic, underline: underline, strikethrough: strikethrough)
-}
+Label("标题").fontWeight(FontWeight.semiBold).fontSize(26.fp)
+Label("强调").bold().italic() // bold 是 700 的快捷方式
+Label("链接").underline()
+Label("弃用内容").strikethrough()
 ```
 
-### 阶梯逐档套用同一样式
-
-字号阶梯每档取框架标准字号，以当前合成样式渲染同一示范文本：
+独立修饰器只覆盖自己的字段；局部字体族或字号也不会清除其它继承样式：
 
 ```cangjie
-Label(SPECIMEN).fontSize(step.size).fontStyle(model.style()).maxLines(1)
+VStack {
+    Label("继承 600、斜体和下划线")
+    Label("只改为 400").fontWeight(FontWeight.normal)
+    Label("只取消斜体").italic(value: false)
+    Label("重置字重、倾斜、装饰和轴").fontStyle(FontStyle.regular)
+}.textStyle(TextStyle(fontWeight: FontWeight.semiBold, italic: true, underline: true))
 ```
 
-## 运行
+同一个 `TextStyle` 同时指定 `fontStyle` 和独立字段时，先应用整组 `fontStyle`，再应用独立字段。本例通过模型的四个 `State<Bool>` 构建完整 FontStyle，适合编辑器工具栏这样的“明确指定整组状态”场景。
+
+## 观察重点
+
+- 打开全部开关：继承卡的第二行仍有倾斜／装饰，第三行仍有粗体／装饰，第四行恢复常规。
+- 比较 Latin 与 CJK、小字号与大字号；真实斜体由字体设计决定，合成斜体是倾斜后备，不代表每个字体都带专门的 Italic 面。
+- 缩窄窗口并滚动：内容按实绘样式测量，省略号只在空间不足时出现。框架已修正斜体栅格拉伸与字间重叠，应用不应手工加字距补偿。
+- 需要指定 350、625 或检查实际文件时，使用 [fonts 字体实验室](../fonts/README.md)。
+
+字号优先用 `fp`，由 `DesktopApp(..., fontScale: 1.25)` 统一放大文字；`vp` 用于间距，`px` 表示物理像素。不要手动把 DPI 再乘到字号上。低层 `ctx.text` 的 pointSize 是已经解析后的逻辑像素。
+
+## 代码与运行
+
+[data.cj](src/data.cj) 定义字号阶梯、样式表与纯函数；[model.cj](src/model.cj) 保存开关；[views.cj](src/views.cj) 展示继承、预览和参考卡；[main.cj](src/main.cj) 选择系统 UI 默认。
 
 ```powershell
 cd examples/typography
 cjpm run
-```
-
-点顶部 Chip 切换粗体/斜体/下划线/删除线，字号阶梯与页脚摘要随之更新。支持视觉回归快照：
-
-```powershell
+cjpm test --no-progress
 cjpm run --run-args "--snapshot typography.bmp"
 ```
+
+更多设置与平台边界见 [字体指南](../../docs/guide/how-to/fonts-and-typography.md)。
+
+## 练习与验收
+
+打开全部样式开关，比较单字段覆盖与 FontStyle 整组重置。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

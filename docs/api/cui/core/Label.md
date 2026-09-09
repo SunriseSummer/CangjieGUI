@@ -18,9 +18,9 @@ Label <: [`Widget`](Widget.md)
 
 ## 说明
 
-粗体、斜体、下划线与删除线经 sdl 的 `FontStyle` 在文本渲染层实时合成，对字体覆盖的所有文字（拉丁与中日韩皆同）生效；`fontFamily` 切换到 `Fonts.register` 注册过的应用字体（语义权威：sdl 模块文档）。显式的 `foregroundColor` 优先于 `muted`。
+粗体和斜体优先采用真实字体面，没有时按策略合成；装饰线由 SDL_ttf 绘制，斜体使用整段纹理路径。`fontFamily` 支持应用注册名和系统目录发现的族名（语义权威：sdl 模块文档）。显式的 `foregroundColor` 优先于 `muted`。
 
-多行排版把字形宽度、Unicode 字素簇和合法断行机会分开处理：组合附加符、ZWJ emoji、旗帜区域指示符与常见 Indic/Hangul 序列不会被截断；硬换行、NBSP/WJ 和 CJK 开闭标点遵循 UAX #14 风格禁则，实在放不下时只在完整字素簇边界紧急换行。冷布局通过 SDL_ttf 有界前缀测量避免反复塑形整段余串；结果进入 `UiContext` 共享、4 MiB 字节预算的真 LRU，因此每帧重建同一 Label 仍可命中。Label 实例自身还在 measure/draw 间复用结果；更改样式、字族或行数上限会重新查询完整键。
+多行排版把字形宽度、Unicode 字素簇和合法断行机会分开处理：组合附加符、ZWJ emoji、旗帜区域指示符与常见 Indic/Hangul 序列不会被截断；硬换行、NBSP/WJ 和 CJK 开闭标点遵循 UAX #14 风格禁则，实在放不下时只在完整字素簇边界紧急换行。冷布局通过 SDL_ttf 有界前缀测量避免反复塑形整段余串；结果进入 `UiContext` 共享、4 MiB 字节预算的真 LRU，因此重新构建相同文本的 Label 仍可命中。预算计入字符串内容、条目及每行描述符（包括空行），并非进程实际内存用量。Label 实例自身还在 measure/draw 间复用结果；更改样式、字族或行数上限会重新查询完整键。
 
 ## 示例
 
@@ -66,7 +66,9 @@ main(): Unit {
 | [`italic(value!: Bool)`](#italic) | 倾斜文本（或把斜体设为 `value`）。 |
 | [`underline(value!: Bool)`](#underline) | 给文本加下划线（或把下划线设为 `value`）。 |
 | [`strikethrough(value!: Bool)`](#strikethrough) | 给文本加删除线（或把删除线设为 `value`）。 |
-| [`fontFamily(name: String)`](#fontfamily) | 用已注册的应用字体绘制文本。 |
+| [`fontFamily(name: String)`](#fontfamily) | 按应用注册名、系统族名或 FontRole 字体角色选择字体。 |
+| [`fontWeight(value: FontWeight)`](#数值字重与变量轴) | 设置数值字重，保留其他继承样式。 |
+| [`fontVariations(value: FontVariations)`](#数值字重与变量轴) | 设置变量字体设计轴。 |
 | [`maxLines(value: Int64)`](#maxlines) | 允许文本换行至最多 `value` 行，仍有剩余文本时最后一行以省略号截断。 |
 | [`wrap()`](#wrap) | 取消行数上限，让文本按需换行。 |
 | [`measure(...)`](#measure) | 单行时按整段文本宽度测量，多行时先按可用宽度折行、再报告最宽行与行数决定的高度。 |
@@ -86,17 +88,17 @@ public init(
     muted!: Bool = false,
     align!: TextAlign = TextAlign.Leading,
     color!: ?Color = None,
-    fontSize!: Length = Length(FontSizes.BODY, LengthUnit.Fp)
+    fontSize!: ?Length = None
 )
 ```
 
 **参数**
 
-- `text`: `String` — 要显示的文本；构造后不可变，变化的文本每帧重建标签即可。
+- `text`: `String` — 要显示的文本；构造后不可变；在声明中读取可观察文本，状态变化会重建相应标签。
 - `muted!`: `Bool` — 是否用主题的次要文字色；默认 `false`。
 - `align!`: [`TextAlign`](TextAlign.md) — 帧内水平对齐；默认 `TextAlign.Leading`。
 - `color!`: `?Color` — 显式文字颜色，优先于 `muted`；默认 `None`，按 `muted` 从主题取色。
-- `fontSize!`: [`Length`](Length.md) — 字号；默认 `Length(FontSizes.BODY, LengthUnit.Fp)`（15 fp，随用户字体缩放）。
+- `fontSize!`: `?`[`Length`](Length.md) — 默认 `None`，继承 `TextStyle`；没有继承值时使用 `FontSizes.BODY`（15 fp）。显式值写作 `Some(18.fp)`，或使用 `.fontSize(18.fp)`。
 
 ## 方法
 
@@ -236,7 +238,7 @@ public func strikethrough(value!: Bool = true): Label
 
 ### fontFamily
 
-用已注册的应用字体绘制文本。未知名称或字体文件加载失败时回退到平台 UI 字体；注册入口是 sdl 的 `Fonts.register`。返回 `this` 便于链式调用。
+按应用注册名、系统族名或 FontRole 字体角色选择字体。未知名称或字体文件加载失败时回退到平台 UI 字体；注册入口是 sdl 的 `Fonts.register`。返回 `this` 便于链式调用。
 
 ```cangjie
 public func fontFamily(name: String): Label
@@ -244,7 +246,7 @@ public func fontFamily(name: String): Label
 
 **参数**
 
-- `name`: `String` — 注册时使用的字体名。
+- `name`: `String` — 应用注册名、系统字体族名或 FontRole 角色值。
 
 **返回值** `Label` — `this`。
 
@@ -278,7 +280,7 @@ public func wrap(): Label
 
 ### measure
 
-单行时按整段文本宽度测量，多行时先按可用宽度折行、再报告最宽行与行数决定的高度。宽度不超过可用宽度，高度下限为小控件高（28 逻辑像素）。
+单行时按整段文本宽度测量，多行时先按可用宽度折行、再报告最宽行与行数决定的高度。宽度不超过可用宽度，高度为文字块高度加 6，且不低于 28 逻辑像素；多行之间另有 2 逻辑像素行距。
 
 ```cangjie
 public func measure(ctx: UiContext, available: Size): Size
@@ -296,7 +298,7 @@ public func measure(ctx: UiContext, available: Size): Size
 记录分配的帧矩形。
 
 ```cangjie
-public func layout(_: UiContext, rect: Rect): Unit
+public func layout(ctx: UiContext, rect: Rect): Unit
 ```
 
 **参数**
@@ -324,6 +326,19 @@ public func handle(_: UiContext, _: UiEvent): Bool
 ```
 
 **返回值** `Bool` — 恒为 `false`。
+
+## 字体继承与缩放
+
+构造时省略 fontSize 会继承 TextStyle；显式 `.fontSize(...)` 或构造参数优先。字体族可使用应用注册名或系统字体服务或目录发现的族名／FontRole 角色。字体/字号/样式、字体版本与实际 raster scale 变化都会使相关布局缓存失效。
+
+## 数值字重与变量轴
+
+独立设置时保留其它继承样式。
+
+```cangjie
+public func fontWeight(value: FontWeight): Label
+public func fontVariations(value: FontVariations): Label
+```
 
 ## 另请参阅
 

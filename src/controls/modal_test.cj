@@ -117,11 +117,12 @@ func modalTabCyclesDialogFocusOnly(): Unit {
     modal.draw(ctx)
     @Expect(ctx.hasOverlay())
 
-    // From no focus Tab enters at the dialog's first stop, then wraps m1 -> m2 -> m1.
-    @Expect(ctx.dispatchOverlay(UiEvent.KeyDown(Key.Tab, false)))
+    // Opening now focuses the first stop immediately; Tab continues and wraps inside the dialog.
     @Expect(ctx.hasFocus("m1"))
     @Expect(ctx.dispatchOverlay(UiEvent.KeyDown(Key.Tab, false)))
     @Expect(ctx.hasFocus("m2"))
     @Expect(ctx.dispatchOverlay(UiEvent.KeyDown(Key.Tab, false)))
-    @Expect(ctx.hasFocus("m1")) // wrapped inside the dialog; "bg" is never visited
+    @Expect(ctx.hasFocus("m1"))
+    @Expect(ctx.dispatchOverlay(UiEvent.KeyDown(Key.Tab, false)))
+    @Expect(ctx.hasFocus("m2")) // wrapped inside the dialog; "bg" is never visited
 }

@@ -2,6 +2,8 @@
 
 本指南先建立运行模型，再按具体任务讲解控件和桌面能力。初次使用按“入门路线”阅读；已有目标时直接查“任务手册”。精确签名、默认值和异常以 [API 参考](../api/index.md)为准。
 
+两个库的职责与学习顺序见[技术体系与学习地图](concepts/technology-map.md)。
+
 ## 入门路线
 
 1. [创建第一个窗口](getting-started/first-window.md)：完成可运行的计数器，认识 `DesktopApp`、`State`、布局和事件。
@@ -48,9 +50,18 @@ CUI 会自动记录状态读取并跳过未受影响的工作。应用代码仍�
 ### 输入与交互
 
 - [组合文本编辑、菜单与快捷动作](how-to/text-editing-and-menus.md)
+- [文本编辑样式、Emoji 与输入法](how-to/text-editing.md)
 - [统一鼠标、Tab 和快捷键](how-to/keyboard-and-focus.md)
 - [使用模态确认和 Toast](how-to/modal-and-toast.md)
 - [建立一致主题](how-to/theme-an-app.md)
+
+### 字体、图片与图标
+
+- [字体配置、继承与渲染](how-to/fonts-and-typography.md)
+- [静态图像、适配与缓存](how-to/images.md)
+- [图标来源、颜色与 DPI](how-to/icons.md)
+- [按需使用预置图标](how-to/preset-icons.md)
+- [字体示例学习路线](../../examples/README.md#字体学习路线)
 
 ### 自定义组件、绘制与动画
 
@@ -63,6 +74,7 @@ CUI 会自动记录状态读取并跳过未受影响的工作。应用代码仍�
 
 ### 桌面集成与交付
 
+- [桌面线程与关闭确认](how-to/desktop-lifecycle.md)
 - [在后台工作并把结果送回界面](how-to/desktop-files-and-background.md)
 - [生成快照并分析帧耗时](how-to/snapshot-and-profile.md)
 - [打包桌面应用](how-to/package-desktop-app.md)
@@ -77,6 +89,7 @@ CUI 会自动记录状态读取并跳过未受影响的工作。应用代码仍�
 - [核心组件与状态](../api/cui/core/index.md)
 - [成品控件](../api/cui/controls/index.md)
 - [文本编辑](../api/cui/text/index.md)
+- [选择、剪贴板与撤销](how-to/text-editing.md)
 - [图片与自绘](../api/cui/media/index.md)
 - [桌面应用](../api/cui/desktop/index.md)
 - [组件测试](../api/cui/testing/index.md)

@@ -15,7 +15,7 @@ class PackageRunnerTest(unittest.TestCase):
     def test_discovers_every_public_source_package(self):
         self.assertEqual(
             runner.discover_packages(),
-            ["controls", "core", "desktop", "media", "testing", "text"],
+            ["controls", "core", "desktop", "media", "symbols", "testing", "text"],
         )
 
     def test_summary_parser_uses_the_final_project_summary(self):

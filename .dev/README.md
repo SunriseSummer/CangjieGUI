@@ -22,8 +22,8 @@ python .dev/cli.py bench run --samples 1
 | 领域 | 命令 | 作用 |
 | --- | --- | --- |
 | 工具自测 | `test tools` | 验证 Python 工具、工作流契约和性能门禁逻辑 |
-| 文档结构 | `check docs` | 检查本地链接及公开 API 页面、索引和伞包导出的完整性 |
-| 文档代码 | `check snippets` | 提取并编译标记为 `verify` 的完整仓颉示例 |
+| 文档结构 | `check docs` | 检查各级示例说明与文档的本地链接、代码块闭合，以及公开 API 页面、索引和伞包导出的完整性 |
+| 文档代码 | `check snippets` | 从 README、指南、API 和示例说明提取并编译标记为 `verify` 的完整仓颉程序 |
 | 包测试 | `test packages` | 隔离运行各 CUI 包测试并生成统一报告 |
 | 示例 | `test examples` | 构建或测试全部示例，可选真实窗口快照 |
 | 桌面生命周期 | `test desktop` | 验证窗口线程、增量绘制、唤醒、退出和清理 |
@@ -31,6 +31,8 @@ python .dev/cli.py bench run --samples 1
 | 示例画廊 | `gallery` | 生成示例真实渲染截图 |
 | 发布 | `release ...` | 工具链引导、SDL 构建/暂存和干净交付验证 |
 | 性能 | `bench ...` | 基准采集、比较、回归门禁和架构压力实验 |
+
+`test desktop --repeat 3 --build-timeout 600` 可重复运行桌面回归。文字场景覆盖布局／绘制比例、原生文本编辑、Emoji 连续粘贴，以及 RichText 硬换行后的像素与链接命中；1×／2× 超采样下使用独立字体／分行绘制结果作对照。Emoji 粘贴对照要求 RGB 完全一致，仅容许不同主字体在分数 DPI 下独立量化基线带来的一行物理像素平移；同时检查光标、选区和撤销。`emoji-alignment` 将 TextArea／TextField 的完整混排行与直接渲染参照逐像素比较，不使用色差容差；底层基线另由 SDL 公共布局数据的独立回归验证。截图写入根目录 `target/dev/fixtures/desktop_lifecycle/`，场景在独立进程运行。
 
 各子命令支持 `--help`，例如：
 
@@ -103,6 +105,8 @@ python .dev/cli.py test tools
 
 ## 扩展规范
 
+`test desktop` 的 `editor-quality` 场景验证内容宽度选区、空行、尾随空格、可选整行背景和原生光标对称几何；实际 DesktopApp 闪烁检查零构建／布局／文字度量／整形，并与完整参考帧逐像素比较（包括空文档提示文字）。测试不能仅依据进程退出码判断成功，还须出现 `@@DESKTOP_LIFECYCLE|passed`。
+
 新增工具时：
 
 1. 先选择 `checks`、`e2e`、`snapshots`、`release`、`platform` 或 `bench` 的明确归属。
@@ -121,3 +125,7 @@ powershell -ExecutionPolicy Bypass -File .dev/platform/windows/check_uia.ps1
 ```
 
 构建脚本自动识别 x86_64/arm64，输出到 `target/native/windows/<arch>`；检查脚本运行独立 UIA 客户端并验证真实窗口 provider。
+
+`image-static` 桌面场景会在临时目录生成 PNG/JPEG，并从文件、JPEG 内存和 SVG 内存完成解码及半透明圆角绘制，检查输出像素。它同时属于干净发布目录验收，不依赖仓库图像资产或可选解码 DLL。
+
+`python .dev/cli.py check symbol-linking` 构建 43 个静态程序，校验预置图标的包含／排除集合。独立构建、逐案例日志、大小与 SHA-256 写入 `target/dev/symbol-linking/`。

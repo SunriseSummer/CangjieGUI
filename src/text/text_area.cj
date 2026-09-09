@@ -1,48 +1,13 @@
 package cui.text
 
-import sdl.{FontSizes, Key, MouseButton, Point, Rect, Size, UiEvent}
-import sdl.input.Clipboard
+import sdl.{Key, MouseButton, Rect, Size, UiEvent}
 import cui.core.{Bindable, CUI_SMALL_H, CursorShape, ScrollBar, maxScrollOffset, State, UiContext, Widget,
-    claimHoverIfInside, clampScrollOffset, drawSurface, drawVerticalScrollBar, emit, localState, registerFocusable,
-    resolveControlKey, registerFrameSubscriber, scrollLineIndex, scrollLineRemainder, scrollOffsetAfterWheel}
+    claimHoverIfInside, clampScrollOffset, emit, localState, registerFocusable, resolveControlKey,
+    registerFrameSubscriber, scrollByWheel, Semantics, SemanticsAction, SemanticsRole, drawVerticalScrollBar}
 
-// SDL reports letter keys as their uppercase ASCII code (see the Ctrl+letter shortcuts).
-private let AREA_LETTER_A: UInt8 = 65
-private let AREA_LETTER_C: UInt8 = 67
-private let AREA_LETTER_V: UInt8 = 86
-private let AREA_LETTER_X: UInt8 = 88
-private let AREA_LETTER_Y: UInt8 = 89
-private let AREA_LETTER_Z: UInt8 = 90
+private let TEXT_AREA_COPY_SHORTCUT: UInt8 = 67
 
-/*
- * Caches a document's line split so scrolling does not re-split the whole text every frame. Keyed
- * by the text's revision: an edit bumps the revision (see Observable.revision), which refreshes the
- * split on next access, so the cache never serves stale lines. Splitting is already the fast
- * primitive here (stdlib split beats a hand-rolled byte scan), so the win is not re-doing it.
- */
-class TextLineCache {
-    private var cachedRevision: UInt64 = 0
-    private var cachedLines: Array<String> = []
-    private var hasValue = false
-
-    func lines(text: String, revision: UInt64): Array<String> {
-        if (!hasValue || revision != cachedRevision) {
-            cachedLines = text.split("\n")
-            cachedRevision = revision
-            hasValue = true
-        }
-        cachedLines
-    }
-}
-
-/*
- * A multi-line text editor bound to a `Bindable<String>`, with vertical scrolling and a scroll bar.
- * As in `TextField`, the caret and selection anchor are BYTE offsets into the UTF-8 text; an owner
- * that moves the cursor from outside (loading a file, a programmatic paste) must move the anchor with
- * it, or the next keystroke replaces a selection the user never made. The document's line split is
- * cached by the text's revision, so scrolling does not re-split the whole text every frame.
- * `editable: false` renders read-only and stays out of Tab traversal.
- */
+/** Multi-line editor with cached rows, grapheme selection, history and scrolling; caret/anchor use UTF-8 bytes. */
 public class TextArea <: Widget {
     private let id: String
     private let text: Bindable<String>
@@ -52,10 +17,18 @@ public class TextArea <: Widget {
     private var isEditable: Bool
     private let scrollBar: ScrollBar
     private let history: UndoHistory
-    private let lineCache: TextLineCache
+    private let clipboard: TextClipboard
+    private let interaction: TextAreaInteraction
+    private let boundaryCache: TextEditBoundaryCache
+    private var inputAppearance = TextInputStyle()
+    private var hint = ""
+    private var wrapLines = false
     private var autofocusRequested = false
     private let autofocusDone: State<Bool>
     private var frame = Rect.zero()
+    private var lastPaintView: ?TextEditorView = None
+    private var lastPaintEpoch: UInt64 = UInt64(0)
+    private var rowHeight: Float32 = CUI_SMALL_H
 
     public init(
         text: Bindable<String>,
@@ -63,7 +36,8 @@ public class TextArea <: Widget {
         scroll!: ?State<Float32> = None,
         cursor!: ?State<Int64> = None,
         anchor!: ?State<Int64> = None,
-        editable!: Bool = true
+        editable!: Bool = true,
+        clipboard!: TextClipboard = TextClipboard.system
     ) {
         let ident = resolveControlKey(key, "TextArea")
         this.id = ident
@@ -76,10 +50,7 @@ public class TextArea <: Widget {
             case Some(value) => value
             case None => localState<Int64>("TextArea:${ident}:cursor") {text.value.size}
         }
-        // The anchor starts collapsed on the caret so no phantom selection appears. A caller
-        // that owns the cursor and moves it from outside (loading a file, a programmatic
-        // paste) must own the anchor too and move both together — otherwise the stale anchor
-        // spans a selection the user never made, and the next keystroke replaces it.
+        // Start collapsed; callers owning the caret must move the anchor with it on document replacement.
         let caretStart = cursorStateValue.value
         this.anchorStateValue = match (anchor) {
             case Some(value) => value
@@ -88,8 +59,14 @@ public class TextArea <: Widget {
         this.isEditable = editable
         this.scrollBar = ScrollBar("TextArea:${ident}:thumb")
         this.history = localState<UndoHistory>("TextArea:${ident}:history") {UndoHistory()}.value
-        this.lineCache = localState<TextLineCache>("TextArea:${ident}:lines") {TextLineCache()}.value
+        this.clipboard = clipboard
+        this.interaction = TextAreaInteraction(ident, history)
+        this.boundaryCache = localState<TextEditBoundaryCache>("TextArea:${ident}:boundaries") {TextEditBoundaryCache()}
+            .value
         this.autofocusDone = localState<Bool>("TextArea:${ident}:autofocused") {false}
+        if (interaction.dragScroll.active.value) {
+            registerFrameSubscriber({ctx, _ => autoScroll(ctx)})
+        }
         // A read-only text area is not an editing stop, so it stays out of Tab traversal.
         if (editable) {
             registerFocusable(ident)
@@ -97,83 +74,229 @@ public class TextArea <: Widget {
         emit(this)
     }
 
+    /** Sets colors, inner padding, alignment and minimum visual row height. */
+    public func style(value: TextInputStyle): TextArea {
+        inputAppearance = value
+        this
+    }
+    /** Shows a hint while the document and pre-edit are empty. */
+    public func placeholder(value: String): TextArea {
+        hint = normalizedEditorInput(value, multiline: true)
+        this
+    }
+    /** Wraps visual rows without changing document bytes; disabled by default. */
+    public func wrap(value!: Bool = true): TextArea {
+        wrapLines = value
+        this
+    }
+
     /** Claims keyboard focus the first time an editable area appears (e.g. a compose box). */
     public func autofocus(): TextArea {
         autofocusRequested = true
-        registerFrameSubscriber({ctx, _ => applyAutofocus(ctx)})
+        subscribeEditorAutofocus(autofocusDone, isEditable, {ctx => applyAutofocus(ctx)})
         this
     }
 
     /** Reverts the last edit group; also bound to Ctrl+Z. */
     public func undo(): Unit {
-        applyHistoryStep(history.undo(snapshot())) {state => applySnapshot(state)}
+        interaction.upstream.value = false
+        interaction.preferredX.value = -1.0
+        actions().undo()
+        revealCaretLine()
     }
 
     /** Reapplies the last undone edit; also bound to Ctrl+Y / Ctrl+Shift+Z. */
     public func redo(): Unit {
-        applyHistoryStep(history.redo(snapshot())) {state => applySnapshot(state)}
+        interaction.upstream.value = false
+        interaction.preferredX.value = -1.0
+        actions().redo()
+        revealCaretLine()
     }
 
-    public func measure(_: UiContext, available: Size): Size {
+    /** Selects all text; selection and copying remain available in read-only mode. */
+    public func selectAll(): Unit {
+        interaction.upstream.value = false
+        interaction.preferredX.value = -1.0
+        actions().selectAll()
+    }
+    /** Selects byte offsets, snapping both endpoints to extended-grapheme boundaries. */
+    public func selectRange(anchor: Int64, cursor: Int64): Unit {
+        interaction.upstream.value = false
+        interaction.preferredX.value = -1.0
+        actions().selectRange(anchor, cursor)
+    }
+    /** Returns selected plain text. */
+    public func selectedText(): String {
+        actions().selectedText()
+    }
+    /** Replaces selection as one undo step; an empty value deletes the selection. */
+    public func replaceSelection(value: String): Bool {
+        interaction.upstream.value = false
+        interaction.preferredX.value = -1.0
+        let changed = actions().replaceSelection(value)
+        if (changed) {
+            revealCaretLine()
+        }
+        changed
+    }
+    /** Copies selection; false means empty selection or a rejected/failed clipboard write. */
+    public func copy(): Bool {
+        actions().copy()
+    }
+    /** Deletes selection only after a successful copy; read-only controls return false. */
+    public func cut(): Bool {
+        interaction.upstream.value = false
+        interaction.preferredX.value = -1.0
+        let changed = actions().cut()
+        if (changed) {
+            revealCaretLine()
+        }
+        changed
+    }
+    /** Pastes as one undo step; empty/failed clipboard reads leave selection intact. */
+    public func paste(): Bool {
+        interaction.upstream.value = false
+        interaction.preferredX.value = -1.0
+        let changed = actions().paste()
+        if (changed) {
+            revealCaretLine()
+        }
+        changed
+    }
+    /** Whether this editable document has an undo step. */
+    public func canUndo(): Bool {
+        actions().canUndo()
+    }
+    /** Whether this editable document has a redo step. */
+    public func canRedo(): Bool {
+        actions().canRedo()
+    }
+
+    public func measure(ctx: UiContext, available: Size): Size {
+        rowHeight = inputAppearance.rowHeight(ctx, multiline: true)
         Size(available.w, available.h)
     }
 
-    public func layout(_: UiContext, rect: Rect): Unit {
+    public func layout(ctx: UiContext, rect: Rect): Unit {
+        rowHeight = inputAppearance.rowHeight(ctx, multiline: true)
         frame = rect
-    }
-
-    // The document split into lines, cached by text revision so scrolling never re-splits per frame.
-    private func lines(): Array<String> {
-        lineCache.lines(text.value, text.revision)
+        let supported = if (isEditable) {
+            [SemanticsAction.Focus, SemanticsAction.SetValue("")]
+        } else {
+            [SemanticsAction.Focus]
+        }
+        ctx.registerSemanticProvider(id, rect, supported,
+            {=> Semantics(role: SemanticsRole.TextField, value: text.value)}, {
+                action => match (action) {
+                    case SemanticsAction.Focus =>
+                        ctx.focus(id, viaKeyboard: true);
+                        true
+                    case SemanticsAction.SetValue(next) where isEditable && !next.contains("\u{0000}") =>
+                        interaction.preferredX.value = -1.0
+                        if (this.actions().replaceValue(next)) {
+                            ctx.requestFrame()
+                        }
+                        revealCaretLine()
+                        true
+                    case _ => false
+                }
+            })
     }
 
     public func draw(ctx: UiContext): Unit {
-        let edit = editState()
-        edit.normalizeCursor()
-        let docLines = lines()
-        // Clamp writes only on change: draw runs every frame, and the offset may be an
-        // externally owned state whose observers should not fire for no-op writes.
-        let clampedScroll = clampScrollOffset(scrollStateValue.value, textContentHeight(docLines), textViewport(frame).h)
+        if (ctx.isCaretOnlyPaint()) {
+            if (ctx.caretPaintIntersects(frame)) {
+                if (let Some(view) <- lastPaintView) {
+                    view.draw(frame, id, isEditable, hint, lastPaintEpoch)
+                    drawVerticalScrollBar(ctx, frame, view.scroll, view.contentHeight(), view.viewport.h, active: false)
+                }
+            }
+            return
+        }
+        let view = editorView(ctx)
+        let clampedScroll = if (interaction.revealPending.value) {
+            view.followVertical()
+        } else {
+            clampScrollOffset(scrollStateValue.value, view.contentHeight(), view.viewport.h)
+        }
+        if (interaction.revealPending.value) {
+            interaction.revealPending.value = false
+        }
         if (clampedScroll != scrollStateValue.value) {
             scrollStateValue.value = clampedScroll
         }
-        let content = TextAreaContent(text.value, cursorStateValue.value, scrollStateValue.value)
-        drawTextAreaBox(ctx, frame, id, content, docLines, selection: (edit.selectionStart(), edit.selectionEnd()),
-            barActive: scrollBar.dragging(ctx))
+        view.scroll = clampedScroll
+        let offset = if (wrapLines) {
+            Float32(0.0)
+        } else {
+            view.followHorizontal()
+        }
+        if (offset != interaction.xOffset.value) {
+            interaction.xOffset.value = offset
+        }
+        view.xShift = offset
+        lastPaintView = Some(view)
+        lastPaintEpoch = interaction.blink.epoch
+        view.draw(frame, id, isEditable, hint, lastPaintEpoch)
+        drawVerticalScrollBar(ctx, frame, clampedScroll, view.contentHeight(), view.viewport.h,
+            active: scrollBar.dragging(ctx))
     }
 
-    public func handle(ctx: UiContext, event: UiEvent): Bool { // cjcheck-ignore: long-function # flat single-match event table; each arm is one editing interaction in the desktop convention order
-        // A read-only area is not an editing target, so it does not request the text cursor.
-        if (isEditable) {
-            claimHoverIfInside(ctx, event, frame, id, CursorShape.Text)
+    private func editorView(ctx: UiContext): TextEditorView {
+        let edit = editState()
+        if (interaction.blink.observe(ctx, id, edit, isEditable)) {
+            interaction.revealPending.value = true
         }
+        if (!isEditable && ctx.hasFocus(id)) {
+            ctx.clearTextInputAnchor();
+            ctx.clearImeComposition()
+        }
+        let view = TextEditorView(ctx, frame, TextEditorDisplay(ctx, id, edit, isEditable), interaction.layoutCache,
+            TextEditorViewState(inputAppearance, multiline: true, wrap: wrapLines, scroll: scrollStateValue.value,
+                xShift: interaction.xOffset.value, upstream: interaction.upstream.value))
+        rowHeight = view.rowHeight
+        view
+    }
+
+    public func handle(ctx: UiContext, event: UiEvent): Bool {
+        let consumed = handleEvent(ctx, event)
+        if (interaction.revealPending.value) {
+            let next = editorView(ctx).followVertical()
+            if (scrollStateValue.value != next) {
+                scrollStateValue.value = next
+            }
+            interaction.revealPending.value = false
+        }
+        consumed
+    }
+
+    private func handleEvent(ctx: UiContext, event: UiEvent): Bool {
+        let view = editorView(ctx)
+        claimHoverIfInside(ctx, event, frame, id, CursorShape.Text)
         let edit = editState()
         match (event) {
             case UiEvent.MouseDown(MouseButton.Left, x, y) =>
-                if (scrollBar.press(ctx, frame, scrollStateValue, textContentHeight(lines()), textViewport(frame).h, x,
-                    y)) {
+                if (scrollBar.press(ctx, frame, scrollStateValue, view.contentHeight(), view.viewport.h, x, y)) {
                     return true
                 }
                 return pressAt(ctx, edit, x, y)
             case UiEvent.MouseMove(x, y) =>
-                if (scrollBar.drag(ctx, frame, scrollStateValue, textContentHeight(lines()), textViewport(frame).h, y)) {
+                if (scrollBar.drag(ctx, frame, scrollStateValue, view.contentHeight(), view.viewport.h, y)) {
                     return true
                 }
                 if (ctx.isDragging(id) && ctx.leftMouseDown) {
                     edit.extendTo(pointOffset(ctx, x, y))
+                    revealCaretLine()
+                    interaction.dragScroll.update(ctx, view.viewport, x, y, multiline: true, wrap: wrapLines)
                     return true
                 }
-            case UiEvent.MouseWheel(_, wheelY, pointerX, pointerY) =>
-                // Content that fits leaves the wheel to an enclosing scroller (no dead zone).
-                let contentH = textContentHeight(lines())
-                let viewportH = textViewport(frame).h
-                if (frame.contains(pointerX, pointerY) && maxScrollOffset(contentH, viewportH) > 0.0) {
-                    scrollStateValue.value = scrollOffsetAfterWheel(scrollStateValue.value, wheelY, contentH, viewportH)
-                    return true
-                }
+            case UiEvent.MouseUp(MouseButton.Left, _, _) => interaction.dragScroll.active.value = false
+            case UiEvent.MouseWheel(_, wheelY, pointerX, pointerY) => return scrollWheel(view, wheelY, pointerX,
+                pointerY)
             case UiEvent.TextEditing(value, start, length) =>
                 if (ctx.hasFocus(id) && isEditable) {
                     ctx.setImeComposition(id, value, start, length)
+                    interaction.revealPending.value = true
                     return true
                 }
             case UiEvent.TextEditingCandidates(values, selected, horizontal) =>
@@ -181,26 +304,13 @@ public class TextArea <: Widget {
                     ctx.setImeCandidates(id, values, selected, horizontal)
                     return true
                 }
-            case UiEvent.TextInput(value) =>
-                ctx.clearImeComposition()
-                return recordedEdit(ctx, {=> edit.insert(value)})
-            case UiEvent.KeyDown(Key.Enter, _) => return recordedEdit(ctx, {=> edit.insert("\n")})
-            case UiEvent.KeyDown(Key.Backspace, _) => return recordedEdit(ctx, {=> edit.backspace()})
-            case UiEvent.KeyDown(Key.Delete, _) => return recordedEdit(ctx, {=> edit.deleteForward()})
-            case UiEvent.KeyDown(Key.Left, _) => return navigate(ctx, {=> edit.moveLeft()}, {=> edit.extendLeft()})
-            case UiEvent.KeyDown(Key.Right, _) => return navigate(ctx, {=> edit.moveRight()}, {=> edit.extendRight()})
-            case UiEvent.KeyDown(Key.Up, _) => return navigate(ctx, {=> edit.moveLineUp()}, {=> edit.extendLineUp()})
-            case UiEvent.KeyDown(Key.Down, _) => return navigate(ctx, {=> edit.moveLineDown()},
-                {=> edit.extendLineDown()})
-            case UiEvent.KeyDown(Key.Home, _) => return navigate(ctx, {=> edit.moveToLineStart()},
-                {=> edit.extendToLineStart()})
-            case UiEvent.KeyDown(Key.End, _) => return navigate(ctx, {=> edit.moveToLineEnd()},
-                {=> edit.extendToLineEnd()})
-            case UiEvent.KeyDown(Key.Letter(code), _) => return shortcut(ctx, edit, code)
+            case UiEvent.TextInput(value) => return inputText(ctx, value)
+            case UiEvent.KeyDown(key, _) => return handleKey(ctx, edit, key)
             case UiEvent.Frame(_) =>
                 // One-time initial focus for an editable area, applied after the frame's pointer
                 // events so a stray startup click cannot cancel it; mirrors TextField.
                 applyAutofocus(ctx)
+                autoScroll(ctx)
             case _ => ()
         }
         false
@@ -210,91 +320,144 @@ public class TextArea <: Widget {
         true
     }
 
-    public func focusableId(): ?String {
-        // A read-only area never registered, so there is nothing for `.enabled` to remove.
-        if (isEditable) {
-            Some(id)
-        } else {
-            None
+    private func scrollWheel(view: TextEditorView, wheelY: Float32, pointerX: Float32, pointerY: Float32): Bool {
+        let contentH = view.contentHeight()
+        let viewportH = view.viewport.h
+        if (!frame.contains(pointerX, pointerY) || maxScrollOffset(contentH, viewportH) <= 0.0) {
+            return false
         }
+        return scrollByWheel(scrollStateValue, wheelY, contentH, viewportH)
+    }
+
+    private func handleKey(ctx: UiContext, edit: TextEditState, key: Key): Bool {
+        match (key) {
+            case Key.Enter => return recordedEdit(ctx, {=> edit.insert("\n")})
+            case Key.Backspace => return recordedEdit(ctx, {
+                => if (textWordModifier(ctx)) {
+                    edit.deleteWordBackward()
+                } else {
+                    edit.backspace()
+                }
+            })
+            case Key.Delete => return recordedEdit(ctx, {
+                => if (textWordModifier(ctx)) {
+                    edit.deleteWordForward()
+                } else {
+                    edit.deleteForward()
+                }
+            })
+            case Key.Left =>
+                if (textWordModifier(ctx)) {
+                    return navigate(ctx, {=> edit.moveWordLeft()}, {=> edit.extendWordLeft()})
+                }
+                return navigate(ctx, {=> edit.moveLeft()}, {=> edit.extendLeft()})
+            case Key.Right =>
+                if (textWordModifier(ctx)) {
+                    return navigate(ctx, {=> edit.moveWordRight()}, {=> edit.extendWordRight()})
+                }
+                return navigate(ctx, {=> edit.moveRight()}, {=> edit.extendRight()})
+            case Key.Up => return interaction.moveVertical(ctx, edit, editorView(ctx), -1)
+            case Key.Down => return interaction.moveVertical(ctx, edit, editorView(ctx), 1)
+            case Key.PageUp => return interaction.moveVertical(ctx, edit, editorView(ctx),
+                -max(1, Int64(inputAppearance.viewport(ctx, frame).h / rowHeight)))
+            case Key.PageDown => return interaction.moveVertical(ctx, edit, editorView(ctx),
+                max(1, Int64(inputAppearance.viewport(ctx, frame).h / rowHeight)))
+            case Key.Home =>
+                if (ctx.eventModifiers().command) {
+                    return navigate(ctx, {=> edit.moveToStart()}, {=> edit.extendToStart()})
+                }
+                return interaction.moveEdge(ctx, edit, editorView(ctx), toEnd: false)
+            case Key.End =>
+                if (ctx.eventModifiers().command) {
+                    return navigate(ctx, {=> edit.moveToEnd()}, {=> edit.extendToEnd()})
+                }
+                return interaction.moveEdge(ctx, edit, editorView(ctx), toEnd: true)
+            case Key.Letter(code) => return shortcut(ctx, edit, code)
+            case _ => false
+        }
+    }
+
+    public func focusableId(): ?String {
+        textEditorFocusableId(id, isEditable)
     }
 
     private func editState(): TextEditState {
-        TextEditState(text, cursor: Some(cursorStateValue), anchor: Some(anchorStateValue))
+        TextEditState(text, cursorStateValue, anchorStateValue, boundaryCache)
+    }
+
+    private func actions(): TextEditorActions {
+        TextEditorActions(editState(), history, clipboard, isEditable, multiline: true)
     }
 
     private func applyAutofocus(ctx: UiContext): Unit {
-        if (autofocusRequested && isEditable && !autofocusDone.value) {
-            ctx.focus(id, viaKeyboard: true)
-            autofocusDone.value = true
-        }
+        focusTextEditorOnce(ctx, id, autofocusRequested, isEditable, autofocusDone)
+    }
+
+    private func autoScroll(ctx: UiContext): Unit {
+        interaction.autoScroll(ctx, editState(), editorView(ctx), scrollStateValue, editable: isEditable)
     }
 
     // Runs a mutating action while focused and editable, recording it for undo. The
     // before/after text comparison means a no-op edit adds no undo step.
-    private func recordedEdit(ctx: UiContext, action: () -> Unit): Bool {
+    private func inputText(ctx: UiContext, value: String): Bool {
         if (!ctx.hasFocus(id) || !isEditable) {
             return false
         }
-        let before = snapshot()
-        action()
-        if (text.value != before.text) {
-            history.commit(before, ctx.frame.elapsedMs)
+        interaction.preferredX.value = -1.0
+        interaction.upstream.value = false
+        let composing = ctx.imeComposition(id).isSome()
+        ctx.clearImeComposition()
+        if (actions().insert(value, ctx.frame.elapsedMs, isolated: composing)) {
+            ctx.requestFrame()
         }
         revealCaretLine()
         true
     }
 
-    private func snapshot(): TextSnapshot {
-        TextSnapshot(text.value, cursorStateValue.value, anchorStateValue.value)
+    private func recordedEdit(ctx: UiContext, action: () -> Unit): Bool {
+        if (!ctx.hasFocus(id) || !isEditable) {
+            return false
+        }
+        if (ctx.imeComposition(id).isSome()) {
+            return true
+        }
+        interaction.preferredX.value = -1.0
+        interaction.upstream.value = false
+        if (actions().record(ctx.frame.elapsedMs, action)) {
+            ctx.requestFrame()
+        }
+        revealCaretLine()
+        true
     }
 
-    private func applySnapshot(state: TextSnapshot): Unit {
-        text.value = state.text
-        cursorStateValue.value = state.cursor
-        anchorStateValue.value = state.anchor
-        revealCaretLine() // an undo/redo may jump the caret far from the visible lines
-    }
-
-    /*
-     * Vertical caret follow: keeps the caret's line inside the viewport after keyboard
-     * edits and navigation, scrolling the minimal distance (top-align when above, bottom-
-     * align when below). Pointer paths need no follow — the pointer is already in view.
-     */
     private func revealCaretLine(): Unit {
-        let viewportH = textViewport(frame).h
-        if (viewportH <= 0.0) {
-            return
-        }
-        let position = normalizedTextCursor(text.value, cursorStateValue.value)
-        let rowTop = Float32(textCursorLineIndex(text.value, position)) * CUI_SMALL_H
-        var scroll = scrollStateValue.value
-        if (rowTop < scroll) {
-            scroll = rowTop
-        } else if (rowTop + CUI_SMALL_H > scroll + viewportH) {
-            scroll = rowTop + CUI_SMALL_H - viewportH
-        }
-        let clamped = clampScrollOffset(scroll, textContentHeight(lines()), viewportH)
-        if (clamped != scrollStateValue.value) {
-            scrollStateValue.value = clamped
-        }
+        interaction.revealPending.value = true
     }
 
     private func pointOffset(ctx: UiContext, x: Float32, y: Float32): Int64 {
-        textAreaCursorForPoint(ctx, frame, TextAreaContent(text.value, cursorStateValue.value, scrollStateValue.value),
-            Point(x, y))
+        let (offset, affinity) = editorView(ctx).hit(x, y)
+        interaction.upstream.value = affinity
+        offset
     }
 
     private func pressAt(ctx: UiContext, edit: TextEditState, x: Float32, y: Float32): Bool {
         if (frame.contains(x, y)) {
+            interaction.dragScroll.active.value = false
+            interaction.preferredX.value = -1.0
             ctx.focus(id)
             let offset = pointOffset(ctx, x, y)
+            ctx.clearImeComposition()
+            interaction.blink.epoch = ctx.frame.elapsedMs
             if (ctx.clickCount == 2) {
                 edit.selectWordAt(offset)
             } else if (ctx.clickCount >= 3) {
                 edit.selectLineAt(offset)
             } else {
-                edit.moveTo(offset)
+                if (ctx.eventModifiers().shift) {
+                    edit.extendTo(offset)
+                } else {
+                    edit.moveTo(offset)
+                }
                 ctx.beginDrag(id) // a press-drag extends the selection (see MouseMove)
             }
             history.breakGroup() // edits before and after a caret jump undo separately
@@ -309,6 +472,11 @@ public class TextArea <: Widget {
         if (!ctx.hasFocus(id)) {
             return false
         }
+        if (ctx.imeComposition(id).isSome()) {
+            return true
+        }
+        interaction.preferredX.value = -1.0
+        interaction.upstream.value = false
         if (ctx.eventModifiers().shift) {
             growSelection()
         } else {
@@ -319,108 +487,13 @@ public class TextArea <: Widget {
         true
     }
 
-    private func shortcut(ctx: UiContext, edit: TextEditState, code: UInt8): Bool {
-        if (!ctx.hasFocus(id) || !ctx.eventModifiers().command) {
-            return false
+    private func shortcut(ctx: UiContext, _: TextEditState, code: UInt8): Bool {
+        let consumed = handleEditorShortcut(ctx, id, code, actions())
+        if (consumed && code != TEXT_AREA_COPY_SHORTCUT) {
+            interaction.preferredX.value = -1.0
+            interaction.upstream.value = false
+            revealCaretLine()
         }
-        if (code == AREA_LETTER_A) {
-            edit.selectAll()
-            return true
-        } else if (code == AREA_LETTER_C) {
-            let _ = copyEditSelection(edit) // cjcheck-ignore: ignore-result # a failed platform copy has no in-UI recovery; the shortcut is still consumed
-            return true
-        } else if (code == AREA_LETTER_X) {
-            if (isEditable) {
-                return recordedEdit(ctx, {
-                    => if (copyEditSelection(edit)) {
-                        let _ = edit.deleteSelection() // cjcheck-ignore: ignore-result # cut always has a selection here; copySelection just confirmed it
-                    }
-                })
-            }
-            let _ = copyEditSelection(edit) // cjcheck-ignore: ignore-result # read-only cut degrades to copy; a failed platform copy has no in-UI recovery
-            return true
-        } else if (code == AREA_LETTER_V) {
-            if (isEditable) {
-                return recordedEdit(ctx, {=> pasteClipboard(edit)})
-            }
-            return true
-        } else if (code == AREA_LETTER_Z) {
-            if (isEditable) {
-                if (ctx.eventModifiers().shift) {
-                    redo()
-                } else {
-                    undo()
-                }
-            }
-            return true
-        } else if (code == AREA_LETTER_Y) {
-            if (isEditable) {
-                redo()
-            }
-            return true
-        }
-        false
+        consumed
     }
-
-    private func pasteClipboard(edit: TextEditState): Unit {
-        // Clipboard access can fail at the platform boundary; a failed read degrades the
-        // paste to a no-op instead of aborting the recorded edit with an exception.
-        let clip = try {
-            Clipboard.getText()
-        } catch (_: Exception) {
-            ""
-        }
-        if (clip.size > 0) {
-            // Line breaks are kept (this is the multi-line control), but Windows CRLF is
-            // normalised: a raw \r at each line end breaks End/Backspace and measurement.
-            edit.insert(clip.replace("\r\n", "\n").replace("\r", "\n"))
-        }
-    }
-}
-
-private func drawTextAreaBox(
-    ctx: UiContext,
-    frame: Rect,
-    id: String,
-    content: TextAreaContent,
-    lines: Array<String>,
-    selection!: (Int64, Int64),
-    barActive!: Bool
-): Unit {
-    drawTextBoxChrome(ctx, frame, id)
-    let viewport = textViewport(frame)
-    ctx.renderer.pushClip(viewport)
-    // The selection paints only while focused, matching the field's focus-scoped highlight.
-    if (ctx.hasFocus(id)) {
-        let (selStart, selEnd) = selection
-        drawTextAreaSelection(ctx, viewport, content, selStart, selEnd)
-    }
-    drawLines(ctx, viewport, lines, content.scroll)
-    if (!drawTextAreaComposition(ctx, viewport, id, content)) {
-        drawTextAreaCursor(ctx, viewport, id, content)
-    }
-    ctx.renderer.popClip()
-    drawVerticalScrollBar(ctx, frame, content.scroll, textContentHeight(lines), viewport.h, active: barActive)
-}
-
-internal func drawTextBoxChrome(ctx: UiContext, frame: Rect, id: String): Unit {
-    drawSurface(ctx, frame, ctx.theme.fieldSurface(active: ctx.showFocusRing(id)))
-}
-
-private func drawLines(ctx: UiContext, rect: Rect, lines: Array<String>, scroll: Float32): Unit {
-    var i = scrollLineIndex(scroll)
-    var y = rect.y - scrollLineRemainder(scroll)
-    while (i < lines.size && y < rect.bottom()) {
-        ctx.renderer.text(lines[i], rect.x, y, ctx.theme.text, pointSize: FontSizes.BODY)
-        y += CUI_SMALL_H
-        i += 1
-    }
-}
-
-private func textContentHeight(lines: Array<String>): Float32 {
-    Float32(lines.size) * CUI_SMALL_H
-}
-
-private func textViewport(frame: Rect): Rect {
-    textInputViewport(frame)
 }

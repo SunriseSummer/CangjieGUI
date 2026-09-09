@@ -18,7 +18,9 @@ public class Slider <: Widget
 
 ## 说明
 
-写入前的规范化恒为“先夹进范围，离散滑杆再四舍五入吸附到最近刻度、吸附结果仍夹回范围”；连续滑杆（`step` 为 0 或负）只做范围限制，起始值原样保留。构造时只有离散滑杆会吸附初值；[`range`](#range) 与 [`step`](#step) 的规范化仅在值确实变化时写回绑定，每帧重建不会产生无效通知。
+构造参数与 `.range()` 都会排序上下界。范围端点和跨度必须有限；Slider 的步长也必须有限，否则抛出 `IllegalArgumentException`。动态数据中的 NaN 按下界处理，无穷值夹到边界；绘制不会为了纠正数据而写回 State。极小正步长采用浮点舍入，避免转整数溢出。
+
+写入前的规范化恒为“先夹进范围，离散滑杆再四舍五入吸附到最近刻度、吸附结果仍夹回范围”；连续滑杆（`step` 为 0 或负）只做范围限制，起始值原样保留。构造时只有离散滑杆会吸附初值；[`range`](#range) 与 [`step`](#step) 的规范化仅在值确实变化时写回绑定，重新构建不会产生无效通知。
 
 拖拽会话由 [`UiContext`](../core/UiContext.md) 的拖拽协议维持：按下后指针移出控件仍持续跟随，直到松开。聚焦后 ←/→ 按键盘步长增减——离散滑杆用 `step`，连续滑杆用范围的 1/100。轨道两端各缩进 8 逻辑像素，指针位置按轨道有效长度换算比例。
 
@@ -53,7 +55,7 @@ main(): Unit {
 |---|---|
 | [`range(lower: Float32, upper: Float32)`](#range) | 设置滑杆控制的闭区间范围并规范化当前值。 |
 | [`step(step: Float32)`](#step) | 设置取值步长；0 让滑杆保持连续。 |
-| [`measure(_: UiContext, available: Size)`](#measure) | 返回 min(可用宽, 180) × 38 逻辑像素。 |
+| [`measure(_: UiContext, available: Size)`](#measure) | 宽度为 `min(可用宽, 180)`，高度为 `max(38, 有效文字行高 + 12)` 逻辑像素。 |
 | [`layout(_: UiContext, rect: Rect)`](#layout) | 记录控件框架。 |
 | [`draw(ctx: UiContext)`](#draw) | 绘制轨道、已填充段与强调色描边的圆钮。 |
 | [`handle(ctx: UiContext, event: UiEvent)`](#handle) | 按下跳到指针处并开始拖拽会话，拖动与松开持续更新；聚焦后 ←/→ 按键盘步长增减。 |
@@ -79,13 +81,13 @@ public init(value: Bindable<Float32>, key!: ?String = None, lower!: Float32 = 0.
 
 **异常**
 
-- `IllegalArgumentException` — `key` 传入空字符串时。
+- `IllegalArgumentException` — `key` 为空，范围端点或跨度非有限，或步长非有限时。
 
 ## 方法
 
 ### range
 
-设置滑杆控制的闭区间范围并规范化当前值。两端传反时自动互换；仅在规范化改变值时写回绑定，避免每帧重建时的无效通知。
+设置滑杆控制的闭区间范围并规范化当前值。两端传反时自动互换；仅在规范化改变值时写回绑定，避免重新构建时的无效通知。
 
 ```cangjie
 public func range(lower: Float32, upper: Float32): Slider
@@ -114,10 +116,10 @@ public func step(step: Float32): Slider
 
 ### measure
 
-返回 min(可用宽, 180) × 38 逻辑像素。[`Widget`](../core/Widget.md) 协议方法。
+宽度为 `min(可用宽, 180)`，高度为 `max(38, 有效文字行高 + 12)` 逻辑像素。[`Widget`](../core/Widget.md) 协议方法。
 
 ```cangjie
-public func measure(_: UiContext, available: Size): Size
+public func measure(ctx: UiContext, available: Size): Size
 ```
 
 **参数**

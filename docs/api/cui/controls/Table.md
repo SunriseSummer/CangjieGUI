@@ -20,7 +20,7 @@ public class Table <: Widget
 
 排序发生在显示层：选择存的是**原始行索引**，重新排序后高亮仍跟随同一行，应用直接改写 `selected` 也会把该行滚入视区。排序是稳定归并排序，数值列（[`TableColumn`](TableColumn.md) 的 `numeric`）按数值键比较，"100" 排在 "88" 之后。排序状态（列与方向）由控件标识内部保留，不对外暴露；计算出的显示顺序跨帧缓存，排序输入不变时每帧只做 O(n) 校验而非重排，被编辑过的单元格会让缓存失效并触发一次重排。
 
-表格是单个焦点项：聚焦后 ↑/↓/Home/End 移动选择并把选中行滚入视区。行区沿用普通箭头指针（电子表格惯例），不会切换成手形指针。表头高 32、行高 28 逻辑像素。
+表格是单个焦点项：聚焦后 ↑/↓/Home/End 移动选择并把选中行滚入视区。行区沿用普通箭头指针（电子表格惯例），不会切换成手形指针。表头高为 `max(32, 有效文字行高 + 8)`，行高为 `max(28, 有效文字行高 + 8)` 逻辑像素。
 
 ## 示例
 
@@ -108,7 +108,7 @@ public static func of<T>(
 占满可用空间（宽高均取 `available`）。列宽固定，超出框架的部分被裁剪（见 [`Widget`](../core/Widget.md)）。
 
 ```cangjie
-public func measure(_: UiContext, available: Size): Size
+public func measure(ctx: UiContext, available: Size): Size
 ```
 
 **参数**
@@ -119,10 +119,10 @@ public func measure(_: UiContext, available: Size): Size
 
 ### layout
 
-记录分配到的框架。表头占顶部 32 逻辑像素，其余是行高 28 的滚动正文。
+记录分配到的框架。表头占据顶部，正文从表头下方开始滚动；表头和行高使用测量阶段计算的字体尺寸。
 
 ```cangjie
-public func layout(_: UiContext, rect: Rect): Unit
+public func layout(ctx: UiContext, rect: Rect): Unit
 ```
 
 **参数**

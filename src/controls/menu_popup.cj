@@ -57,9 +57,9 @@ internal func menuPreferredWidth(ctx: UiContext, items: Array<MenuItem>): Float3
         if (item.isSeparator) {
             continue
         }
-        var w = ctx.renderer.textWidth(item.label, pointSize: FontSizes.CONTROL) + MENU_LABEL_PAD
+        var w = ctx.textWidth(item.label, pointSize: ctx.textSize(fallback: FontSizes.CONTROL)) + MENU_LABEL_PAD
         if (!item.shortcut.isEmpty()) {
-            w += ctx.renderer.textWidth(item.shortcut, pointSize: FontSizes.CAPTION) + MENU_SHORTCUT_GAP
+            w += ctx.textWidth(item.shortcut, pointSize: ctx.textSize(fallback: FontSizes.CAPTION)) + MENU_SHORTCUT_GAP
         }
         width = max(width, w)
     }
@@ -67,19 +67,19 @@ internal func menuPreferredWidth(ctx: UiContext, items: Array<MenuItem>): Float3
 }
 
 /** Total popup height for `items` at uniform row height plus the top and bottom pad strips. */
-internal func menuContentHeight(items: Array<MenuItem>): Float32 {
-    Float32(items.size) * CUI_SMALL_H + MENU_ROW_PAD * 2.0
+internal func menuContentHeight(items: Array<MenuItem>, rowHeight!: Float32 = CUI_SMALL_H): Float32 {
+    Float32(items.size) * rowHeight + MENU_ROW_PAD * 2.0
 }
 
 /*
  * The row index at pointer `y` within `menu` (uniform CUI_SMALL_H rows), or -1 in the pad strips.
  * Callers check the item at that index for selectability before running or highlighting it.
  */
-internal func menuItemIndexAt(menu: Rect, y: Float32): Int64 {
+internal func menuItemIndexAt(menu: Rect, y: Float32, rowHeight!: Float32 = CUI_SMALL_H): Int64 {
     if (y < menu.y + MENU_ROW_PAD || y >= menu.bottom() - MENU_ROW_PAD) {
         return -1
     }
-    Int64((y - menu.y - MENU_ROW_PAD) / CUI_SMALL_H)
+    Int64((y - menu.y - MENU_ROW_PAD) / rowHeight)
 }
 
 /*
@@ -115,8 +115,8 @@ internal func drawMenuPopup(ctx: UiContext, menu: Rect, items: Array<MenuItem>, 
     var y = menu.y + MENU_ROW_PAD
     var i = 0
     while (i < items.size) {
-        drawMenuRow(ctx, items[i], Rect(menu.x + 4.0, y, max(0.0, menu.w - 8.0), CUI_SMALL_H), i == highlight)
-        y += CUI_SMALL_H
+        drawMenuRow(ctx, items[i], Rect(menu.x + 4.0, y, max(0.0, menu.w - 8.0), ctx.textRowHeight()), i == highlight)
+        y += ctx.textRowHeight()
         i += 1
     }
     ctx.renderer.popClip()
@@ -139,21 +139,22 @@ private func drawMenuRow(ctx: UiContext, item: MenuItem, row: Rect, highlightInd
     } else {
         ctx.theme.text
     }
-    let labelY = row.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
-    ctx.renderer.text(item.label, row.x + 8.0, labelY, labelColor, pointSize: FontSizes.CONTROL)
+    let labelY = row.centerY() - ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.CONTROL)) / 2.0
+    ctx.text(item.label, row.x + 8.0, labelY, labelColor, pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
     if (!item.shortcut.isEmpty()) {
         let shortcutColor = if (highlighted) {
             ctx.theme.accentText
         } else {
             ctx.theme.mutedText
         }
-        let sw = ctx.renderer.textWidth(item.shortcut, pointSize: FontSizes.CAPTION)
-        let sy = row.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CAPTION) / 2.0
-        ctx.renderer.text(item.shortcut, row.right() - sw - 8.0, sy, shortcutColor, pointSize: FontSizes.CAPTION)
+        let sw = ctx.textWidth(item.shortcut, pointSize: ctx.textSize(fallback: FontSizes.CAPTION))
+        let sy = row.centerY() - ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.CAPTION)) / 2.0
+        ctx.text(item.shortcut, row.right() - sw - 8.0, sy, shortcutColor,
+            pointSize: ctx.textSize(fallback: FontSizes.CAPTION))
     }
 }
 
 internal func menuPopupSurface(ctx: UiContext): SurfaceStyle {
-    SurfaceStyle(ctx.theme.panelRaised, border: ctx.theme.panelEdge, radius: ctx.theme.controlRadius,
-        borderWidth: 1.0, shadow: ctx.theme.shadow, shadowOffsetY: 4.0)
+    SurfaceStyle(ctx.theme.panelRaised, border: ctx.theme.panelEdge, radius: ctx.theme.controlRadius, borderWidth: 1.0,
+        shadow: ctx.theme.shadow, shadowOffsetY: 4.0)
 }

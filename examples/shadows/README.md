@@ -2,7 +2,7 @@
 
 一页阴影对比：`shadow(layers)` 按序叠绘多层投影，`Shadow.keyAmbient(level)` 给出 Material 式「环境光 +
 方向光」双层预设。同一层级下单层与双层并排对照——单层是一团均匀的晕，双层由宽而淡的环境光叠上窄而深的
-方向光，深度感来自两者的差。这是商用基准的标准投影模型。
+方向光，深度感来自两者的差。
 
 ## 演示要点
 
@@ -51,3 +51,9 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot shadows.bmp"
 ```
+
+## 练习与验收
+
+用两层自定义阴影替换预设，观察层序与裁剪边界。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

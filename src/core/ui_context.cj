@@ -12,6 +12,7 @@ import sdl.{FrameInfo, Rect, Renderer, UiEvent, UiEventMetadata}
 public class UiContext {
     public let renderer: Renderer
     public let theme: Theme
+    internal var inheritedTextStyle = TextStyle()
     internal var focusIdValue: String = ""
     // Whether the focused control should paint a ring: true when focus last moved by keyboard
     // (Tab traversal or autofocus), false when a pointer press claimed it — the :focus-visible
@@ -37,6 +38,7 @@ public class UiContext {
     // draws each layer's content, so a popup opened inside a dialog registers — and
     // paints — above it. Events walk the stack top-down (see `dispatchOverlay`).
     private let overlayRegistry = OverlayRegistry()
+    private let modalFocusRegistry = ModalFocusRegistry()
     // Layout replay must capture registrations, not just growth of the active stack: registering an
     // existing owner replaces in place and leaves the stack size unchanged.
     internal let semanticContributions = ArrayList<SemanticContribution>()
@@ -236,9 +238,14 @@ public class UiContext {
     // all intervening refreshes.
     internal var immediateFrameRequested = false
     internal var frameDeadlineMs: ?UInt64 = None
+    internal var caretDeadlineMs: ?UInt64 = None
+    internal var caretDamage: ?Rect = None
+    internal var caretOnlyPaint = false
+    internal var textWindowActiveValue = true
     // One entry per nested retained-paint recording. Dynamic frame/interaction reads mark every
     // active ancestor so no parent display list can accidentally freeze a live child protocol.
     internal let retainedPaintDynamicReasons = ArrayList<?String>()
+    internal var resourceReadDepth: Int64 = 0
     internal var retainedDamage: ?Rect = None
 
     internal func markRetainedPaintDynamic(reason: String): Unit {
@@ -322,7 +329,13 @@ public class UiContext {
      */
     public func setOverlay(overlay: Overlay): Unit {
         markRetainedPaintDynamic("overlay registered during paint")
-        overlayRegistry.register(overlay)
+        // Overlay callbacks outlive the registering subtree's typography scope.
+        let captured = TextStyle(fontFamily: renderer.effectiveFontFamily(), fontSize: inheritedTextStyle.fontSize,
+            fontStyle: inheritedTextStyle.fontStyle)
+        overlayRegistry.register(
+            Overlay(owner: overlay.owner,
+                handleEvent: {ctx, event => ctx.withTextStyle(captured, {=> overlay.dispatch(ctx, event)})},
+                render: {ctx => ctx.withTextStyle(captured, {=> overlay.render(ctx)})}))
     }
 
     /**
@@ -331,6 +344,35 @@ public class UiContext {
      */
     public func removeOverlay(owner: String): Unit {
         overlayRegistry.remove(owner)
+    }
+
+    /** Records and activates a modal's initial focus once, before laying out nested dialogs. */
+    protected func enterModalFocus(owner: String, keys: Array<String>, initial: ?String): Unit {
+        modalFocusRegistry.enter(this, owner, keys, initial)
+    }
+
+    /** Captures semantic membership without resolving providers or duplicating subscriptions. */
+    protected func withModalContent(owner: String, body: () -> Unit): Unit {
+        let start = semanticContributions.size
+        body()
+        let fragment = SemanticFragment(
+            Array<SemanticContribution>(semanticContributions.size - start, {i => semanticContributions[start + i]}))
+        modalFocusRegistry.setContent(owner, Some(fragment))
+    }
+
+    internal func allowsModalSemanticsAction(id: String): Bool {
+        settleModalFocus()
+        modalFocusRegistry.allowsAction(id)
+    }
+
+    /** Restores removed dialogs against the latest committed focus graph. */
+    protected func settleModalFocus(): Unit {
+        modalFocusRegistry.settle(this, {owner => overlayRegistry.containsOwner(owner)})
+    }
+
+    /** Discards modal history when a test/custom host resets its entire widget tree. */
+    protected func resetModalFocus(): Unit {
+        modalFocusRegistry.clear()
     }
 
     /** Removes every open overlay — the shell calls this each frame before the tree re-registers. */
@@ -375,6 +417,7 @@ public class UiContext {
      * a custom shell (not just `DesktopApp`) can route events through the overlays.
      */
     public func dispatchOverlay(event: UiEvent): Bool {
+        settleModalFocus()
         overlayRegistry.dispatch(this, event)
     }
 
@@ -385,6 +428,7 @@ public class UiContext {
      * and paints them above, within the same frame.
      */
     public func drawActiveOverlay(): Unit {
+        settleModalFocus()
         markRetainedPaintDynamic("overlay draw requested during retained paint")
         overlayRegistry.draw(this)
     }

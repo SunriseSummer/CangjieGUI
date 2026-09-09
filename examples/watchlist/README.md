@@ -57,3 +57,9 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot watchlist.bmp"
 ```
+
+## 练习与验收
+
+清除全部评分再重评分，确认已评数量与平均分按约定计算。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

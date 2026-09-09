@@ -8,8 +8,9 @@
  */
 package cui_workbench
 
-import cui.{Axis, ButtonRole, CrossAxisAlignment, Divider, FontSizes, ForEach, HStack, IconButton, IconName, Label,
-    LengthUnits, ListView, Panel, ScrollView, Spacer, SplitView, TextArea, Tooltip, VStack}
+import cui.{Axis, ButtonRole, CrossAxisAlignment, Divider, FontSizes, ForEach, HStack, IconButton}
+import cui.{IconSource, Label, LengthUnits, ListView, Panel, ScrollView, Spacer, SplitView, TextArea}
+import cui.{Tooltip, VStack}
 
 func workbenchView(model: WorkbenchModel): Unit {
     VStack {
@@ -30,7 +31,7 @@ func appHeader(model: WorkbenchModel): Unit {
         }.spacing(2.vp).hug()
         Spacer()
         Tooltip(text: "新建文档") {
-            IconButton(IconName.NewDocument) {
+            IconButton(IconSource("assets/icons/document.svg")) {
                 => model.addDoc()
             }.label("新建").role(ButtonRole.Primary)
         }

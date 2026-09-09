@@ -18,7 +18,8 @@ func drawCanvas(r: Renderer, frame: Rect, model: PaintModel): Unit {
             pointSize: FontSizes.BODY)
     }
     for (stroke in model.strokes) {
-        r.strokeLine(stroke.x1, stroke.y1, stroke.x2, stroke.y2, Pen(width: stroke.size, color: stroke.color))
+        r.strokeLine(frame.x + stroke.x1, frame.y + stroke.y1, frame.x + stroke.x2, frame.y + stroke.y2,
+            Pen(width: stroke.size, color: stroke.color))
     }
 }
 
@@ -26,12 +27,12 @@ func paintEvent(event: UiEvent, frame: Rect, model: PaintModel): Bool {
     match (event) {
         case UiEvent.MouseDown(MouseButton.Left, x, y) =>
             if (frame.contains(x, y)) {
-                model.beginStroke(x, y)
+                model.beginStroke(x - frame.x, y - frame.y)
                 return true
             }
         case UiEvent.MouseMove(x, y) =>
             if (model.isDrawing() && frame.contains(x, y)) {
-                model.extendStroke(x, y)
+                model.extendStroke(x - frame.x, y - frame.y)
                 return true
             }
         case UiEvent.MouseUp(MouseButton.Left, x, y) =>

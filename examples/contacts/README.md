@@ -7,7 +7,7 @@
 ## 演示要点
 
 - 主从式增删改查的状态编排：联系人列表、选中行、搜索词、两组对话框标志与一组“草稿”字段
-- 用 `Table` 呈现过滤后的可见列表；搜索变化时用 `State.observe` 归零选择，避免索引指向被过滤掉的行
+- 用 `Table` 呈现过滤后的可见列表；搜索变化时用 `State.observe` 清空选择，避免索引指向被过滤掉的行
 - `ComboBox` 作搜索框：可键入任意关键字，也可从公司建议中选取
 - `Modal` 承载表单子树：`TextField` 编辑草稿，打开即自动聚焦姓名字段（`autofocus` 依赖 Modal 的
   Frame 转发在对话框内生效），`Tab` 在表单控件间循环（焦点陷阱）；`.enabled(canSave())` 让“保存”
@@ -47,10 +47,10 @@ func saveForm(): Unit {
 Button("保存", {=> model.saveForm()}, role: ButtonRole.Primary).enabled(model.canSave())
 ```
 
-### 过滤即归零选择
+### 过滤即清空选择
 
 `Table` 展示的是过滤后的可见列表，`selected` 是可见列表中的行索引。搜索词一变，旧索引就可能指向
-另一位（或已被过滤掉的）联系人，因此用观察器把选择归零：
+另一位（或已被过滤掉的）联系人，因此用观察器把选择设为 `-1`（未选择）：
 
 ```cangjie
 this.queryObservation = this.query.observe({_, _ => selectionState.value = -1})
@@ -66,11 +66,11 @@ this.queryObservation = this.query.observe({_, _ => selectionState.value = -1})
 ```cangjie
 Modal(model.formOpen) {
     // ...
-    ComboBox("contacts.form.company", model.draftCompany, companySuggestions()).flex()
+    ComboBox(model.draftCompany, companySuggestions(), key: "contacts.form.company").flex()
 }
 ```
 
-组合框的建议列表在对话框绘制期间登记到浮层栈顶，同帧画在面板之上、优先接收事件；选中或 `Esc`
+组合框的建议列表在对话框内容布局时登记到浮层栈顶，同帧画在面板之上、优先接收事件；选中或 `Esc`
 只关闭列表本身，对话框保持打开。页面级与对话框级的组合框行为完全一致，无需任何适配代码。
 
 ## 运行
@@ -85,3 +85,9 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot contacts.bmp"
 ```
+
+## 练习与验收
+
+修改联系人后取消，再重新打开，确认未提交草稿没有覆盖原记录。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

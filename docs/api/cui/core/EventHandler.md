@@ -142,7 +142,7 @@ public func draw(ctx: UiContext): Unit
 
 ### handle
 
-先把事件交给回调，回调未消费时再下发给子树。`Frame` 事件例外：回调与子树都会收到，且本方法总是返回 `false`，帧脉搏因此无法被拦截。
+先把事件交给回调，回调未消费时再下发给子树。显式传入 `Frame` 时，回调与子树都会收到，本方法返回 `false`。桌面宿主通过独立订阅表调用帧观察者，不依赖这一兼容分支广播整棵树。
 
 ```cangjie
 public func handle(ctx: UiContext, event: UiEvent): Bool

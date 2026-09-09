@@ -1,12 +1,30 @@
 /*
  * 文件对话框：打开与另存为。
  *
- * 系统对话框是异步的：这里只负责“发起请求”，结果由 main.cj 的 FrameHandler
- * 每帧轮询 poll* 函数取回，事件循环全程不被阻塞。
+ * 系统对话框是异步的：请求存入状态后才注册帧订阅，并约每 50 ms 请求下一帧。
+ * 完成／取消后释放请求与订阅，空闲文档不会因文件对话框逻辑持续刷新。
  */
 package cui_notepad
 
-import cui.{DesktopApp, FileDialogFilter, FileDialogOptions, FileDialogRequest, FileDialogResult, State}
+import cui.{DesktopApp, FileDialogFilter, FileDialogOptions, FileDialogRequest, FileDialogResult, State, subscribeFrame}
+
+private let DIALOG_POLL_MS: UInt64 = UInt64(50)
+
+// Conditional subscription keeps the document subtree stable and allows idle caret rendering.
+func subscribeNotepadDialogs(model: NotepadModel): Unit {
+    if (model.hasDialog()) {
+        subscribeFrame(
+            {
+                ctx, _ =>
+                    pollOpenDialog(model)
+                    pollSaveDialog(model)
+                    if (model.hasDialog()) {
+                        ctx.requestFrameAt(ctx.frame.elapsedMs + DIALOG_POLL_MS)
+                    }
+            }
+        )
+    }
+}
 
 func openFile(model: NotepadModel, app: DesktopApp): Unit {
     // 同一时刻只允许一个系统对话框，避免两份结果互相覆盖。

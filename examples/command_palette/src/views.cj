@@ -7,8 +7,8 @@
  */
 package cui_command_palette
 
-import cui.{Color, CrossAxisAlignment, EventHandler, FontSizes, Icon, IconName, Key, Label, LengthUnits, ListView,
-    Panel, ScrollView, Spacer, TextField, UiEvent, VStack, HStack}
+import cui.{Color, CrossAxisAlignment, EventHandler, FontSizes, Icon, IconSource, Key, Label}
+import cui.{LengthUnits, ListView, Panel, ScrollView, Spacer, TextField, UiEvent, VStack, HStack}
 
 func paletteView(model: PaletteModel): Unit {
     EventHandler(onEvent: {event => handlePaletteKeys(event, model)}) {
@@ -56,7 +56,7 @@ func header(model: PaletteModel): Unit {
 func searchBox(model: PaletteModel): Unit {
     Panel {
         HStack {
-            Icon(IconName.ChevronRight).foregroundColor(Color.rgb(108, 140, 255)).iconSize(18.vp)
+            Icon(IconSource("assets/icons/chevron-right.svg")).foregroundColor(Color.rgb(108, 140, 255)).iconSize(18.vp)
             TextField(model.query).autofocus().flex()
         }.spacing(8.vp).crossAxisAlignment(CrossAxisAlignment.Center)
     }.contentPadding(12.vp, 8.vp).hug()

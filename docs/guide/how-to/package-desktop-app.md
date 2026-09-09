@@ -4,7 +4,7 @@
 
 ## 目标
 
-在[第一个窗口](../getting-started/first-window.md)工程基础上，把可执行文件、SDL 运行库和应用资源放进干净交付目录，并做一次脱离源码树的启动检查。约需 20 分钟。
+在[第一个窗口](../getting-started/first-window.md)工程基础上，把可执行文件、SDL 运行库和应用资源放进干净交付目录，并做一次脱离源码树的启动检查。
 
 ## 适用场景
 
@@ -12,7 +12,7 @@
 
 ## 准备工作
 
-确认目标机器的操作系统和处理器架构与构建产物一致。先在项目内运行首窗口，再找到 `cjpm build` 生成的可执行文件；SDL 动态库名称因平台不同，Windows 常见为 `SDL3.dll`，Linux 为对应的 `.so`。从源码构建 Windows 包时先运行 `.dev/platform/windows/build_uia.ps1` 生成同架构 UI Automation 桥。
+确认目标机器的操作系统和处理器架构与构建产物一致。先在项目内运行首窗口，再找到 `cjpm build` 生成的可执行文件；Windows 需要 `SDL3.dll`、`SDL3_ttf.dll`、`SDL3_image.dll`，Linux／macOS 则使用对应共享库及传递依赖。从源码构建 Windows 包时先运行 `.dev/platform/windows/build_uia.ps1` 生成同架构 UI Automation 桥。
 
 ## 操作步骤
 
@@ -23,7 +23,7 @@
 
 ### 2. 建立干净目录
 
-交付目录至少包含可执行文件和匹配架构的 SDL 运行库。Windows 还要复制
+交付目录至少包含可执行文件、匹配架构的三个 SDL 运行库，以及当前构建所需的仓颉运行时和传递依赖。完整清单与复制示例见 [SDL 部署指南](../../../../CangjieSDL/docs/guide/how-to/deploy-native-runtime.md)。Windows 还要复制
 `target/native/windows/<arch>/cui_uia.dll`；其源码位于 `platform/windows/accessibility/uia/`，由
 `.dev/platform/windows/build_uia.ps1` 独立构建。框架在运行时动态加载 DLL，缺少时应用仍能启动，但原生
 UI Automation provider 不可用。应用运行时读取的字体、图像或配置也按程序约定的相对路径复制。资源路径应集中定义，
@@ -43,7 +43,7 @@ Windows 检查 SDL 与 `cui_uia.dll` 的架构、安全软件拦截，并用 Nar
 
 ## 常见错误
 
-- 只复制可执行文件：目标机提示找不到 SDL 或 Windows UIA 动态库。
+- 只复制可执行文件：缺少 SDL 或仓颉运行时可能无法启动；缺少 `cui_uia.dll` 则会失去原生 UI Automation 支持。
 - 从项目根启动冒烟：程序悄悄读到源码树中的资源。
 - 混用不同架构的 DLL：文件存在但加载失败。
 - 把 `cjpm run` 成功当成交付验证：它仍处在开发环境中。

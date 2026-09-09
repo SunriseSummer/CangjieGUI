@@ -1,12 +1,8 @@
-/*
- * 样本册视图层：标题 + 字重切换 + 大字样张卡 + 字重对比卡 + 等宽代码卡 + 状态条。
- *
- * 样张卡整卡随切换器换字重（fontFamily 按名引用）；对比卡三行同文案各绑一个字重名，并排看粗细；
- * 等宽卡固定 wenkai-mono。字体缺失时同样的名字会整页回退系统字体，页面结构不变。
- */
+// 随附字体：一个字体族、多份静态字重文件，使用 fontWeight 选择。
 package cui_wenkai
 
-import cui.{CrossAxisAlignment, FontSizes, Label, LengthUnits, Panel, ScrollView, SegmentedControl, VStack}
+import cui.{CrossAxisAlignment, FontSizes, Label, LengthUnits, Panel, ScrollView, SegmentedControl, VStack, TextStyle,
+    CanvasWidget, Color, FontStyle}
 
 func wenkaiView(model: WenkaiModel): Unit {
     VStack {
@@ -26,8 +22,10 @@ func wenkaiView(model: WenkaiModel): Unit {
 private func header(): Unit {
     VStack {
         Label("本地字体样本册").fontSize(FontSizes.TITLE).bold()
-        Label("Fonts.register 从本地文件加载 CJK 字体（多字重各占一名），fontFamily 按名套用——楷体的笔意与系统黑体一望而知").muted()
-            .fontSize(FontSizes.CAPTION).wrap()
+        Label("一个字体族关联多份文件；用 fontWeight 选择 Light / Regular / Medium")
+            .muted()
+            .fontSize(FontSizes.CAPTION)
+            .wrap()
     }.spacing(4.vp).crossAxisAlignment(CrossAxisAlignment.Start).hug()
 }
 
@@ -36,22 +34,29 @@ private func specimenCard(model: WenkaiModel): Unit {
     let family = model.family()
     Panel {
         VStack {
-            Label(SPECIMEN_TITLE).fontFamily(family).fontSize(44.0).foregroundColor(INK_ACCENT)
-            Label(SPECIMEN_POEM).fontFamily(family).fontSize(19.0).wrap()
-            Label(SPECIMEN_LATIN).fontFamily(family).fontSize(14.0).muted()
-        }.spacing(10.vp).crossAxisAlignment(CrossAxisAlignment.Start)
+            Label(SPECIMEN_TITLE).fontSize(44.0).foregroundColor(INK_ACCENT)
+            Label(SPECIMEN_POEM).fontSize(19.0).wrap()
+            Label(SPECIMEN_LATIN).fontSize(14.0).muted().wrap()
+        }
+            .spacing(10.vp)
+            .crossAxisAlignment(CrossAxisAlignment.Start)
+            .hug()
+            .textStyle(TextStyle(fontFamily: family, fontWeight: model.weight()))
     }.contentPadding(18.vp)
 }
 
-// 字重对比：三行同一句，各绑一个字重名，笔画粗细并排可辨。
+// 字重对比：三行同一句，共享一个字族并指定数值字重，笔画粗细并排可辨。
 private func weightCompareCard(): Unit {
     Panel {
         VStack {
             Label("字重对比").fontSize(FontSizes.CAPTION).muted()
             for (weight in WEIGHTS) {
-                Label("春风得意马蹄疾 · ${weight.label}").fontFamily(weight.family).fontSize(18.0)
+                Label("春风得意马蹄疾 · ${weight.label}")
+                    .fontFamily(WENKAI_FAMILY)
+                    .fontWeight(weight.value)
+                    .fontSize(18.0)
             }
-        }.spacing(8.vp).crossAxisAlignment(CrossAxisAlignment.Start)
+        }.spacing(8.vp).crossAxisAlignment(CrossAxisAlignment.Start).hug()
     }.contentPadding(16.vp)
 }
 
@@ -61,14 +66,33 @@ private func monoCard(): Unit {
         VStack {
             Label("等宽变体 ${MONO.label}").fontSize(FontSizes.CAPTION).muted()
             for (line in MONO_LINES) {
-                Label(line).fontFamily(MONO.family).fontSize(14.0).wrap()
+                Label(line).fontFamily(WENKAI_MONO).fontSize(14.0).wrap()
             }
-        }.spacing(6.vp).crossAxisAlignment(CrossAxisAlignment.Start)
+        }.spacing(6.vp).crossAxisAlignment(CrossAxisAlignment.Start).hug()
     }.contentPadding(16.vp)
 }
 
 private func statusBar(model: WenkaiModel): Unit {
     Panel {
-        Label(model.statusText()).fontSize(FontSizes.CAPTION).wrap()
+        VStack {
+            Label(model.statusText()).fontSize(FontSizes.CAPTION).wrap()
+            CanvasWidget(
+                {
+                    renderer, rect =>
+                        let result = renderer.resolveFont(font: WENKAI_FAMILY, style: FontStyle(weight: model.weight()))
+                        if (!result.faces.isEmpty()) {
+                            let face = result.faces[0]
+                            let inner = rect.inset(6.0)
+                            renderer.pushClip(inner)
+                            try {
+                                renderer.text("实际：${face.familyName} / ${face.styleName} / ${face.weight.value}",
+                                    inner.x, inner.y, Color.rgb(90, 80, 65), pointSize: FontSizes.CAPTION)
+                            } finally {
+                                renderer.popClip()
+                            }
+                        }
+                }
+            ).height(34.vp)
+        }.spacing(4.vp).hug()
     }.contentPadding(12.vp)
 }

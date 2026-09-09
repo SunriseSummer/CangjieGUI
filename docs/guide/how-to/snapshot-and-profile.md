@@ -26,6 +26,7 @@ package docexample
 import cui.*
 
 main(): Unit {
+    FileSystem.createDirectory("target/snapshots")
     let app = DesktopApp(WindowSpec("快照基准", 520, 320))
     app.run {
         let progress = rememberState<Float32>("release-progress") {0.72}
@@ -47,10 +48,10 @@ main(): Unit {
 构建完成后执行：
 
 ```text
-cjpm run --run-args="--snapshot artifacts/release-check.bmp"
+cjpm run --run-args="--snapshot target/snapshots/release-check.bmp"
 ```
 
-进程应自动退出。检查文件存在、长度非零、BMP 头有效，并人工查看标题、进度条、徽章和按钮没有裁切。不要把“能构建”写成“已运行”；二者是不同证据。
+程序先创建输出目录，再由快照模式绘制并自动退出。检查文件存在、长度非零、BMP 头有效，并查看标题、进度条、徽章和按钮没有裁切；高 DPI 下图片尺寸使用后备像素，可能大于 `WindowSpec` 的逻辑尺寸。
 
 ### 3. 为交互另写测试
 

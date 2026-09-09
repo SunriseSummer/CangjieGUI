@@ -1,6 +1,5 @@
 package cui.text
 
-import sdl.input.Clipboard
 import cui.core.{Bindable, State}
 
 /**
@@ -9,10 +8,10 @@ import cui.core.{Bindable, State}
 public class TextEditState {
     public let text: Bindable<String>
     public let cursor: State<Int64>
-    // The selection is the span between `anchor` and `cursor`. When they coincide there is
-    // no selection and editing behaves exactly as a plain caret — this keeps controls that
-    // never pass an anchor (a read-only text area) on their original code path.
+    // The selection spans anchor and cursor; equal endpoints represent a caret.
+    // Read-only policy belongs to the controls, while this model remains directly editable.
     public let anchor: State<Int64>
+    private var boundaryCache = TextEditBoundaryCache()
 
     public init(text: Bindable<String>, cursor!: ?State<Int64> = None, anchor!: ?State<Int64> = None) {
         this.text = text
@@ -33,28 +32,49 @@ public class TextEditState {
         this.anchor = State<Int64>(value.size)
     }
 
-    /** Clamps caret and anchor onto valid rune boundaries after an external text write. */
+    init(text: Bindable<String>, cursor: State<Int64>, anchor: State<Int64>, cache: TextEditBoundaryCache) {
+        this.text = text
+        this.cursor = cursor
+        this.anchor = anchor
+        this.boundaryCache = cache
+        normalizeCursor()
+    }
+
+    private func boundaries(): TextEditBoundaryCache {
+        boundaryCache.prepare(text)
+    }
+    private func normalized(position: Int64): Int64 {
+        boundaries().floor(position)
+    }
+    private func previousBoundary(position: Int64): Int64 {
+        boundaries().previous(position)
+    }
+    private func nextBoundary(position: Int64): Int64 {
+        boundaries().next(position)
+    }
+
+    /** Clamps caret and anchor onto valid extended-grapheme boundaries after an external text write. */
     public func normalizeCursor(): Unit {
         // Runs every frame (draw calls it): skip the write when already normalized so callers
         // that own and observe the cursor/anchor are not notified — and revisions not bumped —
         // for a no-op. Behaviour is unchanged; only redundant notifications are avoided.
-        let _ = cursor.setIfChanged(normalizedTextCursor(text.value, cursor.value)) // cjcheck-ignore: ignore-result # write-on-change only; whether it changed is irrelevant here
-        let _ = anchor.setIfChanged(normalizedTextCursor(text.value, anchor.value)) // cjcheck-ignore: ignore-result # write-on-change only; whether it changed is irrelevant here
+        let _ = cursor.setIfChanged(normalized(cursor.value)) // cjcheck-ignore: ignore-result # write-on-change only; whether it changed is irrelevant here
+        let _ = anchor.setIfChanged(normalized(anchor.value)) // cjcheck-ignore: ignore-result # write-on-change only; whether it changed is irrelevant here
     }
 
     /** Whether a non-empty range is selected. */
     public func hasSelection(): Bool {
-        normalizedTextCursor(text.value, anchor.value) != normalizedTextCursor(text.value, cursor.value)
+        normalized(anchor.value) != normalized(cursor.value)
     }
 
     /** The lower byte offset of the selection (or the caret when nothing is selected). */
     public func selectionStart(): Int64 {
-        min(normalizedTextCursor(text.value, anchor.value), normalizedTextCursor(text.value, cursor.value))
+        min(normalized(anchor.value), normalized(cursor.value))
     }
 
     /** The upper byte offset of the selection (or the caret when nothing is selected). */
     public func selectionEnd(): Int64 {
-        max(normalizedTextCursor(text.value, anchor.value), normalizedTextCursor(text.value, cursor.value))
+        max(normalized(anchor.value), normalized(cursor.value))
     }
 
     /** The selected substring, empty when nothing is selected. */
@@ -76,25 +96,25 @@ public class TextEditState {
             cursor.value = 0
             return
         }
-        var probe = normalizedTextCursor(content, position)
+        var probe = normalized(position)
         if (probe >= content.size) {
-            probe = previousTextBoundary(content, content.size)
+            probe = previousBoundary(content.size)
         }
         let cls = charClassAt(content, probe)
         var start = probe
         while (start > 0) {
-            let previous = previousTextBoundary(content, start)
+            let previous = previousBoundary(start)
             if (charClassAt(content, previous) != cls) {
                 break
             }
             start = previous
         }
-        var end = nextTextBoundary(content, probe)
+        var end = nextBoundary(probe)
         while (end < content.size) {
             if (charClassAt(content, end) != cls) {
                 break
             }
-            end = nextTextBoundary(content, end)
+            end = nextBoundary(end)
         }
         anchor.value = start
         cursor.value = end
@@ -103,11 +123,11 @@ public class TextEditState {
     /** Selects the line containing `position`, including its trailing newline (a triple-click). */
     public func selectLineAt(position: Int64): Unit {
         let content = text.value
-        let pos = normalizedTextCursor(content, position)
+        let pos = normalized(position)
         anchor.value = lineStartBeforeOrAt(content, pos)
         let lineEnd = lineEndAfterOrAt(content, pos)
         cursor.value = if (lineEnd < content.size) {
-            nextTextBoundary(content, lineEnd)
+            nextBoundary(lineEnd)
         } else {
             lineEnd
         }
@@ -115,59 +135,53 @@ public class TextEditState {
 
     /** Collapses any selection onto the caret. */
     public func clearSelection(): Unit {
-        anchor.value = normalizedTextCursor(text.value, cursor.value)
+        cursor.value = normalized(cursor.value)
+        anchor.value = cursor.value
     }
 
-    /** Removes the selected span if any; returns whether text changed. */
+    /** Removes the selected span atomically; returns whether text changed. */
     public func deleteSelection(): Bool {
         let start = selectionStart()
         let end = selectionEnd()
         if (start == end) {
             return false
         }
-        text.value = text.value[0..start] + text.value[end..text.value.size]
-        cursor.value = start
-        anchor.value = start
+        replaceRange(start, end, "")
         true
     }
 
-    /** Replaces the selection (or inserts at the caret) with `value`, collapsing the caret after it. */
+    /** Replaces the selection with one published text update, preserving whole graphemes. */
     public func insert(value: String): Unit {
-        let _ = deleteSelection() // cjcheck-ignore: ignore-result # insert replaces any selection; "nothing was selected" needs no branch
-        let position = normalizedTextCursor(text.value, cursor.value)
-        text.value = text.value[0..position] + value + text.value[position..text.value.size]
-        cursor.value = position + value.size
-        anchor.value = cursor.value
+        replaceRange(selectionStart(), selectionEnd(), value)
     }
 
-    /** Deletes the selection, or the rune before the caret when nothing is selected. */
+    /** Deletes the selection, or one complete extended grapheme before the caret. */
     public func backspace(): Unit {
         if (deleteSelection()) {
             return
         }
-        let end = normalizedTextCursor(text.value, cursor.value)
-        let start = previousTextBoundary(text.value, end)
-        if (start == end) {
-            return
-        }
-        text.value = text.value[0..start] + text.value[end..text.value.size]
-        cursor.value = start
-        anchor.value = start
+        let end = normalized(cursor.value)
+        replaceRange(previousBoundary(end), end, "")
     }
 
-    /** Deletes the selection, or the rune after the caret when nothing is selected. */
+    /** Deletes the selection, or one complete extended grapheme after the caret. */
     public func deleteForward(): Unit {
         if (deleteSelection()) {
             return
         }
-        let start = normalizedTextCursor(text.value, cursor.value)
-        let end = nextTextBoundary(text.value, start)
-        if (start == end) {
-            return
+        let start = normalized(cursor.value)
+        replaceRange(start, nextBoundary(start), "")
+    }
+
+    private func replaceRange(start: Int64, end: Int64, value: String): Unit {
+        let content = text.value
+        let next = content[0..start] + value + content[end..content.size]
+        if (next != content) {
+            text.value = next
         }
-        text.value = text.value[0..start] + text.value[end..text.value.size]
-        cursor.value = start
-        anchor.value = start
+        // An inserted ZWJ/mark or a deleted separator can merge adjacent graphemes.
+        cursor.value = boundaries().ceiling(start + value.size)
+        anchor.value = cursor.value
     }
 
     // Plain navigation collapses any selection: to its near edge when one exists, otherwise
@@ -179,7 +193,7 @@ public class TextEditState {
         if (hasSelection()) {
             cursor.value = selectionStart()
         } else {
-            cursor.value = previousTextBoundary(text.value, cursor.value)
+            cursor.value = previousBoundary(cursor.value)
         }
         anchor.value = cursor.value
     }
@@ -189,19 +203,19 @@ public class TextEditState {
         if (hasSelection()) {
             cursor.value = selectionEnd()
         } else {
-            cursor.value = nextTextBoundary(text.value, cursor.value)
+            cursor.value = nextBoundary(cursor.value)
         }
         anchor.value = cursor.value
     }
 
     /** Extends the selection one boundary left, keeping the anchor (Shift+Left). */
     public func extendLeft(): Unit {
-        cursor.value = previousTextBoundary(text.value, cursor.value)
+        cursor.value = previousBoundary(cursor.value)
     }
 
     /** Extends the selection one boundary right, keeping the anchor (Shift+Right). */
     public func extendRight(): Unit {
-        cursor.value = nextTextBoundary(text.value, cursor.value)
+        cursor.value = nextBoundary(cursor.value)
     }
 
     /** Moves the caret to the start of the document, collapsing any selection. */
@@ -265,58 +279,112 @@ public class TextEditState {
 
     /** Extends the selection one line up keeping the column and the anchor (Shift+Up). */
     public func extendLineUp(): Unit {
-        let current = normalizedTextCursor(text.value, cursor.value)
+        let current = normalized(cursor.value)
         let currentStart = lineStartBeforeOrAt(text.value, current)
         if (currentStart <= 0) {
             cursor.value = 0
             return
         }
-        let previousEnd = previousTextBoundary(text.value, currentStart)
+        let previousEnd = previousBoundary(currentStart)
         let previousStart = lineStartBeforeOrAt(text.value, previousEnd)
-        let column = current - currentStart
-        cursor.value = advanceTextCursorByBytes(text.value, previousStart, column, previousEnd)
+        let column = boundaries().index(current) - boundaries().index(currentStart)
+        cursor.value = advanceColumn(previousStart, column, previousEnd)
     }
 
     /** Extends the selection one line down keeping the column and the anchor (Shift+Down). */
     public func extendLineDown(): Unit {
-        let current = normalizedTextCursor(text.value, cursor.value)
+        let current = normalized(cursor.value)
         let currentEnd = lineEndAfterOrAt(text.value, current)
         if (currentEnd >= text.value.size) {
             cursor.value = text.value.size
             return
         }
-        let nextStart = nextTextBoundary(text.value, currentEnd)
+        let nextStart = nextBoundary(currentEnd)
         let nextEnd = lineEndAfterOrAt(text.value, nextStart)
-        let column = current - lineStartBeforeOrAt(text.value, current)
-        cursor.value = advanceTextCursorByBytes(text.value, nextStart, column, nextEnd)
+        let column = boundaries().index(current) - boundaries().index(lineStartBeforeOrAt(text.value, current))
+        cursor.value = advanceColumn(nextStart, column, nextEnd)
+    }
+
+    private func advanceColumn(start: Int64, column: Int64, limit: Int64): Int64 {
+        let map = boundaries()
+        map.at(min(map.index(limit), map.index(start) + column))
+    }
+
+    /** Moves by a same-class word run (Ctrl+Left), collapsing selection. */
+    public func moveWordLeft(): Unit {
+        extendWordLeft();
+        anchor.value = cursor.value
+    }
+    /** Moves to the next word run (Ctrl+Right), collapsing selection. */
+    public func moveWordRight(): Unit {
+        extendWordRight();
+        anchor.value = cursor.value
+    }
+    /** Extends selection to the preceding word-run start. */
+    public func extendWordLeft(): Unit {
+        cursor.value = wordLeft(cursor.value)
+    }
+    /** Extends selection to the next word-run start. */
+    public func extendWordRight(): Unit {
+        cursor.value = wordRight(cursor.value)
+    }
+    /** Removes selection, or the preceding word run. */
+    public func deleteWordBackward(): Unit {
+        if (deleteSelection()) {
+            return
+        }
+        let end = normalized(cursor.value)
+        replaceRange(wordLeft(end), end, "")
+    }
+    /** Removes selection, or the following word run. */
+    public func deleteWordForward(): Unit {
+        if (deleteSelection()) {
+            return
+        }
+        let start = normalized(cursor.value)
+        replaceRange(start, wordRight(start), "")
+    }
+
+    private func wordLeft(position: Int64): Int64 {
+        let content = text.value
+        let map = boundaries()
+        var index = map.index(position)
+        while (index > 0 && charClassAt(content, map.at(index - 1)) == 1) {
+            index -= 1
+        }
+        if (index > 0) {
+            let kind = charClassAt(content, map.at(index - 1))
+            while (index > 0 && charClassAt(content, map.at(index - 1)) == kind) {
+                index -= 1
+            }
+        }
+        map.at(index)
+    }
+
+    private func wordRight(position: Int64): Int64 {
+        let content = text.value
+        let map = boundaries()
+        var index = map.index(position)
+        if (map.at(index) < content.size) {
+            let kind = charClassAt(content, map.at(index))
+            while (map.at(index) < content.size && charClassAt(content, map.at(index)) == kind) {
+                index += 1
+            }
+            while (map.at(index) < content.size && charClassAt(content, map.at(index)) == 1) {
+                index += 1
+            }
+        }
+        map.at(index)
     }
 
     /** Places the caret at `position`, collapsing any selection (a plain click). */
     public func moveTo(position: Int64): Unit {
-        cursor.value = normalizedTextCursor(text.value, position)
+        cursor.value = normalized(position)
         anchor.value = cursor.value
     }
 
     /** Moves the caret to `position` while keeping the anchor (a drag-select). */
     public func extendTo(position: Int64): Unit {
-        cursor.value = normalizedTextCursor(text.value, position)
-    }
-}
-
-/*
- * Copies the selection to the system clipboard, returning whether anything was copied.
- * Clipboard access can fail without a desktop session; a failed platform write reports
- * false (nothing copied) rather than raising, so Ctrl+C/Ctrl+X never crash the editor.
- * Shared by TextField and TextArea.
- */
-internal func copyEditSelection(edit: TextEditState): Bool {
-    if (!edit.hasSelection()) {
-        return false
-    }
-    try {
-        Clipboard.setText(edit.selectedText())
-        true
-    } catch (_: Exception) {
-        false
+        cursor.value = normalized(position)
     }
 }

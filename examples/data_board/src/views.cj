@@ -9,8 +9,9 @@
  */
 package cui_data_board
 
-import cui.{Button, ButtonRole, Color, CrossAxisAlignment, FlowRow, FontSizes, ForEach, Grid, HStack, Icon, IconName,
-    Label, LengthUnits, Panel, Picker, ScrollView, Spacer, State, Stepper, Switch, VStack}
+import cui.{Button, ButtonRole, Color, CrossAxisAlignment, FlowRow, FontSizes, ForEach, Grid, HStack}
+import cui.{Icon, IconSource, Label, LengthUnits, Panel, Picker, ScrollView, Spacer, State, Stepper}
+import cui.{Switch, VStack}
 
 func boardView(model: BoardModel): Unit {
     VStack {
@@ -18,10 +19,8 @@ func boardView(model: BoardModel): Unit {
         Grid(3) {
             boardColumn(model, "待规划", model.plannedCount.value, Color.rgb(98, 112, 132), model.planned,
                 model.visiblePlanned())
-            boardColumn(model, "进行中", model.doingCount.value, doingAccent(model), model.doing,
-                model.visibleDoing())
-            boardColumn(model, "已完成", model.doneCount.value, Color.rgb(24, 145, 105), model.done,
-                model.visibleDone())
+            boardColumn(model, "进行中", model.doingCount.value, doingAccent(model), model.doing, model.visibleDoing())
+            boardColumn(model, "已完成", model.doneCount.value, Color.rgb(24, 145, 105), model.done, model.visibleDone())
         }.spacing(14.vp).flex()
     }.spacing(14.vp).padding(18.vp)
 }
@@ -38,7 +37,7 @@ func boardHeader(model: BoardModel): Unit {
     Panel {
         // 居中对齐让定高控件保持自然高度（38vp），而不是被两行标题撑高的行拉伸变形。
         HStack {
-            Icon(IconName.Process).foregroundColor(Color.rgb(54, 116, 210)).iconSize(22.vp)
+            Icon(IconSource("assets/icons/process.svg")).foregroundColor(Color.rgb(54, 116, 210)).iconSize(22.vp)
             VStack {
                 Label("产品看板").fontSize(FontSizes.TITLE)
                 Label("Northstar · 桌面端体验迭代").muted().fontSize(FontSizes.CAPTION)

@@ -1,6 +1,6 @@
 package cui.core
 
-import sdl.{Color, FontSizes, FontStyle, Rect, Size, UiEvent}
+import sdl.{Color, FontStyle, FontWeight, FontVariations, Rect, Size, UiEvent}
 
 private let LABEL_LINE_GAP: Float32 = 2.0
 
@@ -17,8 +17,9 @@ public class Label <: Widget {
     private var isMuted: Bool
     private var alignment: TextAlign
     private var textColor: ?Color
-    private var pointSize: Length
-    private var textStyle: FontStyle = FontStyle.regular
+    private var pointSize: ?Length
+    private var localStyleMask: Int32 = 0
+    private var localFontStyle: ?FontStyle = None
     private var fontFace: ?String = None
     private var lineLimit: Int64 = 1
     private var frame = Rect.zero()
@@ -39,7 +40,7 @@ public class Label <: Widget {
         muted!: Bool = false,
         align!: TextAlign = TextAlign.Leading,
         color!: ?Color = None,
-        fontSize!: Length = Length(FontSizes.BODY, LengthUnit.Fp)
+        fontSize!: ?Length = None
     ) {
         this.text = text
         this.semanticId = controlIdentity("Label:${text}")
@@ -76,7 +77,7 @@ public class Label <: Widget {
 
     /** Sets the font size, e.g. `.fontSize(15.fp)`. */
     public func fontSize(value: Length): Label {
-        pointSize = value
+        pointSize = Some(value)
         this
     }
 
@@ -87,35 +88,40 @@ public class Label <: Widget {
 
     /** Replaces the whole text style (weight, slant, and decorations) at once. */
     public func fontStyle(value: FontStyle): Label {
-        textStyle = value
+        localStyleMask = 31
+        localFontStyle = Some(value)
         dropMetricsCaches()
         this
     }
 
     /** Draws the text bold (or sets bold to `value`). */
     public func bold(value!: Bool = true): Label {
-        textStyle = textStyle.withBold(value: value)
+        localStyleMask |= 1
+        localFontStyle = Some(baseFontStyle().withBold(value: value))
         dropMetricsCaches()
         this
     }
 
     /** Draws the text italic (or sets italic to `value`). */
     public func italic(value!: Bool = true): Label {
-        textStyle = textStyle.withItalic(value: value)
+        localStyleMask |= 2
+        localFontStyle = Some(baseFontStyle().withItalic(value: value))
         dropMetricsCaches()
         this
     }
 
     /** Underlines the text (or sets the underline to `value`). */
     public func underline(value!: Bool = true): Label {
-        textStyle = textStyle.withUnderline(value: value)
+        localStyleMask |= 4
+        localFontStyle = Some(baseFontStyle().withUnderline(value: value))
         dropMetricsCaches()
         this
     }
 
     /** Strikes through the text (or sets the strikethrough to `value`). */
     public func strikethrough(value!: Bool = true): Label {
-        textStyle = textStyle.withStrikethrough(value: value)
+        localStyleMask |= 8
+        localFontStyle = Some(baseFontStyle().withStrikethrough(value: value))
         dropMetricsCaches()
         this
     }
@@ -165,7 +171,7 @@ public class Label <: Widget {
 
     public func measure(ctx: UiContext, available: Size): Size {
         let ps = resolvedPointSize(ctx)
-        let lineHeight = ctx.renderer.textHeight(pointSize: ps, style: textStyle, font: fontFace)
+        let lineHeight = ctx.textHeight(pointSize: ps, style: resolvedFontStyle(ctx), font: fontFace)
         if (lineLimit == 1) {
             return Size(min(available.w, singleLineWidth(ctx, ps)), max(CUI_SMALL_H, lineHeight + 6.0))
         }
@@ -184,22 +190,22 @@ public class Label <: Widget {
     public func draw(ctx: UiContext): Unit {
         let ps = resolvedPointSize(ctx)
         let color = drawColor(ctx)
-        let lineHeight = ctx.renderer.textHeight(pointSize: ps, style: textStyle, font: fontFace)
+        let lineHeight = ctx.textHeight(pointSize: ps, style: resolvedFontStyle(ctx), font: fontFace)
         if (lineLimit == 1) {
             // Reuse the cached full-text width for the fit test: ellipsize (a binary search) runs
             // only when the text overflows, so a fitting single-line label re-measures nothing.
             let fitted = if (singleLineWidth(ctx, ps) <= frame.w) {
                 text
             } else {
-                ellipsize(ctx, text, frame.w, ps, style: textStyle, font: fontFace)
+                ellipsize(ctx, text, frame.w, ps, style: resolvedFontStyle(ctx), font: fontFace)
             }
-            ctx.renderer.text(
+            ctx.text(
                 fitted,
                 lineX(ctx, fitted, ps),
                 frame.centerY() - lineHeight / 2.0,
                 color,
                 pointSize: ps,
-                style: textStyle,
+                style: resolvedFontStyle(ctx),
                 font: fontFace
             )
             return
@@ -208,7 +214,7 @@ public class Label <: Widget {
         let textBlock = Float32(lines.size) * lineHeight + Float32(max(0, lines.size - 1)) * LABEL_LINE_GAP
         var y = frame.centerY() - textBlock / 2.0
         for (line in lines) {
-            ctx.renderer.text(line, lineX(ctx, line, ps), y, color, pointSize: ps, style: textStyle, font: fontFace)
+            ctx.text(line, lineX(ctx, line, ps), y, color, pointSize: ps, style: resolvedFontStyle(ctx), font: fontFace)
             y += lineHeight + LABEL_LINE_GAP
         }
     }
@@ -233,8 +239,35 @@ public class Label <: Widget {
         }
     }
 
+    /** Selects a numeric weight while inheriting other style fields. */
+    public func fontWeight(value: FontWeight): Label {
+        localStyleMask |= 1
+        localFontStyle = Some(baseFontStyle().withWeight(value))
+        dropMetricsCaches()
+        this
+    }
+
+    /** Overrides variable design coordinates while inheriting other text style fields. */
+    public func fontVariations(value: FontVariations): Label {
+        localStyleMask |= 16
+        localFontStyle = Some(baseFontStyle().withVariations(value))
+        dropMetricsCaches()
+        this
+    }
+
+    private func resolvedFontStyle(ctx: UiContext): FontStyle {
+        mergeFontStyle(ctx.effectiveFontStyle(), baseFontStyle(), localStyleMask)
+    }
+
+    private func baseFontStyle(): FontStyle {
+        match (localFontStyle) {
+            case Some(value) => value
+            case None => FontStyle.regular
+        }
+    }
+
     private func resolvedPointSize(ctx: UiContext): Float32 {
-        max(1.0, ctx.resolve(pointSize))
+        ctx.textSize(override: pointSize)
     }
 
     // Exact float comparison is deliberate in both caches: the keys are reused values,
@@ -242,7 +275,7 @@ public class Label <: Widget {
     private func singleLineWidth(ctx: UiContext, ps: Float32): Float32 {
         prepareMeasurementEnvironment(ctx)
         if (cachedTextWidthPointSize != ps) { // cjcheck-ignore: float-equal # cache-key identity; miss only costs a re-measure
-            cachedTextWidth = ctx.renderer.textWidth(text, pointSize: ps, style: textStyle, font: fontFace)
+            cachedTextWidth = ctx.textWidth(text, pointSize: ps, style: resolvedFontStyle(ctx), font: fontFace)
             cachedTextWidthPointSize = ps
         }
         cachedTextWidth
@@ -253,7 +286,8 @@ public class Label <: Widget {
         match (cachedLines) {
             case Some(lines) where cachedLinesWidth == width && cachedLinesPointSize == ps => lines // cjcheck-ignore: float-equal # cache-key identity; miss only costs a re-wrap
             case _ =>
-                let layout = layoutParagraph(ctx, text, width, ps, lineLimit, style: textStyle, font: fontFace)
+                let layout = layoutParagraph(ctx, text, width, ps, lineLimit, style: resolvedFontStyle(ctx),
+                    font: fontFace)
                 cachedLines = Some(layout.lines)
                 cachedLinesWidth = width
                 cachedLinesPointSize = ps
@@ -277,10 +311,10 @@ public class Label <: Widget {
         match (alignment) {
             case TextAlign.Leading => frame.x
             case TextAlign.Center =>
-                let lineW = ctx.renderer.textWidth(line, pointSize: ps, style: textStyle, font: fontFace)
+                let lineW = ctx.textWidth(line, pointSize: ps, style: resolvedFontStyle(ctx), font: fontFace)
                 frame.x + max(0.0, frame.w - lineW) / 2.0
             case TextAlign.Trailing =>
-                let lineW = ctx.renderer.textWidth(line, pointSize: ps, style: textStyle, font: fontFace)
+                let lineW = ctx.textWidth(line, pointSize: ps, style: resolvedFontStyle(ctx), font: fontFace)
                 frame.right() - lineW
         }
     }

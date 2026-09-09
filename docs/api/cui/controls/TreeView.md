@@ -18,7 +18,7 @@ public class TreeView <: Widget
 
 ## 说明
 
-选中以节点 id 为键（而非行号——展开与折叠会移动其下所有行），`selected` 绑定持有选中节点的 id，空串表示无选中；选中变化时（含从外部写入绑定）该行滚入可视区。展开集由控件的稳定标识跨每帧重建保留：用 `initiallyExpanded` 设置初始展开的节点，或经 `expanded` 由外部持有以便持久化或协同。行高 28 逻辑像素；内容装得下时滚轮留给外层滚动容器（无死区）。本帧内切换展开只更新状态，行的增减在下一帧重建时生效。
+选中以节点 id 为键（而非行号——展开与折叠会移动其下所有行），`selected` 绑定持有选中节点的 id，空串表示无选中；选中变化时（含从外部写入绑定）该行滚入可视区。展开集由控件的稳定标识跨构建保留：用 `initiallyExpanded` 设置初始展开的节点，或经 `expanded` 由外部持有以便持久化或协同。行高为 `max(28, 有效文字行高 + 8)` 逻辑像素；内容装得下时滚轮留给外层滚动容器（无死区）。切换展开会更新可观察状态，宿主在绘制前完成必要的重建与布局，使行结构和命中区域一致。
 
 聚焦后的键盘导航：Up/Down 在可见行间移动，Home/End 跳到两端，Right 展开折叠节点、已展开则步入第一个子行，Left 折叠展开节点、否则步出到父行，Enter/Space 切换当前节点的展开。点击行选中它；点击行首箭头切换展开。
 
@@ -124,7 +124,7 @@ public func scrollState(value: State<Float32>): TreeView
 占满全部可用尺寸（[`Widget`](../core/Widget.md) 协议）。
 
 ```cangjie
-public func measure(_: UiContext, available: Size): Size
+public func measure(ctx: UiContext, available: Size): Size
 ```
 
 **参数**
@@ -138,7 +138,7 @@ public func measure(_: UiContext, available: Size): Size
 记录分配的矩形作为视口与命中的基准（[`Widget`](../core/Widget.md) 协议）。
 
 ```cangjie
-public func layout(_: UiContext, rect: Rect): Unit
+public func layout(ctx: UiContext, rect: Rect): Unit
 ```
 
 **参数**

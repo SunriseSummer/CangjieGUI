@@ -67,9 +67,10 @@ public class StepIndicator <: Widget {
     public func handle(ctx: UiContext, event: UiEvent): Bool {
         match ((event, onSelect)) {
             // Only the already-reached steps are clickable, so only they show the interactive cursor.
-            case (UiEvent.MouseMove(x, y), Some(_)) => if (reachedStepAt(x, y) >= 0) {
-                ctx.claimHover(id, CursorShape.Interactive)
-            }
+            case (UiEvent.MouseMove(x, y), Some(_)) =>
+                if (reachedStepAt(x, y) >= 0) {
+                    ctx.claimHover(id, CursorShape.Interactive)
+                }
             case (UiEvent.MouseDown(MouseButton.Left, x, y), Some(callback)) =>
                 let step = reachedStepAt(x, y)
                 if (step >= 0) {
@@ -131,16 +132,16 @@ public class StepIndicator <: Widget {
             ctx.theme.mutedText
         }
         let label = steps[step]
-        let labelW = ctx.renderer.textWidth(label, pointSize: FontSizes.CAPTION)
+        let labelW = ctx.textWidth(label, pointSize: ctx.textSize(fallback: FontSizes.CAPTION))
         let ly = cy + STEP_CIRCLE_R + STEP_LABEL_GAP
-        ctx.renderer.text(label, cx - labelW / 2.0, ly, labelColor, pointSize: FontSizes.CAPTION)
+        ctx.text(label, cx - labelW / 2.0, ly, labelColor, pointSize: ctx.textSize(fallback: FontSizes.CAPTION))
     }
 
     private func drawNumber(ctx: UiContext, cx: Float32, cy: Float32, number: Int64, color: Color): Unit {
         let text = "${number}"
-        let w = ctx.renderer.textWidth(text, pointSize: FontSizes.CAPTION)
-        let h = ctx.renderer.textHeight(pointSize: FontSizes.CAPTION)
-        ctx.renderer.text(text, cx - w / 2.0, cy - h / 2.0, color, pointSize: FontSizes.CAPTION)
+        let w = ctx.textWidth(text, pointSize: ctx.textSize(fallback: FontSizes.CAPTION))
+        let h = ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.CAPTION))
+        ctx.text(text, cx - w / 2.0, cy - h / 2.0, color, pointSize: ctx.textSize(fallback: FontSizes.CAPTION))
     }
 
     private func drawCheck(ctx: UiContext, cx: Float32, cy: Float32, color: Color): Unit {

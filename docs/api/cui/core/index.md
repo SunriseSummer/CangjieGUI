@@ -26,6 +26,7 @@ import cui.core.*
 | [`Widget`](Widget.md) | 所有组件实现的测量、布局、绘制和事件协议。 |
 | [`Modifier`](Modifier.md) | 可组合、可复用的组件修饰器。 |
 | [`UiContext`](UiContext.md) | 组件访问渲染、主题、输入、焦点、浮层和帧调度的上下文。 |
+| [`UiAggregateException`](UiAggregateException.md) | 保留一次操作中所有原始异常及发生顺序。 |
 | [`VStack`](VStack.md) / [`HStack`](HStack.md) | 纵向或横向排列子组件。 |
 | [`ZStack`](ZStack.md) | 按声明顺序叠放子组件。 |
 | [`Grid`](Grid.md) | 固定列数、等宽单元格的网格。 |
@@ -34,8 +35,7 @@ import cui.core.*
 | [`Spacer`](Spacer.md) | 吸收栈中的剩余空间。 |
 | [`Panel`](Panel.md) | 带主题背景和内边距的内容容器。 |
 | [`Label`](Label.md) | 单行或多行文本。 |
-| [`Button`](Button.md) / [`IconButton`](IconButton.md) | 文字按钮或图标按钮。 |
-| [`Icon`](Icon.md) | 非交互矢量图标。 |
+| [`Button`](Button.md) | 文字按钮；媒体图标按钮位于 cui.media。 |
 | [`Divider`](Divider.md) | 水平或垂直分隔线。 |
 | [`ScrollView`](ScrollView.md) | 可滚动、会裁剪内容的垂直视口。 |
 | [`ScrollBar`](ScrollBar.md) / [`HScrollBar`](HScrollBar.md) | 可供自定义滚动容器复用的滚动条控制器。 |
@@ -188,3 +188,7 @@ import cui.core.*
 
 - [`Int64` 的 `LengthUnits` 实现](extensions.md#int64-的-lengthunits-实现)
 - [`Float64` 的 `LengthUnits` 实现](extensions.md#float64-的-lengthunits-实现)
+
+## 字体继承
+
+- [`TextStyle`](TextStyle.md)：子树的字体族、字号与样式默认值。

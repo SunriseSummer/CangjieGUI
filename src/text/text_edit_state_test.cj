@@ -24,7 +24,7 @@ func textAreaScrollbarThumbDragScrollsAndTakesPriorityOverTextDrag(): Unit {
 }
 
 @Test
-func editableTextAreaRequestsTextCursorButReadOnlyDoesNot(): Unit {
+func selectableTextAreaRequestsTextCursorInEditableAndReadOnlyModes(): Unit {
     let editableCtx = textTestContext()
     let editable = TextArea(State<String>("hi"), key: "editable")
     editable.layout(editableCtx, Rect(0.0, 0.0, 200.0, 120.0))
@@ -39,7 +39,7 @@ func editableTextAreaRequestsTextCursorButReadOnlyDoesNot(): Unit {
     readOnlyCtx.beginHoverTest()
     let _ = readOnly.handle(readOnlyCtx, UiEvent.MouseMove(20.0, 20.0))
     readOnlyCtx.settleHover()
-    @Expect(readOnlyCtx.desiredCursor() == CursorShape.Default)
+    @Expect(readOnlyCtx.desiredCursor() == CursorShape.Text)
 }
 
 @Test

@@ -1,6 +1,6 @@
 package cui.core
 
-import sdl.{FontSizes, Key, MouseButton, Rect, Size, SurfaceStyle, UiEvent}
+import sdl.{FontSizes, FontWeight, FontStyle, Key, MouseButton, Rect, Size, SurfaceStyle, UiEvent}
 
 /**
  * An empty, flexible widget: it measures zero and absorbs a share of its stack's leftover space,
@@ -44,7 +44,9 @@ public class Button <: Widget {
     private let onClick: () -> Unit
     private var buttonRole: ButtonRole
     private var customStyle: ?SurfaceStyle
-    private var pointSize: Length
+    private var pointSize: ?Length
+    private var titleWeight: ?FontWeight = None
+    private var fontFace: ?String = None
     private var controlId: String
     private var frame = Rect.zero()
 
@@ -53,7 +55,7 @@ public class Button <: Widget {
         onClick: () -> Unit,
         role!: ButtonRole = ButtonRole.Normal,
         style!: ?SurfaceStyle = None,
-        fontSize!: Length = Length(FontSizes.CONTROL, LengthUnit.Fp)
+        fontSize!: ?Length = None
     ) {
         this.title = title
         this.onClick = onClick
@@ -86,9 +88,29 @@ public class Button <: Widget {
         this
     }
 
+    /** Overrides the inherited font family for this button's title. */
+    public func fontFamily(name: String): Button {
+        fontFace = Some(name)
+        this
+    }
+
+    /** Overrides only the title weight. Other style fields inherit from the surrounding text style. */
+    public func fontWeight(value: FontWeight): Button {
+        titleWeight = Some(value)
+        this
+    }
+
+    private func titleStyle(ctx: UiContext): FontStyle {
+        let inherited = ctx.effectiveFontStyle()
+        match (titleWeight) {
+            case Some(value) => inherited.withWeight(value);
+            case None => inherited
+        }
+    }
+
     /** Sets the label font size, e.g. `.fontSize(15.fp)`. */
     public func fontSize(value: Length): Button {
-        pointSize = value
+        pointSize = Some(value)
         this
     }
 
@@ -98,8 +120,9 @@ public class Button <: Widget {
     }
 
     public func measure(ctx: UiContext, available: Size): Size {
-        let ps = max(1.0, ctx.resolve(pointSize))
-        Size(min(available.w, max(72.0, ctx.renderer.textWidth(title, pointSize: ps) + 24.0)), CUI_CONTROL_H)
+        let ps = ctx.textSize(fallback: FontSizes.CONTROL, override: pointSize)
+        Size(min(available.w, max(72.0, ctx.textWidth(title, pointSize: ps, font: fontFace, style: titleStyle(ctx)) +
+            24.0)), max(CUI_CONTROL_H, ctx.textHeight(pointSize: ps, font: fontFace, style: titleStyle(ctx)) + 12.0))
     }
 
     public func layout(ctx: UiContext, rect: Rect): Unit {
@@ -121,7 +144,15 @@ public class Button <: Widget {
             case ButtonRole.Normal => ctx.theme.text
             case _ => ctx.theme.accentText
         }
-        ctx.renderer.textCenter(title, frame, textColor, pointSize: max(1.0, ctx.resolve(pointSize)))
+        // A parent may impose a size smaller than the natural title; keep ink inside its surface.
+        ctx.renderer.pushClip(frame.inset(2.0))
+        try {
+            ctx.textCenter(title, frame, textColor,
+                pointSize: ctx.textSize(fallback: FontSizes.CONTROL, override: pointSize), font: fontFace,
+                style: titleStyle(ctx))
+        } finally {
+            ctx.renderer.popClip()
+        }
         if (ctx.showFocusRing(controlId)) {
             drawFocusRing(ctx, frame, ctx.theme.controlRadius)
         }

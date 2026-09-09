@@ -1,7 +1,7 @@
 [package]
 cjc-version = "1.0.5"
 name = "cui"
-version = "0.9.5"
+version = "0.9.6"
 output-type = "static"
 description = "Declarative desktop GUI framework for Cangjie"
 compile-option = "-O2"

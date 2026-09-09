@@ -9,7 +9,7 @@
  */
 package cui_notepad
 
-import cui.{ApplicationPaths, DesktopApp, FrameHandler, WindowSpec}
+import cui.{ApplicationPaths, DesktopApp, WindowSpec}
 
 main(): Int64 {
     let model = NotepadModel()
@@ -19,17 +19,7 @@ main(): Int64 {
     app.setMinimumSize(640, 460)
     let documentPath = ApplicationPaths.preferencePath("CUI", "Notepad") + "notepad.txt"
     app.run {
-        // 文件对话框是“发起请求 -> 帧内轮询结果”的异步模式：每帧检查一次结果，
-        // 事件循环始终保持运转，界面不会因等待用户选择而冻结。
-        FrameHandler(
-            onFrame: {
-                _ =>
-                    pollOpenDialog(model)
-                    pollSaveDialog(model)
-            }
-        ) {
-            notepadView(model, app, documentPath)
-        }
+        notepadView(model, app, documentPath)
     }
     return 0
 }

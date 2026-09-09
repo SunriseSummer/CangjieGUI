@@ -5,12 +5,9 @@
 标签 + 加粗主题词 + 常规描述 + 灰底内联代码 + 划除的弃用旧写法 + 下划线议题链接），底部
 状态条实时反馈链接点击。类别过滤沿用分段控件。
 
-本例由早前的 activity（活动流）与旧版 richtext（更新日志）合并而来——两者都只演示了
-「图标 + 彩色片段」这一小截能力，合并后的发布说明页覆盖全部片段样式且更接近真实产品页面。
-
 ## 演示要点
 
-- 逐段字号：`RichSpan.fontSize` 让版本号（24）、正文（15）、标签（12）同行混排，行内居中、
+- 逐段字号：`RichSpan.fontSize` 让版本号（24）、正文（15）、标签（12）同行混排，按字体基线对齐、
   行高随最大字号增长
 - 软底标签与内联代码：`highlight(color)` 画紧贴字形的圆角底盒——类别标签用类别柔和色、
   代码片段用灰底墨字（等价 `<code>` 的视觉）
@@ -40,15 +37,34 @@
 RichText([
     RichSpan.icon(categoryIcon(c), color: categoryColor(c)),
     RichSpan.text(" 新增 ", color: categoryColor(c)).highlight(categorySoft(c)).fontSize(12.0),
-    RichSpan.text("真粗体字面").bold(),
+    RichSpan.text("真粗体字面").fontWeight(FontWeight.semiBold),
     RichSpan.text("：粗体优先加载同族的粗体文件…"),
-    RichSpan.text("msyhbd.ttc", color: CODE_INK).highlight(CODE_BG).fontSize(13.0),
+    RichSpan.text("msyhbd.ttc", color: CODE_INK).fontFamily(FontRole.monospace).highlight(CODE_BG).fontSize(13.0),
     RichSpan.text("#4821", color: LINK_COLOR).underline().onTap({=> model.openIssue("#4821")})
 ])
 ```
 
 长句在卡宽内自动换行，全部片段同处一个文流；代码片段的高亮盒不含内衬空格，行尾断开时
 不会留下孤悬的空格高亮条。
+
+## 字体与样式的最佳实践
+
+根容器使用 `TextStyle(fontFamily: FontRole.systemUI, fontSize: 15.fp)`；普通片段继承正文，主题词只改 `fontWeight`，内联代码只改为等宽角色。独立设置保留其它继承字段；只有明确重置整组样式时才用 `fontStyle(FontStyle.regular)`。
+
+```cangjie
+RichText([
+    RichSpan.text("正文 "),
+    RichSpan.text("重点 ").fontWeight(FontWeight.semiBold),
+    RichSpan.text("let value = 42").fontFamily(FontRole.monospace),
+    RichSpan.text(" 斜体").italic()
+]).textStyle(TextStyle(fontFamily: FontRole.systemUI, fontSize: 15.fp))
+```
+
+请缩窄窗口观察基线、换行和高亮边界；点击链接验证文字几何与命中保持一致。不同字体的缺字仍可能使用后备字体。当前会合并相邻同视觉样式的普通片段，但跨颜色／链接／高亮的统一 shaping 与完整段落 bidi 仍待扩展，不应把任意拆分片段视为复杂脚本排版的等价写法。
+
+![富文本字体效果](../.images/richtext.png)
+
+族名、文件注册、变量轴与平台限制见 [字体指南](../../docs/guide/how-to/fonts-and-typography.md)，交互实验见 [fonts](../fonts/README.md)。
 
 ## 运行
 
@@ -63,3 +79,9 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot richtext.bmp"
 ```
+
+## 练习与验收
+
+缩窄窗口并切换类别，检查不同字号基线及换行后链接命中。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

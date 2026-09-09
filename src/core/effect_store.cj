@@ -73,8 +73,8 @@ public class EffectStore<Model, Action, Effect> <: Observable<Model> {
 
     /**
      * Reduces and commits one action, then hands its effects to `handleEffects`. If model observers
-     * fail after the revision commits, effects are still handed off once before the first failure is
-     * rethrown. A pre-commit policy/reducer failure runs no effects.
+     * fail after the revision commits, effects are still handed off once before failures are
+     * reported. A pre-commit policy/reducer failure runs no effects.
      */
     public func dispatch(action: Action, handleEffects!: (EffectBatch<Effect>) -> Unit): Unit {
         commitAndHandle(reducer.reduce(storage.value, action), handleEffects)
@@ -256,7 +256,7 @@ public class EffectStore<Model, Action, Effect> <: Observable<Model> {
             handleEffects(transition.effects)
         } catch (effectFailure: Exception) {
             match (commitFailure) {
-                case Some(firstFailure) => throw firstFailure
+                case Some(firstFailure) => throw rollbackUiFailure(firstFailure, {=> Some(effectFailure)})
                 case None => throw effectFailure
             }
         }

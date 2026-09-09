@@ -40,7 +40,7 @@ class DesktopLifecycleRunnerTests(unittest.TestCase):
 
     def test_each_global_state_contract_is_process_isolated(self):
         self.assertEqual(lifecycle.SCENARIOS, (
-            "retained-damage", "automatic-partial", "automatic-fallback", "lifecycle"))
+            "retained-damage", "automatic-partial", "automatic-fallback", "lifecycle", "font-layout", "text-editing", "editor-style", "editor-quality", "emoji-paste", "emoji-alignment", "startup", "commercial", "scrolling", "failure-recovery", "numeric-recovery", "rich-text-breaks", "image-static"))
 
 
 if __name__ == "__main__":

@@ -68,9 +68,10 @@ public class Pagination <: Widget {
 
     public func handle(ctx: UiContext, event: UiEvent): Bool {
         match (event) {
-            case UiEvent.MouseMove(x, y) => if (clickableAt(x, y)) {
-                ctx.claimHover(id, CursorShape.Interactive)
-            }
+            case UiEvent.MouseMove(x, y) =>
+                if (clickableAt(x, y)) {
+                    ctx.claimHover(id, CursorShape.Interactive)
+                }
             case UiEvent.MouseDown(MouseButton.Left, x, y) =>
                 let page = clampPage(current.value, pageCount)
                 if (prevRect.contains(x, y)) {
@@ -162,9 +163,10 @@ public class Pagination <: Widget {
     }
 
     private func drawCentered(ctx: UiContext, text: String, rect: Rect, color: Color): Unit {
-        let w = ctx.renderer.textWidth(text, pointSize: FontSizes.CONTROL)
-        let h = ctx.renderer.textHeight(pointSize: FontSizes.CONTROL)
-        ctx.renderer.text(text, rect.centerX() - w / 2.0, rect.centerY() - h / 2.0, color, pointSize: FontSizes.CONTROL)
+        let w = ctx.textWidth(text, pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
+        let h = ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
+        ctx.text(text, rect.centerX() - w / 2.0, rect.centerY() - h / 2.0, color,
+            pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
     }
 }
 

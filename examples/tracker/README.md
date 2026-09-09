@@ -57,3 +57,9 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot tracker.bmp"
 ```
+
+## 练习与验收
+
+关闭全部过滤项，再逐项恢复，确认列表只显示对应状态。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

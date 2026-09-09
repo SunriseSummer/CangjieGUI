@@ -54,9 +54,9 @@ public class ProgressRing <: Widget {
             // Round to the nearest percent — truncation would show 69% for an exact 0.7 (whose nearest
             // Float32 sits just below it).
             let text = "${Int64(frac * 100.0 + 0.5)}%"
-            let tw = ctx.renderer.textWidth(text, pointSize: FontSizes.CONTROL)
-            let ty = cy - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
-            ctx.renderer.text(text, cx - tw / 2.0, ty, ctx.theme.text, pointSize: FontSizes.CONTROL)
+            let tw = ctx.textWidth(text, pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
+            let ty = cy - ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.CONTROL)) / 2.0
+            ctx.text(text, cx - tw / 2.0, ty, ctx.theme.text, pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
         }
     }
 

@@ -28,8 +28,8 @@ python .dev/cli.py check snippets --timeout 600
 python .dev/cli.py test examples --action build --jobs 4 --timeout 300
 ```
 
-- `check docs` 验证本地链接，并将公开类型、成员、函数、重载、包索引和 `cui` 统一导出与源码对照。
-- `check snippets` 编译 API 与指南中所有带 `verify` 的完整程序；指南不接受无法独立编译的仓颉片段。
+- `check docs` 验证各级示例 README、指南与 API 的本地链接及代码块闭合，并将公开类型、成员、函数、重载、包索引和 `cui` 统一导出与源码对照。
+- `check snippets` 编译根 README、API、指南和示例说明中带 `verify` 的完整程序；根 README 与指南要求完整程序，示例说明的局部片段结合对应源码阅读。
 - `test examples` 把每个示例当作独立的公开 API 使用者，避免统一构建掩盖包配置或依赖问题。
 - 严格 L2 只允许审阅过的存量基线，不允许新增问题。外部 `cjlint`、`cjfmt` 是补充视图；若规则与项目不匹配，
   必须在 `.dev/README.md` 记录原因和替代门禁。
@@ -41,7 +41,7 @@ python .dev/cli.py test packages
 python .dev/cli.py test packages --coverage --min-line-coverage 45
 ```
 
-包测试必须串行运行 CangjieGUI 与 CangjieSDL 的原生窗口用例，避免两个进程争用 SDL 的进程级状态。覆盖率报告位于
+CangjieGUI 与 CangjieSDL 的原生窗口测试应串行运行，避免窗口焦点、输入法和显示资源相互干扰；SDL 的进程级状态本身不跨进程共享。覆盖率报告位于
 `target/dev/test-package-results/`；当前仓颉工具链可能把部分内联代码归到测试目标，因此覆盖率用于防回退，不代替功能测试。
 
 ## 真实窗口与交付
@@ -55,7 +55,7 @@ python .dev/cli.py test examples --smoke-snapshots --retained-diff --timeout 300
 ```
 
 桌面测试验证窗口线程、事件等待、增量绘制、唤醒、退出和资源释放。`--retained-diff` 还会比较默认增量模式和强制全量
-模式的最终图像，避免缓存命中掩盖依赖遗漏。逐示例结果写入 `target/dev/examples/report.json`。
+模式的最终图像，避免缓存命中掩盖依赖遗漏。普通构建结果写入 `target/dev/examples/report.json`，快照结果写入 `snapshot-report.json`，`--smoke-snapshots` 结果写入 `smoke-report.json`；这些文件均位于同一目录。
 
 发布验证必须使用明确的目标平台运行库。先用 `release stage-runtime` 建立干净交付目录，再用 `release verify` 从该目录
 直接启动可执行文件。只运行 `cjpm run` 不能证明交付包完整。

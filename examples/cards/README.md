@@ -8,7 +8,7 @@
 
 - `shadow(Shadow.elevation(level), radius:)`：Material 式高度预设，层级越高阴影越大越柔；阶梯 e1..e6 一眼对比
 - `background(fill, radius)` 圆角填充 + `border(color, width:, radius:)` 圆角描边，三者传同一 radius 与圆角吻合
-- 绘制顺序固定正确：阴影在内容之后（视觉在其下）、边框在内容之上，故按 `background → shadow → border` 链式即可
+- 绘制顺序固定正确：阴影先于内容绘制（视觉在其下）、边框在内容之上，故按 `background → shadow → border` 链式即可
 - 关闭阴影/边框时传透明色（自然不绘制），从而恒链式套三个修饰符、无需条件包装
 - Stepper 调层级/圆角、Switch 切边框，样式描述由 `describeStyle` 纯函数派生
 
@@ -52,3 +52,9 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot cards.bmp"
 ```
+
+## 练习与验收
+
+分别关闭阴影和边框，确认卡片布局不变。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

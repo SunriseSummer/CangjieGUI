@@ -26,6 +26,8 @@
 
 ### 3. 运行菜单与编辑器
 
+下面的“保存”只增加计数，用于验证多个入口共享业务动作；它不会写入文件。实际文件保存见本页末尾的后续任务。
+
 ```cangjie verify role=complete profile=gui-visual
 package docexample
 
@@ -67,7 +69,7 @@ main(): Unit {
                     ]
                 )
                 TextArea(draft).autofocus().flex()
-                Label("字符数 ${draft.value.size} · 已保存 ${saved.value} 次").muted().padding(10.vp)
+                Label("UTF-8 字节数 ${draft.value.size} · 已保存 ${saved.value} 次").muted().padding(10.vp)
             }
         }
     }

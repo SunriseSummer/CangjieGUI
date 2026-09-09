@@ -5,16 +5,16 @@
  */
 package cui_skeleton
 
-import cui.{Color, IconName}
+import cui.{Color, IconSource}
 
 // 一篇文章：图标、图标色、标题、摘要。
 struct Article {
-    let icon: IconName
+    let icon: IconSource
     let iconColor: Color
     let title: String
     let summary: String
 
-    init(icon: IconName, iconColor: Color, title: String, summary: String) {
+    init(icon: IconSource, iconColor: Color, title: String, summary: String) {
         this.icon = icon
         this.iconColor = iconColor
         this.title = title
@@ -23,10 +23,14 @@ struct Article {
 }
 
 let ARTICLES: Array<Article> = [
-    Article(IconName.NewDocument, Color.rgb(52, 168, 120), "声明式界面的即时模式实现", "每帧重建控件树，用缓存与脏帧跳过压住成本"),
-    Article(IconName.Brush, Color.rgb(230, 158, 60), "多重阴影与深度感", "环境光叠方向光，深度来自两层之差"),
-    Article(IconName.Refresh, Color.rgb(96, 150, 250), "交错入场的时序数学", "第 i 行只比上一行多等一个步进"),
-    Article(IconName.Save, Color.rgb(150, 110, 220), "本地字体的加载与回退", "打不开就退回系统字体，中途拔盘也不崩")
+    Article(IconSource("assets/icons/document.svg"), Color.rgb(52, 168, 120), "声明式界面的即时模式实现",
+        "每帧重建控件树，用缓存与脏帧跳过压住成本"),
+    Article(IconSource("assets/icons/brush.svg"), Color.rgb(230, 158, 60), "多重阴影与深度感",
+        "环境光叠方向光，深度来自两层之差"),
+    Article(IconSource("assets/icons/refresh.svg"), Color.rgb(96, 150, 250), "交错入场的时序数学",
+        "第 i 行只比上一行多等一个步进"),
+    Article(IconSource("assets/icons/save.svg"), Color.rgb(150, 110, 220), "本地字体的加载与回退",
+        "打不开就退回系统字体，中途拔盘也不崩")
 ]
 
 // 骨架行数与文章数一致，切换前后高度不跳。

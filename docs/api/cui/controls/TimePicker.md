@@ -51,7 +51,7 @@ main(): Unit {
 
 | 成员 | 说明 |
 |---|---|
-| [`measure(_: UiContext, available: Size)`](#measure) | 报告至多 132 逻辑像素宽、固定 38 高的期望尺寸（[`Widget`](../core/Widget.md) 协议）。 |
+| [`measure(ctx: UiContext, available: Size)`](#measure) | 自然宽度至少 132 逻辑像素，并按实际显示文本（含 12 小时制后缀）加 46 单位图标与留白测量，高度适应字号（[`Widget`](../core/Widget.md) 协议）。 |
 | [`layout(_: UiContext, rect: Rect)`](#layout) | 记录分配的矩形作为字段的命中与绘制区域（[`Widget`](../core/Widget.md) 协议）。 |
 | [`draw(ctx: UiContext)`](#draw) | 绘制闭合字段（当前时刻加时钟图标），面板打开时注册浮层（[`Widget`](../core/Widget.md) 协议）。 |
 | [`handle(ctx: UiContext, event: UiEvent)`](#handle) | 点击字段或聚焦后按 Enter/Space/Down 打开面板（[`Widget`](../core/Widget.md) 协议）。 |
@@ -83,10 +83,10 @@ public init(selected: Bindable<TimeOfDay>, minuteStep!: Int64 = 5, hour12!: Bool
 
 ### measure
 
-报告至多 132 逻辑像素宽、固定 38 高的期望尺寸（[`Widget`](../core/Widget.md) 协议）。可用宽度不足 132 时收窄到可用宽度。
+自然宽度至少 132 逻辑像素，并按实际显示文本（含 12 小时制后缀）加 46 单位图标与留白测量，高度适应字号（[`Widget`](../core/Widget.md) 协议）。自然宽度超出可用空间时收窄到可用宽度。
 
 ```cangjie
-public func measure(_: UiContext, available: Size): Size
+public func measure(ctx: UiContext, available: Size): Size
 ```
 
 **参数**
@@ -100,7 +100,7 @@ public func measure(_: UiContext, available: Size): Size
 记录分配的矩形作为字段的命中与绘制区域（[`Widget`](../core/Widget.md) 协议）。
 
 ```cangjie
-public func layout(_: UiContext, rect: Rect): Unit
+public func layout(ctx: UiContext, rect: Rect): Unit
 ```
 
 **参数**

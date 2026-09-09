@@ -46,5 +46,14 @@
       "sha256": "63547d58d0185c833213885b635a2c0548201cc8f301e6587c0be1a67e1e045d",
       "size": 1545950
     }
+  },
+  "sdlImage": {
+    "version": "3.4.6",
+    "artifact": {
+      "filename": "SDL3_image-3.4.6.tar.gz",
+      "url": "https://github.com/libsdl-org/SDL_image/releases/download/release-3.4.6/SDL3_image-3.4.6.tar.gz",
+      "sha256": "d2e4637ae700f72e5196b8fbd749850ed2e5e1e09c5a5be8d06ff55aaccf3b01",
+      "size": 8604748
+    }
   }
 }

@@ -54,7 +54,7 @@ main(): Unit {
 
 | 成员 | 说明 |
 |---|---|
-| [`measure(_: UiContext, available: Size)`](#measure) | 宽为可用宽与 176 逻辑像素的较小者，高固定 38。 |
+| [`measure(ctx: UiContext, available: Size)`](#measure) | 自然宽度至少 176 逻辑像素，并为实际日期文本、18 单位图标、8 单位间隔和两侧内边距预留空间；宽度受可用宽约束，高度适应字号。 |
 | [`layout(_: UiContext, rect: Rect)`](#layout) | 记录分配到的框架。 |
 | [`draw(ctx: UiContext)`](#draw) | 画字段（当前日期文本与日历图标）；打开时把月历注册为交互浮层。 |
 | [`handle(ctx: UiContext, event: UiEvent)`](#handle) | 点击字段打开月历；聚焦时 Enter/Space/↓ 同效。 |
@@ -80,10 +80,10 @@ public init(selected: Bindable<CalendarDate>, key!: ?String = None)
 
 ### measure
 
-宽为可用宽与 176 逻辑像素的较小者，高固定 38。字段自身贴合固有尺寸（见 [`Widget`](../core/Widget.md)）。
+自然宽度至少 176 逻辑像素，并为实际日期文本、18 单位图标、8 单位间隔和两侧内边距预留空间；宽度受可用宽约束，高度适应字号。字段自身贴合固有尺寸（见 [`Widget`](../core/Widget.md)）。
 
 ```cangjie
-public func measure(_: UiContext, available: Size): Size
+public func measure(ctx: UiContext, available: Size): Size
 ```
 
 **参数**
@@ -97,7 +97,7 @@ public func measure(_: UiContext, available: Size): Size
 记录分配到的框架。
 
 ```cangjie
-public func layout(_: UiContext, rect: Rect): Unit
+public func layout(ctx: UiContext, rect: Rect): Unit
 ```
 
 **参数**

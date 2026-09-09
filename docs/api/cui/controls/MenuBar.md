@@ -113,7 +113,7 @@ public func measure(_: UiContext, available: Size): Size
 记录菜单栏的水平条框架，高度恒为 34 逻辑像素，忽略传入高度。[`Widget`](../core/Widget.md) 协议方法。
 
 ```cangjie
-public func layout(_: UiContext, rect: Rect): Unit
+public func layout(ctx: UiContext, rect: Rect): Unit
 ```
 
 **参数**

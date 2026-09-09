@@ -195,25 +195,11 @@ main(): Unit {
 
 ## 可以继续修改
 
-### 第四步：拆成多文件工程
+### 拆成多文件工程
 
-单文件运行成功后，进入项目随附的 `cui/examples/workbench`。它不是只有 `main` 片段的目录示意，而是一套已经配好包名、依赖和测试的真实工程：
+保持本页包名不变，将 `WorkItem` 与业务模型移入 `model.cj`，将 `workbench` 等视图函数移入 `views.cj`，`main.cj` 只创建模型和 DesktopApp。拆分不会改变可见行为，随后重新执行筛选、选择与编辑验收。
 
-```text
-examples/workbench/
-├── cjpm.toml
-└── src/
-    ├── main.cj        # 只创建 WorkbenchModel 和 DesktopApp
-    ├── model.cj       # WorkItem、筛选、选择、编辑和保存动作
-    ├── views.cj       # 导航栏、任务列表、编辑区和状态反馈
-    ├── data.cj        # 示例任务与筛选数据
-    ├── theme.cj       # 工作台颜色与间距选择
-    └── model_test.cj  # 筛选后选择修正等无窗口检查
-```
-
-`model.cj` 不导入窗口或绘制 API；`views.cj` 不直接读写文件；`main.cj` 不承载业务规则。模型检查只需创建 `WorkbenchModel`、调用动作并断言选择仍指向可见任务，无需启动 GUI。执行下面的命令，才能证明拆分后的包名、可见性和入口仍然完整：
-
-随附项目中的模型测试会直接切换选择并写入当前任务，证明“选择改变后编辑的是新对象”这一边界不依赖 GUI。测试调用项目自身的公开模型动作，不复制另一套示例模型。
+仓库 [workbench 示例](../../../examples/workbench/README.md) 是另一套文档工作台：`data.cj` 定义 `Doc`、`Heading` 与大纲函数，`model.cj` 保存文档绑定和分栏比例，`views.cj` 组合导航、编辑器与大纲。它可作为嵌套分栏的延伸阅读，不是本页任务筛选程序的源码副本。
 
 ## 确认结果
 

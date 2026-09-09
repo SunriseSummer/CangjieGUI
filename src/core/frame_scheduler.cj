@@ -36,7 +36,7 @@ public class FrameScheduler {
     private var lastPendingStateNotification: ?PendingStateNotification = None
     private let deferredObserverActions = ArrayList<DeferredStateObserverAction>()
     private let deferredObserverIdentities = HashSet<UInt64>()
-    private var pendingDispatchFailure: ?Exception = None
+    private var pendingDispatchFailure: ?UiFailureCollector = None
     private var stateReadCollector: ?StateReadCollector = None
     private let parentStateReadCollectors = ArrayList<StateReadCollector>()
 
@@ -109,7 +109,7 @@ public class FrameScheduler {
         }
     }
 
-    /** Runs one UI action atomically, draining State/derived work before reporting its first failure. */
+    /** Runs one UI action atomically, draining State/derived work before reporting all failures. */
     protected func transaction(body: () -> Unit): Unit {
         assertOwnerThread()
         transactionDepth += 1
@@ -136,8 +136,7 @@ public class FrameScheduler {
 
         match (bodyFailure) {
             case Some(error) => match (notificationFailure) {
-                case Some(notification) => throw IllegalStateException(
-                    "State transaction failed (${error.message}) and notification also failed (${notification.message})")
+                case Some(notification) => throw rollbackUiFailure(error, {=> Some(notification)})
                 case None => throw error
             }
             case None => match (notificationFailure) {
@@ -209,8 +208,13 @@ public class FrameScheduler {
                     dispatchDeferredObserverAction(action)
                 }
             }
-            firstFailure = pendingDispatchFailure
+        } catch (error: Exception) {
+            recordDispatchFailure(error)
         } finally {
+            firstFailure = match (pendingDispatchFailure) {
+                case Some(failures) => failures.failure()
+                case None => None
+            }
             clearPendingTransactionWork()
         }
         match (firstFailure) {
@@ -239,9 +243,7 @@ public class FrameScheduler {
     }
 
     private func recordDispatchFailure(error: Exception): Unit {
-        if (pendingDispatchFailure.isNone()) {
-            pendingDispatchFailure = Some(error)
-        }
+        pendingDispatchFailure = appendUiFailure(pendingDispatchFailure, error)
     }
 
     private func clearPendingTransactionWork(): Unit {

@@ -20,7 +20,7 @@ public class RadioButton <: Widget
 
 一组单选按钮没有容器——把若干 `RadioButton` 指向同一个 [`Bindable`](../core/Bindable.md)`<Int64>`、各自携带不同的 `value` 即成一组；共享值等于哪个 `value`，哪一项就呈现选中。每一项都是独立的键盘焦点项，聚焦后 Enter/Space 选中该项（组内没有方向键导航）。
 
-内点缩放与外圈颜色共用同一只 [`Spring`](../core/Spring.md)，跨每帧重建保留并以当前状态起步，静态首帧即已稳定。指针交互采用按下-释放语义：释放仍落在控件内才选中。
+内点缩放与外圈颜色共用同一只 [`Spring`](../core/Spring.md)，跨构建保留并以当前状态起步，静态首帧即已稳定。指针交互采用按下-释放语义：释放仍落在控件内才选中。
 
 ## 示例
 
@@ -53,7 +53,7 @@ main(): Unit {
 | 成员 | 说明 |
 |---|---|
 | [`key(value: String)`](#key) | 设置显式焦点与按下状态标识；默认标识按构建顺序唯一。 |
-| [`measure(ctx: UiContext, available: Size)`](#measure) | 返回标签宽加 34 逻辑像素圆点区的宽度（封顶于可用宽度）与 38 高。 |
+| [`measure(ctx: UiContext, available: Size)`](#measure) | 返回标签宽加 34 逻辑像素圆点区的宽度（封顶于可用宽度），高度为 `max(38, 有效文字行高 + 12)`。 |
 | [`layout(_: UiContext, rect: Rect)`](#layout) | 记录控件框架。 |
 | [`draw(ctx: UiContext)`](#draw) | 绘制外圈（选中渐变为强调色）、按弹簧比例放大的内点、标签与键盘焦点环。 |
 | [`handle(ctx: UiContext, event: UiEvent)`](#handle) | 按下并在控件内松开时把共享的 `selected` 设为本项 `value`；聚焦后 Enter/Space 同效。 |
@@ -97,7 +97,7 @@ public func key(value: String): RadioButton
 
 ### measure
 
-返回标签宽加 34 逻辑像素圆点区的宽度（封顶于可用宽度）与 38 高。[`Widget`](../core/Widget.md) 协议方法。
+返回标签宽加 34 逻辑像素圆点区的宽度（封顶于可用宽度），高度为 `max(38, 有效文字行高 + 12)`。[`Widget`](../core/Widget.md) 协议方法。
 
 ```cangjie
 public func measure(ctx: UiContext, available: Size): Size

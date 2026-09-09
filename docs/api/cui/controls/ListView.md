@@ -20,7 +20,7 @@ public class ListView <: Widget
 
 滚动偏移默认由控件标识内部保留；传 `scroll`（或链式调用 [`scrollState`](#scrollstate)）改用外部 [`State`](../core/State.md)`<Float32>` 持有，可用于恢复位置或与别的视图联动。选择变化时（无论来自点击、键盘还是应用直接改写绑定）选中行都会滚入视区；单纯的滚动不回拉选择。内容装得下时滚轮不消费，留给外层滚动容器。
 
-行高固定 28 逻辑像素，仅绘制可见行。每行渲染一条纯文本；要自定义行内容，用 [`LazyColumn`](../core/LazyColumn.md) 等按需构建容器自行组合。
+行高为 `max(28, 有效文字行高 + 8)` 逻辑像素，仅绘制可见行。每行渲染一条纯文本；要自定义行内容，用 [`LazyColumn`](../core/LazyColumn.md) 等按需构建容器自行组合。
 
 ## 示例
 
@@ -103,7 +103,7 @@ public func scrollState(value: State<Float32>): ListView
 占满可用空间（宽高均取 `available`）。列表填满栈分配的区域（见 [`Widget`](../core/Widget.md)）。
 
 ```cangjie
-public func measure(_: UiContext, available: Size): Size
+public func measure(ctx: UiContext, available: Size): Size
 ```
 
 **参数**
@@ -117,7 +117,7 @@ public func measure(_: UiContext, available: Size): Size
 记录分配到的框架。行区在框架内缩四周留出边缘。
 
 ```cangjie
-public func layout(_: UiContext, rect: Rect): Unit
+public func layout(ctx: UiContext, rect: Rect): Unit
 ```
 
 **参数**

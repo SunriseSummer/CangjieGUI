@@ -55,7 +55,7 @@ main(): Unit {
 
 | 成员 | 说明 |
 |---|---|
-| [`measure(_: UiContext, available: Size)`](#measure) | 宽为可用宽与 190 逻辑像素的较小者，高固定 38。 |
+| [`measure(_: UiContext, available: Size)`](#measure) | 宽为可用宽与 190 逻辑像素的较小者，高度为 `max(38, 有效文字行高 + 16)`。 |
 | [`layout(_: UiContext, rect: Rect)`](#layout) | 记录分配到的框架。 |
 | [`draw(ctx: UiContext)`](#draw) | 画字段（当前项文本与下箭头）；打开时把选项列表注册为交互浮层。 |
 | [`handle(ctx: UiContext, event: UiEvent)`](#handle) | 点击字段展开列表；聚焦时 Enter/Space/↓ 同效。 |
@@ -82,10 +82,10 @@ public init(items: Array<String>, selected: Bindable<Int64>, key!: ?String = Non
 
 ### measure
 
-宽为可用宽与 190 逻辑像素的较小者，高固定 38。字段自身贴合固有尺寸（见 [`Widget`](../core/Widget.md)）。
+宽为可用宽与 190 逻辑像素的较小者，高度为 `max(38, 有效文字行高 + 16)`。字段自身贴合固有尺寸（见 [`Widget`](../core/Widget.md)）。
 
 ```cangjie
-public func measure(_: UiContext, available: Size): Size
+public func measure(ctx: UiContext, available: Size): Size
 ```
 
 **参数**
@@ -99,7 +99,7 @@ public func measure(_: UiContext, available: Size): Size
 记录分配到的框架。弹出列表与字段同宽。
 
 ```cangjie
-public func layout(_: UiContext, rect: Rect): Unit
+public func layout(ctx: UiContext, rect: Rect): Unit
 ```
 
 **参数**
@@ -108,7 +108,7 @@ public func layout(_: UiContext, rect: Rect): Unit
 
 ### draw
 
-画字段（当前项文本与下箭头）；打开时把选项列表注册为交互浮层。聚焦或打开时底面进入活跃态；列表按行高 28 只画可见行，超长时带滚动条。
+画字段（当前项文本与下箭头）；打开时把选项列表注册为交互浮层。聚焦或打开时底面进入活跃态；列表行高为 `max(28, 有效文字行高 + 8)`，只画可见行，超长时带滚动条。
 
 ```cangjie
 public func draw(ctx: UiContext): Unit

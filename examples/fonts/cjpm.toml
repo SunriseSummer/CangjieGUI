@@ -3,7 +3,7 @@ cjc-version = "1.0.5"
 name = "cui_fonts"
 version = "0.1.0"
 output-type = "executable"
-description = "CUI local font-file loading (Fonts.register + Label.fontFamily) showcase."
+description = "CUI system font discovery, variable axes, numeric weights and typography showcase."
 
 [dependencies]
 cui = { path = "../.." }

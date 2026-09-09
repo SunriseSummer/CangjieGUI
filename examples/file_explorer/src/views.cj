@@ -8,8 +8,8 @@
  */
 package cui_file_explorer
 
-import cui.{Axis, CrossAxisAlignment, Divider, FontSizes, HStack, Icon, IconName, Label, LengthUnits, Panel, Spacer,
-    SplitView, TextAlign, TreeView, VStack}
+import cui.{Axis, CrossAxisAlignment, Divider, FontSizes, HStack, Icon, IconSource, Label, LengthUnits}
+import cui.{Panel, Spacer, SplitView, TextAlign, TreeView, VStack}
 
 func explorerView(model: ExplorerModel): Unit {
     VStack {
@@ -24,7 +24,8 @@ func explorerView(model: ExplorerModel): Unit {
 func appHeader(): Unit {
     VStack {
         Label("文件浏览器").fontSize(EXPLORER_TITLE)
-        Label("左树：点击箭头展开、点击行选中；Tab 聚焦后 ↑↓ 移动、→ 展开、← 折叠、空格切换").muted()
+        Label("左树：点击箭头展开、点击行选中；Tab 聚焦后 ↑↓ 移动、→ 展开、← 折叠、空格切换")
+            .muted()
             .fontSize(FontSizes.CAPTION)
     }.spacing(2.vp).hug()
 }
@@ -39,12 +40,11 @@ func detailPane(model: ExplorerModel): Unit {
     Panel {
         match (model.infoFor(model.selected.value)) {
             case Some(info) => detailBody(info)
-            case None =>
-                VStack {
-                    Spacer()
-                    Label("从左侧选择文件或文件夹查看详情").muted().textAlign(TextAlign.Center)
-                    Spacer()
-                }
+            case None => VStack {
+                Spacer()
+                Label("从左侧选择文件或文件夹查看详情").muted().textAlign(TextAlign.Center)
+                Spacer()
+            }
         }
     }.contentPadding(16.vp)
 }
@@ -66,11 +66,11 @@ func detailBody(info: FileInfo): Unit {
     }.spacing(10.vp)
 }
 
-func iconFor(info: FileInfo): IconName {
+func iconFor(info: FileInfo): IconSource {
     if (info.isFolder) {
-        IconName.OpenFolder
+        IconSource("assets/icons/folder.svg")
     } else {
-        IconName.NewDocument
+        IconSource("assets/icons/document.svg")
     }
 }
 

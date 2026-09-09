@@ -33,7 +33,7 @@ public class Badge <: Widget {
     }
 
     public func measure(ctx: UiContext, _: Size): Size {
-        Size(ctx.renderer.textWidth(text, pointSize: FontSizes.CAPTION) + 2.0 * BADGE_HPAD, BADGE_H)
+        Size(ctx.textWidth(text, pointSize: ctx.textSize(fallback: FontSizes.CAPTION)) + 2.0 * BADGE_HPAD, BADGE_H)
     }
 
     public func layout(_: UiContext, rect: Rect): Unit {
@@ -47,9 +47,9 @@ public class Badge <: Widget {
     public func draw(ctx: UiContext): Unit {
         let base = badgeColor(ctx, kind)
         ctx.renderer.fillRoundedRect(frame, frame.h / 2.0, base.withAlpha(36))
-        let tw = ctx.renderer.textWidth(text, pointSize: FontSizes.CAPTION)
-        let ty = frame.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CAPTION) / 2.0
-        ctx.renderer.text(text, frame.centerX() - tw / 2.0, ty, base, pointSize: FontSizes.CAPTION)
+        let tw = ctx.textWidth(text, pointSize: ctx.textSize(fallback: FontSizes.CAPTION))
+        let ty = frame.centerY() - ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.CAPTION)) / 2.0
+        ctx.text(text, frame.centerX() - tw / 2.0, ty, base, pointSize: ctx.textSize(fallback: FontSizes.CAPTION))
     }
 
     public func handle(_: UiContext, _: UiEvent): Bool {

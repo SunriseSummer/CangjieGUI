@@ -2,7 +2,7 @@
  * CUI 示例：主从式笔记。
  *
  * 演示主从结构的最优实践：`notes.project` 把编辑器双向绑定到选中笔记，编辑器 id 含笔记 id 实现
- * 按笔记独立的光标与撤销历史。综合演示 ListView 键盘导航、TextArea 选区/撤销、Tooltip 与派生统计。
+ * 按笔记区分的编辑会话。综合演示 ListView 键盘导航、TextArea 选区/撤销、Modal 与派生统计。
  */
 package cui_notes
 

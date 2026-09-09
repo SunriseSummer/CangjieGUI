@@ -7,9 +7,9 @@
  */
 package cui_planner
 
-import cui.{Button, ButtonRole, Color, ComboBox, CrossAxisAlignment, Dropdown, FlowRow, FontSizes, Grid, HStack, Icon,
-    IconName, Keyed, Label, LengthUnits, Panel, ProgressBar, RadioButton, ScrollView, Spacer, Stepper, Switch,
-    TextField, VStack, rememberState}
+import cui.{Button, ButtonRole, Color, ComboBox, CrossAxisAlignment, Dropdown, FlowRow, FontSizes, Grid}
+import cui.{HStack, Icon, IconSource, Keyed, Label, LengthUnits, Panel, ProgressBar, RadioButton}
+import cui.{ScrollView, Spacer, Stepper, Switch, TextField, VStack, rememberState}
 
 func plannerView(model: PlannerModel): Unit {
     VStack {
@@ -29,7 +29,7 @@ func plannerView(model: PlannerModel): Unit {
 
 func appHeader(): Unit {
     HStack {
-        Icon(IconName.Calendar).foregroundColor(Color.rgb(91, 79, 207)).iconSize(22.vp)
+        Icon(IconSource("assets/icons/calendar.svg")).foregroundColor(Color.rgb(91, 79, 207)).iconSize(22.vp)
         VStack {
             Label("专注规划台").fontSize(FontSizes.TITLE)
             Label("把今天最重要的事，放在注意力最清醒的时段").muted().fontSize(FontSizes.CAPTION)
@@ -49,10 +49,7 @@ func navigation(model: PlannerModel): Unit {
             navigationEntry(model, 0, "今日概览")
             navigationEntry(model, 1, "偏好设置")
             Spacer()
-            Label("本地状态由 Keyed 与 rememberState 管理")
-                .muted()
-                .fontSize(FontSizes.CAPTION)
-                .maxLines(3)
+            Label("本地状态由 Keyed 与 rememberState 管理").muted().fontSize(FontSizes.CAPTION).maxLines(3)
         }.spacing(10.vp)
     }.contentPadding(14.vp).hug().width(220.vp)
 }
@@ -182,8 +179,8 @@ func preferencesPage(model: PlannerModel): Unit {
 
 /** 常用城市建议：数量超过一屏，用于演示弹层内部滚动；组合框允许键入列表之外的城市。 */
 func majorCities(): Array<String> {
-    ["北京", "上海", "广州", "深圳", "杭州", "成都", "武汉", "西安", "南京", "苏州", "重庆", "天津",
-        "长沙", "郑州", "青岛", "大连", "厦门", "福州", "合肥", "昆明", "贵阳", "南宁", "哈尔滨", "沈阳"]
+    ["北京", "上海", "广州", "深圳", "杭州", "成都", "武汉", "西安", "南京", "苏州", "重庆", "天津", "长沙", "郑州",
+        "青岛", "大连", "厦门", "福州", "合肥", "昆明", "贵阳", "南宁", "哈尔滨", "沈阳"]
 }
 
 func settingsSection(title: String, body: () -> Unit): Unit {

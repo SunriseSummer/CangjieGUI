@@ -11,6 +11,34 @@ private func comboTestContext(): UiContext {
     ctx
 }
 
+@Test
+func comboBoxOpeningBrowsesAllOptionsFromCurrentSelection(): Unit {
+    let ctx = comboTestContext()
+    let text = State<String>("Cascadia Code")
+    let combo = ComboBox(text, ["Arial", "Cascadia Code", "Consolas"], key: "font-browse")
+    combo.layout(ctx, Rect(0.0, 0.0, 240.0, 38.0))
+    let _ = combo.handle(ctx, UiEvent.MouseDown(MouseButton.Left, 225.0, 19.0))
+    combo.draw(ctx)
+    @Expect(text.value, "Cascadia Code")
+    @Expect(ctx.dispatchOverlay(UiEvent.KeyDown(Key.Down, false)))
+    @Expect(ctx.dispatchOverlay(UiEvent.KeyDown(Key.Enter, false)))
+    @Expect(text.value, "Consolas")
+}
+
+@Test
+func comboBoxTypingAfterBrowseReplacesSelectionAndFilters(): Unit {
+    let ctx = comboTestContext()
+    let text = State<String>("Arial")
+    let combo = ComboBox(text, ["Arial", "Cascadia Code", "Consolas"], key: "font-search")
+    combo.layout(ctx, Rect(0.0, 0.0, 240.0, 38.0))
+    let _ = combo.handle(ctx, UiEvent.MouseDown(MouseButton.Left, 225.0, 19.0))
+    combo.draw(ctx)
+    @Expect(combo.handle(ctx, UiEvent.TextInput("Code")))
+    @Expect(text.value, "Code")
+    @Expect(ctx.dispatchOverlay(UiEvent.KeyDown(Key.Enter, false)))
+    @Expect(text.value, "Cascadia Code")
+}
+
 // Clicking the chevron opens the suggestion list (an interactive overlay); clicking a row fills
 // the bound text with that suggestion and closes.
 @Test

@@ -1,21 +1,24 @@
 package cui.media
 
 import std.collection.HashMap
+import std.collection.ArrayList
 
 /* One entry in the media cache's weighted, doubly-linked LRU list. */
 internal class BoundedResourceCacheEntry<T> {
     let key: String
     let cached: ?T
     let weight: UInt64
+    let failure: ?String
     var previous: ?BoundedResourceCacheEntry<T> = None
     var next: ?BoundedResourceCacheEntry<T> = None
     var active = true
     var recentlyUsed = false
 
-    init(key: String, cached: ?T, weight: UInt64) {
+    init(key: String, cached: ?T, weight: UInt64, failure!: ?String = None) {
         this.key = key
         this.cached = cached
         this.weight = weight
+        this.failure = failure
     }
 }
 
@@ -63,9 +66,9 @@ internal class BoundedResourceCache<T> {
         }
     }
 
-    func put(key: String, cached: ?T, weight: UInt64): Unit {
+    func put(key: String, cached: ?T, weight: UInt64, failure!: ?String = None): Unit {
         let _ = remove(key) // cjcheck-ignore: ignore-result # replacement is valid whether or not the key existed
-        let entry = BoundedResourceCacheEntry<T>(key, cached, weight)
+        let entry = BoundedResourceCacheEntry<T>(key, cached, weight, failure: failure)
         entries[key] = entry
         linkFirst(entry)
         last = Some(entry)
@@ -89,6 +92,9 @@ internal class BoundedResourceCache<T> {
     func clear(): Unit {
         for ((_, entry) in entries) {
             entry.active = false
+            // Fast slots can retain an entry after clear; detach the old generation's graph.
+            entry.previous = None
+            entry.next = None
             releaseValue(entry)
         }
         entries.clear()
@@ -96,6 +102,20 @@ internal class BoundedResourceCache<T> {
         tail = None
         last = None
         bytes = UInt64(0)
+    }
+
+    // Cold invalidation path: collect keys before mutating the bounded map.
+    func removeMatching(matches: (String) -> Bool): Bool {
+        let keys = ArrayList<String>()
+        for ((key, _) in entries) {
+            if (matches(key)) {
+                keys.add(key)
+            }
+        }
+        for (key in keys) {
+            let _ = remove(key) // cjcheck-ignore: ignore-result # keys were collected from the same confined cache
+        }
+        !keys.isEmpty()
     }
 
     func size(): Int64 {
@@ -183,10 +203,14 @@ internal class BoundedResourceCache<T> {
                 case Some(value) => value
                 case None => return
             }
-            // A single oversized admission is deliberately retained; while there are other
-            // entries, normal LRU order decides what leaves first.
-            if (refEq(victim, admitted) && entries.size == Int64(1)) {
-                return
+            // Second chances can move every old entry ahead of the new admission. Never
+            // dispose the value put() is about to return to its caller, even in that order.
+            if (refEq(victim, admitted)) {
+                if (entries.size == Int64(1)) {
+                    return
+                }
+                promote(victim)
+                continue
             }
             // Lock-free image fast paths cannot relink this list on every frame. They mark the
             // entry instead, and eviction grants that hot entry one promotion before reconsidering

@@ -18,7 +18,7 @@ public class Switch <: Widget
 
 ## 说明
 
-圆钮位置与轨道颜色共用同一只 [`Spring`](../core/Spring.md)（0 为关、1 为开），两者同步平滑过渡。弹簧跨每帧重建保留，并以当前状态起步，静态首帧即已稳定、无入场动画。
+圆钮位置与轨道颜色共用同一只 [`Spring`](../core/Spring.md)（0 为关、1 为开），两者同步平滑过渡。弹簧跨构建保留，并以当前状态起步，静态首帧即已稳定、无入场动画。
 
 指针交互采用按下-释放语义：按下获得焦点与按压，释放仍落在控件内才真正取反——把指针拖出控件再松开即取消这次操作。
 
@@ -52,7 +52,7 @@ main(): Unit {
 | 成员 | 说明 |
 |---|---|
 | [`key(value: String)`](#key) | 设置显式焦点与按下状态标识；默认标识按构建顺序唯一。 |
-| [`measure(ctx: UiContext, available: Size)`](#measure) | 返回 40 逻辑像素轨道加 12 间距加标签宽的宽度（封顶于可用宽度）与 38 高。 |
+| [`measure(ctx: UiContext, available: Size)`](#measure) | 返回 40 逻辑像素轨道加 12 间距加标签宽的宽度（封顶于可用宽度），高度为 `max(38, 有效文字行高 + 12)`。 |
 | [`layout(_: UiContext, rect: Rect)`](#layout) | 记录控件框架。 |
 | [`draw(ctx: UiContext)`](#draw) | 按弹簧进度绘制轨道渐变色与滑动圆钮，随后是标签与键盘焦点环。 |
 | [`handle(ctx: UiContext, event: UiEvent)`](#handle) | 按下并在控件内松开时取反 `checked`；聚焦后 Enter/Space 同效。 |
@@ -95,7 +95,7 @@ public func key(value: String): Switch
 
 ### measure
 
-返回 40 逻辑像素轨道加 12 间距加标签宽的宽度（封顶于可用宽度）与 38 高。[`Widget`](../core/Widget.md) 协议方法。
+返回 40 逻辑像素轨道加 12 间距加标签宽的宽度（封顶于可用宽度），高度为 `max(38, 有效文字行高 + 12)`。[`Widget`](../core/Widget.md) 协议方法。
 
 ```cangjie
 public func measure(ctx: UiContext, available: Size): Size

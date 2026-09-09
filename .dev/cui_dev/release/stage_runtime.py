@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage an explicit target-platform SDL3/SDL3_ttf runtime into the sibling SDL checkout."""
+"""Stage an explicit target-platform SDL3/SDL3_ttf/SDL3_image runtime into the sibling SDL checkout."""
 
 import argparse
 import os
@@ -27,7 +27,7 @@ def resolve_source(argument=None, environment=None):
 
 def selected_runtime_files(source, system):
     result = {}
-    for family in ("sdl", "ttf"):
+    for family in ("sdl", "ttf", "image"):
         files = family_files(source, family, system)
         if not files:
             raise BundleError(f"missing {family} runtime for {system} under {source}")
@@ -39,7 +39,7 @@ def stage(source, destination, system):
     selected = selected_runtime_files(source, system)
     destination.mkdir(parents=True, exist_ok=True)
     staged = []
-    for family in ("sdl", "ttf"):
+    for family in ("sdl", "ttf", "image"):
         for runtime in selected[family]:
             target = destination / runtime.name
             if runtime.resolve() != target.resolve():

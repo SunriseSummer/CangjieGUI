@@ -151,9 +151,10 @@ public class ToastLayer <: Widget {
                 ctx.theme.shadow.withAlpha(Int64(clampF32(alpha, 0.0, 1.0) * 40.0)))
         ctx.renderer.fillRoundedRect(rect, ctx.theme.controlRadius, ctx.theme.panelRaised.withAlpha(a))
         ctx.renderer.fillRoundedRect(Rect(rect.x + 6.0, rect.y + 8.0, 4.0, rect.h - 16.0), 2.0, accent.withAlpha(a))
-        let textY = rect.centerY() - ctx.renderer.textHeight(pointSize: FontSizes.CONTROL) / 2.0
+        let textY = rect.centerY() - ctx.textHeight(pointSize: ctx.textSize(fallback: FontSizes.CONTROL)) / 2.0
         ctx.renderer.pushClip(Rect(rect.x + 18.0, rect.y, rect.w - 28.0, rect.h))
-        ctx.renderer.text(toast.message, rect.x + 18.0, textY, ctx.theme.text.withAlpha(a), pointSize: FontSizes.CONTROL)
+        ctx.text(toast.message, rect.x + 18.0, textY, ctx.theme.text.withAlpha(a),
+            pointSize: ctx.textSize(fallback: FontSizes.CONTROL))
         ctx.renderer.popClip()
     }
 

@@ -61,3 +61,9 @@ cjpm run
 ```powershell
 cjpm run --run-args "--snapshot wizard.bmp"
 ```
+
+## 练习与验收
+
+为资料页增加必填项，确认前进、回退与末页摘要保持一致。
+
+[返回示例学习路线](../README.md) · [运行准备](../README.md#运行准备) · [API 参考](../../docs/api/index.md)

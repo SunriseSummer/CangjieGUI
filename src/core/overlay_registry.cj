@@ -100,6 +100,13 @@ class OverlayRegistry {
         size == 0
     }
 
+    func containsOwner(owner: String): Bool {
+        match (adopted) {
+            case Some(snapshot) => snapshot.indexFor(owner).isSome()
+            case None => indexByOwner.contains(owner)
+        }
+    }
+
     func registrationCount(): Int64 {
         match (adopted) {
             case Some(snapshot) => snapshot.registrations.size
