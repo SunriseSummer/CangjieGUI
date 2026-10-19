@@ -6,6 +6,7 @@ __pycache__/
 *.cov
 .todo/
 .agents/
+.images/
 .claude/
 .idea/
 .vscode/

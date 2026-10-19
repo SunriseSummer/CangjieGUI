@@ -16,8 +16,11 @@ import cui.symbols.chevron_right.ICON_CHEVRON_RIGHT
 func calendarView(model: CalendarModel): Unit {
     VStack {
         HStack {
-            // 逐帧内联声明即可：解码后的纹理按路径缓存在共享缓存里，重建不触碰磁盘。
-            ImageView(CALENDAR_BADGE).size(40.vp, 30.vp).decodeSize(120, 90).cornerRadius(4.vp).alt("日历")
+            ImageView(CALENDAR_BADGE)
+                .size(40.vp, 30.vp)
+                .decodeSize(120, 90)
+                .cornerRadius(4.vp)
+                .alt("日历")
             Label(model.title.value).fontSize(FontSizes.TITLE)
             Spacer()
             IconButton(ICON_CHEVRON_LEFT) {
