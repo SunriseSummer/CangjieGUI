@@ -3,7 +3,7 @@
 用[仓颉编程语言](https://cangjie-lang.cn/)实现的跨平台/自渲染/声明式桌面 GUI 框架，提供声明式界面构建、状态管理、常用组件、图形图像渲染以及系统能力集成等。底层依赖[仓颉 SDL 图形库](https://github.com/SunriseSummer/CangjieSDL)。
 
 ![苍翠](examples/.images/cangcui.png)
-![示例画廊](images/gallery.jpg)
+<img width="3770" height="5570" alt="gallery" src="https://github.com/user-attachments/assets/d7e72b44-37de-40f1-9c4e-1ac78a8b058f" />
 
 ## 文档与示例
 
@@ -54,4 +54,4 @@ main() {
 
 执行 `cjpm run` 即可运行查看效果。
 
-![海报](images/poster.png)
+<img width="1122" height="1402" alt="poster" src="https://github.com/user-attachments/assets/1929819c-549c-4b35-8354-2318422d0b99" />
